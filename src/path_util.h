@@ -1,0 +1,239 @@
+/*
+**      PJL Library
+**      src/path_util.h
+**
+**      Copyright (C) 2026  Paul J. Lucas
+**
+**      This program is free software: you can redistribute it and/or modify
+**      it under the terms of the GNU General Public License as published by
+**      the Free Software Foundation, either version 3 of the License, or
+**      (at your option) any later version.
+**
+**      This program is distributed in the hope that it will be useful,
+**      but WITHOUT ANY WARRANTY; without even the implied warranty of
+**      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+**      GNU General Public License for more details.
+**
+**      You should have received a copy of the GNU General Public License
+**      along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+#ifndef pjl_path_util_h
+#define pjl_path_util_h
+
+/**
+ * @file
+ * Declares path utility functions.
+ */
+
+// local
+#include "pjl_config.h"
+#include "strbuf.h"
+
+/// @cond DOXYGEN_IGNORE
+
+// standard
+#include <stdbool.h>
+#include <string.h>
+
+/// @endcond
+
+/**
+ * @defgroup path-util-group Path Utility Functions
+ * Path utility functions.
+ * @{
+ */
+
+////////// extern functions ///////////////////////////////////////////////////
+
+/**
+ * Extracts the base portion of a \a path.
+ *
+ * @remarks
+ * @parblock
+ * Unlike **basename**(3):
+ *  + Trailing `/` characters are not deleted.
+ *  + \a path is never modified (hence can therefore be `const`).
+ *  + Returns a pointer within \a path (hence is multi-call safe).
+ * @endparblock
+ *
+ * @param path The path to extract the base portion of.
+ * @return Returns a pointer to the last component of \a path.  If \a path
+ * consists entirely of '/' characters, a pointer to the string "/" is
+ * returned.
+ *
+ * @sa path_dirname()
+ */
+NODISCARD
+char const* path_basename( char const *path );
+
+/**
+ * Gets the absolute path of the current working directory.
+ *
+ * @param rv_len If not NULL, the length of the path is put here.
+ * @return Returns the absolute path of the current working directory.  The
+ * path is guaranteed to end with `'/'`.
+ */
+NODISCARD
+char const* path_cwd( size_t *rv_len );
+
+/**
+ * Extracts the directory portion of \a path.
+ *
+ * @param path The path to extract the directory portion of.
+ * @param rv_dir_buf Receives the directory portion of \a path.  It will not
+ * end with <tt>'/'</tt> (unless \a path is exactly <tt>'/'</tt>).
+ * @return Returns the directory portion of path.
+ *
+ * @sa path_basename()
+ */
+PJL_DISCARD
+char* path_dirname( char const *path, strbuf_t *rv_dir_buf );
+
+/**
+ * Gets whether \a path ends with \a end_path.
+ *
+ * @remarks This function ensures that \a end_path will match only at directory
+ * boundaries, i.e., either the character preceding the match in \a path must
+ * be <tt>'/'</tt> or \a path equals \a end_path.
+ *
+ * @par Examples
+ * @parblock
+ *
+ * `path`                    | `end_path`         | Result
+ * ------------------------- | ------------------ | ------
+ *  `/var/log/bar/error.log` | `bar/error.log`    | `true`
+ *  `/var/log/bar/error.log` | `foobar/error.log` | `false`
+ * @endparblock
+ *
+ * @param path The absolute path to check against.
+ * @param path_len The length of \a path.
+ * @param end_path The relative path to check.
+ * @param end_path_len The length of \a end_path.
+ * @return Returns `true` only if \a path ends with \a end_path at a directory
+ * boundary.
+ */
+NODISCARD
+bool path_ends_with( char const *path, size_t path_len, char const *end_path,
+                     size_t end_path_len );
+
+/**
+ * Gets the filename extension of \a path, if any.
+ *
+ * @param path The path to get the filename extension of.
+ * @return Returns a pointer into \a path pointing at the first character of
+ * the extension (not the dot) or NULL if \a path has no extension.
+ *
+ * @sa path_no_ext()
+ */
+NODISCARD
+char const* path_ext( char const *path );
+
+/**
+ * Gets whether \a path is an absolute path.
+ *
+ * @param path the path to check.
+ * @return Returns `true` only if \a path is absolute.
+ *
+ * @sa path_is_relative()
+ * @sa path_is_filename()
+ */
+NODISCARD
+inline bool path_is_absolute( char const *path ) {
+  return path[0] == '/';
+}
+
+/**
+ * Gets whether \a path is just a filename.
+ *
+ * @param path the path to check.
+ * @return Returns `true` only if \a path is just a filename.
+ *
+ * @sa path_is_absolute()
+ * @sa path_is_relative()
+ */
+NODISCARD
+inline bool path_is_filename( char const *path ) {
+  return strchr( path, '/' ) == NULL;
+}
+
+/**
+ * Gets whether \a abs_path refers to a local file relative to the current
+ * working directory.
+ *
+ * @par Example
+ * @parblock
+ * Assuming the current working directory is `/home/pjl/src/include-tidy/src`:
+ *
+ * `abs_path`                              | Local?
+ * --------------------------------------- | ------
+ * `/home/pjl/src/include-tidy/src/util.h` | true
+ * `/usr/include/stdio.h`                  | false
+ * @endparblock
+ *
+ * @param abs_path The absolute path of a file.
+ * @return Returns `true` only if \a abs_path refers to a local file.
+ */
+NODISCARD
+bool path_is_local( char const *abs_path );
+
+/**
+ * Gets whether \a path is a relative path.
+ *
+ * @param path the path to check.
+ * @return Returns `true` only if \a path is relative.
+ *
+ * @sa path_is_absolute()
+ * @sa path_is_filename()
+ */
+NODISCARD
+inline bool path_is_relative( char const *path ) {
+  return !path_is_absolute( path );
+}
+
+/**
+ * Strips leading dot-slashes, if any, from \a path.
+ *
+ * @param path The path to strip `./` from.
+ * @return Returns \a path without leading `./`.
+ *
+ * @warning If \a path starts with `./`, the pointer returned is within \a
+ * path. If \a path was dynamically allocated, \a path --- and not a pointer
+ * with \a path --- must be freed.
+ */
+NODISCARD
+char const* path_no_dot_slash( char const *path );
+
+/**
+ * Gets the pathname of \a path without its filename extension, if any.
+ *
+ * @param path The path.
+ * @param rv_path_buf Receives \a path without its extension, but only if \a
+ * path has an extension.
+ * @return If \a path has no extension, returns \a path as-is; otherwise
+ * returns \a path without its extension in \a rv_path_buf.
+ *
+ * @sa path_ext()
+ */
+NODISCARD
+char const* path_no_ext( char const *path, strbuf_t *rv_path_buf );
+
+/**
+ * Normalizes a path by:
+ *
+ *  + Making a relative path absolute.
+ *  + Eliminating all occurrences of `./` or `../`.
+ *
+ * @param path The path to normalize.
+ * @return Returns a normalized path.  The caller is responsible for freeing
+ * it.
+ */
+NODISCARD
+char* path_normalize( char const *path );
+
+///////////////////////////////////////////////////////////////////////////////
+
+/** @} */
+
+#endif /* pjl_path_util_h */
+/* vim:set et sw=2 ts=2: */

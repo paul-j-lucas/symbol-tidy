@@ -1,0 +1,588 @@
+/*
+**      PJL Library
+**      src/array.h
+**
+**      Copyright (C) 2017-2026  Paul J. Lucas
+**
+**      This program is free software: you can redistribute it and/or modify
+**      it under the terms of the GNU General Public License as published by
+**      the Free Software Foundation, either version 3 of the License, or
+**      (at your option) any later version.
+**
+**      This program is distributed in the hope that it will be useful,
+**      but WITHOUT ANY WARRANTY; without even the implied warranty of
+**      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+**      GNU General Public License for more details.
+**
+**      You should have received a copy of the GNU General Public License
+**      along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+#ifndef pjl_array_h
+#define pjl_array_h
+
+/**
+ * @file
+ * Declares a type to represent a dynamic array as well as functions for
+ * manipulating said arrays.
+ */
+
+// local
+#include "pjl_config.h"                 /* must go first */
+#include "util.h"
+
+/// @cond DOXYGEN_IGNORE
+
+// standard
+#include <stdbool.h>
+#include <stddef.h>                     /* for size_t */
+#include <stdlib.h>                     /* for bsearch, qsort */
+
+#ifndef NODISCARD
+# define NODISCARD                      /* nothing */
+#endif /* NODISCARD */
+#ifndef PJL_DISCARD
+# define PJL_DISCARD                    /* nothing */
+#endif /* PJL_DISCARD */
+
+/// @endcond
+
+///
+/// @defgroup array-group Dynamic Array
+/// A type for a dynamic array and functions for manipulating said array.
+///
+/// @remarks
+/// Functions without an `_nc` suffix do bounds-checking; functions with an
+/// `_nc` (no-check) suffix don't.
+///
+/// @par Example
+/// @parblock
+/// An array of `int`:
+///
+///     array_t array_of_int = ARRAY_INIT( sizeof(int) );
+///     *(int*)array_push_back( &array_of_int ) = 42;
+///     // ...
+///     array_cleanup( &array_of_int, /*free_fn=*/NULL );
+///
+/// Note that \ref array_push_back _only_ makes space for a new element and
+/// does _not_ actually push it; instead, it returns the address for the new
+/// element that can then be cast to `int*` and dereferenced to assign a value
+/// to it.  In general, for an array of type `T`, the pointer is of type `T*`.
+///
+/// Since the elements are just `int`s, no free function is needed.
+/// @endparblock
+///
+/// @par Example
+/// @parblock
+/// An array of `char*`:
+///
+///     array_t array_of_str = ARRAY_INIT( sizeof(char*) );
+///     *(char**)array_push_back( &array_of_str ) = strdup( "hello" );
+///     *(char**)array_push_back( &array_of_str ) = strdup( "world" );
+///     // ...
+///     array_cleanup( &array_of_str, &free_pptr );
+///
+/// Similar to the previous example, except now the element `T` is `char*`, so,
+/// as before, the pointer is of type `T*` or `char**`.
+///
+/// Since the elements are owning `char*` pointers, a free function is needed.
+/// Note that \ref array_cleanup passes a _pointer_ to each element to be
+/// freed, so, in the case of an element of type `char*`, a _pointer_ to that
+/// pointer is passed, hence you can't use `free`, but instead need a function
+/// that frees a pointer pointed to by a pointer such as:
+///
+///     void free_pptr( void *pptr ) {
+///       if ( pptr != NULL )
+///         free( *(void**)pptr );
+///     }
+/// @endparblock
+/// @{
+///
+
+////////// macros /////////////////////////////////////////////////////////////
+
+/**
+ * An initializer that can be assigned to stand-alone arrays.
+ *
+ * @param ESIZE The element size.
+ *
+ * @sa array_cleanup()
+ * @sa array_init()
+ */
+#define ARRAY_INIT(ESIZE)         (array_t){ .esize = (ESIZE) }
+
+////////// typedefs ///////////////////////////////////////////////////////////
+
+typedef struct array array_t;
+
+/**
+ * The signature for a function that compares two elements.
+ *
+ * @param i_element A pointer to the first element.
+ * @param j_element A pointer to the second element.
+ * @return Returns a number less than 0, 0, or greater than 0 if \a i_element
+ * is less than, equal to, or greater than \a j_element, respectively.
+ *
+ * @sa array_bsearch()
+ * @sa array_merge_fn_t
+ * @sa array_qsort()
+ * @sa array_unique()
+ */
+typedef int (*array_cmp_fn_t)( void const *i_element, void const *j_element );
+
+/**
+ * The signature for a function used to free an element (if necessary).
+ *
+ * @param element A pointer to the element to free.
+ *
+ * @sa array_cleanup()
+ * @sa array_merge()
+ * @sa array_unique()
+ */
+typedef void (*array_free_fn_t)( void *element );
+
+/**
+ * The signature for a function that compares two elements and, if equal,
+ * merges \a maybe_dup into \a unique.
+ *
+ * @param unique A pointer to the element to compare and possibly merge into.
+ * @param maybe_dup A pointer to the element to compare against and possibly
+ * merge from.
+ * @return Returns zero only if \a unique is equal to \a maybe_dup; non-zero
+ * otherwise.
+ *
+ * @sa array_cmp_fn_t
+ * @sa array_merge()
+ */
+typedef int (*array_merge_fn_t)( void *unique, void const *maybe_dup );
+
+////////// structs ////////////////////////////////////////////////////////////
+
+/**
+ * An array.
+ */
+struct array {
+  void   *elements;                     ///< Pointer to array of elements.
+  size_t  esize;                        ///< Size of an element.
+  size_t  len;                          ///< Length of array.
+  size_t  cap;                          ///< Capacity of array.
+};
+
+////////// extern functions ///////////////////////////////////////////////////
+
+/**
+ * Cleans-up all memory associated with \a array but does _not_ free \a array
+ * itself.
+ *
+ * @param array The array to clean up.  If NULL, does nothing; otherwise,
+ * reinitializes \a array upon completion.
+ * @param free_fn A pointer to a function used to free each element or NULL if
+ * unnecessary.
+ *
+ * @warning \a free_fn must _not_ modify \a array.
+ * @note If \a free_fn is NULL, this is an O(1) operation; otherwise O(N).
+ *
+ * @sa array_init()
+ * @sa #ARRAY_INIT()
+ */
+void array_cleanup( array_t *restrict array, array_free_fn_t free_fn );
+
+/**
+ * Pushes the elements of \a src_array onto the back of \a dst_array.
+ *
+ * @param dst_array The \ref array to push onto.
+ * @param src_array The \ref array to push the elements of.  It's \ref
+ * array::len "length" is set to zero upon return.
+ * @return Returns a pointer to the first pushed element in \a dst_array or
+ * NULL if \a src_array is empty.
+ *
+ * @note Both arrays _must_ have the same \ref array::esize "element size".
+ * @note This is an O(N) operation.
+ *
+ * @sa array_push_back()
+ */
+PJL_DISCARD
+void* array_push_array_back( array_t *restrict dst_array,
+                             array_t *restrict src_array );
+
+/**
+ * Ensures at least \a res_len additional elements of capacity exist in \a
+ * array.
+ *
+ * @param array A pointer to the \ref array to reserve \a res_len additional
+ * elements for.
+ * @param res_len The number of additional elements to reserve.
+ * @return Returns `true` only if a memory reallocation was necessary.
+ *
+ * @note This is an O(1) best-case operation and O(N + log R) worst-case (where
+ * R is \a res_len).
+ */
+PJL_DISCARD
+bool array_reserve( array_t *restrict array, size_t res_len );
+
+////////// inline functions ///////////////////////////////////////////////////
+
+/**
+ * Gets a pointer to the element at \a index of \a array.
+ *
+ * @param array A pointer to the \ref array.
+ * @param index The index (starting at 0) of the element to get.
+ * @return Returns a pointer to the element at \a index.
+ *
+ * @warning \a index is _not_ checked to ensure it's &lt; the array's length.
+ * A value &ge; the array's length results in undefined behavior.
+ * @note If the element type is a pointer, then this returns a _pointer to that
+ * pointer_, i.e., `T**`.
+ * @note This is an O(1) operation.
+ *
+ * @sa array_at()
+ * @sa array_back()
+ * @sa array_back_nc()
+ * @sa array_front()
+ * @sa array_front_nc()
+ */
+NODISCARD
+inline void const* array_at_nc( array_t const *array, size_t index ) {
+  return (char*)array->elements + index * array->esize;
+}
+
+/// @cond DOXYGEN_IGNORE
+// LCOV_EXCL_START
+NODISCARD
+inline void* nonconst_array_at_nc( array_t *array, size_t index ) {
+  return CONST_CAST( void*, array_at_nc( array, index ) );
+}
+// LCOV_EXCL_STOP
+
+#define array_at_nc(ARRAY,INDEX) \
+  NONCONST_OVERLOAD( array_at_nc, (ARRAY), (INDEX) )
+/// @endcond
+
+/**
+ * Gets a pointer to the element at \a index of \a array.
+ *
+ * @param array A pointer to the \ref array.
+ * @param index The index (starting at 0) of the element to get.
+ * @return Returns a pointer to the element at \a index or NULL if \a index
+ * &ge; \ref array::len "len".
+ *
+ * @note If the element type is a pointer, then this returns a _pointer to that
+ * pointer_, i.e., `T**`.
+ * @note This is an O(1) operation.
+ *
+ * @sa array_at_nc()
+ * @sa array_back()
+ * @sa array_back_nc()
+ * @sa array_front()
+ * @sa array_front_nc()
+ */
+NODISCARD
+inline void const* array_at( array_t const *array, size_t index ) {
+  return index < array->len ? array_at_nc( array, index ) : NULL;
+}
+
+/// @cond DOXYGEN_IGNORE
+// LCOV_EXCL_START
+NODISCARD
+inline void* nonconst_array_at( array_t *array, size_t index ) {
+  return CONST_CAST( void*, array_at( array, index ) );
+}
+// LCOV_EXCL_STOP
+
+#define array_at(ARRAY,INDEX) \
+  NONCONST_OVERLOAD( array_at, (ARRAY), (INDEX) )
+/// @endcond
+
+/**
+ * Gets a pointer to the element at the back of \a array.
+ *
+ * @param array A pointer to the \ref array.
+ * @return Returns a pointer to the element at the back of \a array or NULL if
+ * \a array is empty.
+ *
+ * @warning \a array is _not_ checked to ensure it's not empty.
+ * @note If the element type is a pointer, then this returns a _pointer to that
+ * pointer_, i.e., `T**`.
+ * @note This is an O(1) operation.
+ *
+ * @sa array_at()
+ * @sa array_at_nc()
+ * @sa array_back()
+ * @sa array_front()
+ * @sa array_front_nc()
+ * @sa array_pop_back()
+ * @sa array_pop_back_nc()
+ */
+NODISCARD
+inline void const* array_back_nc( array_t const *array ) {
+  return array_at_nc( array, array->len - 1 );
+}
+
+/// @cond DOXYGEN_IGNORE
+// LCOV_EXCL_START
+NODISCARD
+inline void* nonconst_array_back_nc( array_t *array ) {
+  return CONST_CAST( void*, array_back_nc( array ) );
+}
+// LCOV_EXCL_STOP
+
+#define array_back_nc(ARRAY) \
+  NONCONST_OVERLOAD( array_back_nc, (ARRAY) )
+/// @endcond
+
+/**
+ * Gets a pointer to the element at the back of \a array.
+ *
+ * @param array A pointer to the \ref array.
+ * @return Returns a pointer to the element at the back of \a array or NULL if
+ * \a array is empty.
+ *
+ * @note If the element type is a pointer, then this returns a _pointer to that
+ * pointer_, i.e., `T**`.
+ * @note This is an O(1) operation.
+ *
+ * @sa array_at()
+ * @sa array_at_nc()
+ * @sa array_back_nc()
+ * @sa array_front()
+ * @sa array_front_nc()
+ * @sa array_pop_back()
+ * @sa array_pop_back_nc()
+ */
+NODISCARD
+inline void const* array_back( array_t const *array ) {
+  return array->len > 0 ? array_back_nc( array ) : NULL;
+}
+
+/// @cond DOXYGEN_IGNORE
+// LCOV_EXCL_START
+NODISCARD
+inline void* nonconst_array_back( array_t *array ) {
+  return CONST_CAST( void*, array_back( array ) );
+}
+// LCOV_EXCL_STOP
+
+#define array_back(ARRAY) \
+  NONCONST_OVERLOAD( array_back, (ARRAY) )
+/// @endcond
+
+/**
+ * Calls **bsearch**(3) on \a array.
+ *
+ * @param array The array to search.
+ * @param key The key to search for.
+ * @param cmp_fn The comparison function to use.
+ * @return Returns a pointer to the matching element or NULL if no match is
+ * found.
+ */
+NODISCARD
+inline void* array_bsearch( array_t *array, void const *key,
+                            array_cmp_fn_t cmp_fn ) {
+  return bsearch( key, array->elements, array->len, array->esize, cmp_fn );
+}
+
+/**
+ * Gets a pointer to the element at the front of \a array.
+ *
+ * @param array A pointer to the \ref array.
+ * @return Returns a pointer to the element at the front of \a array.
+ *
+ * @warning \a array is _not_ checked to ensure it's not empty.
+ *
+ * @note If the element type is a pointer, then this returns a _pointer to that
+ * pointer_, i.e., `T**`.
+ * @note This is an O(1) operation.
+ *
+ * @sa array_at()
+ * @sa array_at_nc()
+ * @sa array_back()
+ * @sa array_back_nc()
+ * @sa array_front()
+ */
+NODISCARD
+inline void const* array_front_nc( array_t const *array ) {
+  return array->elements;
+}
+
+/// @cond DOXYGEN_IGNORE
+// LCOV_EXCL_START
+NODISCARD
+inline void* nonconst_array_front_nc( array_t *array ) {
+  return CONST_CAST( void*, array_front_nc( array ) );
+}
+// LCOV_EXCL_STOP
+
+#define array_front_nc(ARRAY) \
+  NONCONST_OVERLOAD( array_front_nc, (ARRAY) )
+/// @endcond
+
+/**
+ * Gets a pointer to the element at the front of \a array.
+ *
+ * @param array A pointer to the \ref array.
+ * @return Returns a pointer to the element at the front of \a array or NULL if
+ * \a array is empty.
+ *
+ * @note If the element type is a pointer, then this returns a _pointer to that
+ * pointer_, i.e., `T**`.
+ * @note This is an O(1) operation.
+ *
+ * @sa array_at()
+ * @sa array_at_nc()
+ * @sa array_back()
+ * @sa array_back_nc()
+ * @sa array_front_nc()
+ */
+NODISCARD
+inline void const* array_front( array_t const *array ) {
+  return array->len > 0 ? array_front_nc( array ) : NULL;
+}
+
+/// @cond DOXYGEN_IGNORE
+// LCOV_EXCL_START
+NODISCARD
+inline void* nonconst_array_front( array_t *array ) {
+  return CONST_CAST( void*, array_front( array ) );
+}
+// LCOV_EXCL_STOP
+
+#define array_front(ARRAY) \
+  NONCONST_OVERLOAD( array_front, (ARRAY) )
+/// @endcond
+
+/**
+ * Initializes \a array.
+ *
+ * @param array A pointer to the \ref array to initialize.
+ * @param esize The element size.
+ *
+ * @sa array_cleanup()
+ * @sa #ARRAY_INIT()
+ */
+inline void array_init( array_t *array, size_t esize ) {
+  *array = ARRAY_INIT( esize );
+}
+
+/**
+ * Merges consecutive duplicate elements of a sorted array by merging elements
+ * _a[i+1]_, _a[i+2]_, ..., into element _a[i]_ where they compare equal.
+ *
+ * @param array The sorted array to merge elements of.
+ * @param merge_fn The merge function to use.
+ * @param free_fn A pointer to a function used to free duplicate elements or
+ * NULL if unnecessary.
+ *
+ * @note This is an O(N) operation.
+ *
+ * @sa array_qsort()
+ * @sa array_unique()
+ */
+void array_merge( array_t *restrict array, array_merge_fn_t merge_fn,
+                  array_free_fn_t free_fn );
+
+/**
+ * Pops an element from the back of \a array.
+ *
+ * @param array The pointer to the \ref array.
+ * @return Returns a pointer to the element at the back of \a array.
+ *
+ * @warning \a array is _not_ checked to ensure it's not empty.
+ * @warning While the caller is responsible for cleaning up the element, it
+ * _must not_ be freed.
+ * @warning The pointer to the element returned is ephemeral and should be
+ * dealt with before either array_cleanup() or array_push_back() is called.
+ * @note If the element type is a pointer, then this returns a _pointer to that
+ * pointer_, i.e., `T**`.
+ * @note This is an O(1) operation.
+ *
+ * @sa array_at()
+ * @sa array_at_nc()
+ * @sa array_back()
+ * @sa array_back_nc()
+ * @sa array_pop_back()
+ */
+PJL_DISCARD
+inline void* array_pop_back_nc( array_t *array ) {
+  return array_at_nc( array, --array->len );
+}
+
+/**
+ * Pops an element from the back of \a array.
+ *
+ * @param array The pointer to the \ref array.
+ * @return Returns a pointer to the element at the back of \a array or NULL if
+ * the array is empty.
+ *
+ * @warning While the caller is responsible for cleaning up the element, it
+ * _must not_ be freed.
+ * @warning The pointer to the element returned is ephemeral and should be
+ * dealt with before either array_cleanup() or array_push_back() is called.
+ *
+ * @note If the element type is a pointer, then this returns a _pointer to that
+ * pointer_, i.e., `T**`.
+ * @note This is an O(1) operation.
+ *
+ * @sa array_at()
+ * @sa array_at_nc()
+ * @sa array_back()
+ * @sa array_back_nc()
+ * @sa array_pop_back_nc()
+ */
+PJL_DISCARD
+inline void* array_pop_back( array_t *array ) {
+  return array->len > 0 ? array_pop_back_nc( array ) : NULL;
+}
+
+/**
+ * Appends space for a new element onto the back of \a array.
+ *
+ * @param array The \ref array to push onto.
+ * @return Returns a pointer to the new element.
+ *
+ * @note This is an O(1) amortized operation and O(N) worst-case.
+ *
+ * @sa array_push_array_back()
+ */
+NODISCARD
+inline void* array_push_back( array_t *array ) {
+  array_reserve( array, 1 );
+  return array_at_nc( array, array->len++ );
+}
+
+/**
+ * Calls **qsort**(3) on \a array.
+ *
+ * @param array The array to sort.
+ * @param cmp_fn The comparison function to use.
+ */
+inline void array_qsort( array_t *array, array_cmp_fn_t cmp_fn ) {
+  qsort( array->elements, array->len, array->esize, cmp_fn );
+}
+
+/**
+ * Removes consecutive duplicate elements from a sorted array by overwriting
+ * elements _a[i+1]_, _a[i+2]_, ..., where they compare equal to _a[i]_.
+ *
+ * @param array The sorted array to remove duplicate elements from.
+ * @param cmp_fn The comparison function to use.
+ * @param free_fn A pointer to a function used to free duplicate elements or
+ * NULL if unnecessary.
+ *
+ * @note There is no significance to a particular non-zero value returned by \a
+ * cmp_fn when elements are not equal.
+ * @note This is an O(N) operation.
+ *
+ * @sa array_merge()
+ * @sa array_qsort()
+ */
+inline void array_unique( array_t *restrict array, array_cmp_fn_t cmp_fn,
+                          array_free_fn_t free_fn ) {
+  array_merge( array, POINTER_CAST( array_merge_fn_t, cmp_fn ), free_fn );
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+/** @} */
+
+#endif /* pjl_array_h */
+/* vim:set et sw=2 ts=2: */

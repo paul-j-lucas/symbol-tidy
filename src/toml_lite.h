@@ -1,0 +1,356 @@
+/*
+**      PJL Library
+**      src/toml_lite.h
+**
+**      Copyright (C) 2026  Paul J. Lucas
+**
+**      This program is free software: you can redistribute it and/or modify
+**      it under the terms of the GNU General Public License as published by
+**      the Free Software Foundation, either version 3 of the License, or
+**      (at your option) any later version.
+**
+**      This program is distributed in the hope that it will be useful,
+**      but WITHOUT ANY WARRANTY; without even the implied warranty of
+**      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+**      GNU General Public License for more details.
+**
+**      You should have received a copy of the GNU General Public License
+**      along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+#ifndef pjl_toml_lite_h
+#define pjl_toml_lite_h
+
+/**
+ * @file
+ * Declares types and functions for reading a TOML file.
+ */
+
+// local
+#include "pjl_config.h"
+#include "array.h"
+#include "hash_table.h"
+
+/// @cond DOXYGEN_IGNORE
+
+// standard
+#include <stdbool.h>
+#include <stdio.h>
+
+/// @endcond
+
+///
+/// @defgroup toml-group TOML
+/// Types and functions for reading a TOML file.
+///
+/// @remarks
+/// @parblock
+/// This implements a "lite" version of the TOML 1.1.0 specification in that
+/// the following are **_not_** supported:
+///
+/// + Array of tables.
+/// + Dates or times.
+/// + Floating-point numbers.
+/// + Inline tables.
+/// + Multi-line strings.
+/// + Unicode.
+/// @endparblock
+///
+/// @par Example
+/// @parblock
+///
+///     void read_toml_file( char const *toml_path ) {
+///       FILE *const ftoml = fopen( toml_path, "r" );
+///       if ( ftoml == NULL ) {
+///         fprintf( stderr, "%s: %s\n", toml_path, strerror( errno ) );
+///         return;
+///       }
+///       toml_file toml;
+///       toml_file_init( &toml, ftoml );
+///       toml_table table;
+///       toml_table_init( &table );
+///
+///       while ( toml_table_next( &toml, &table ) ) {
+///         // ...
+///         // Use toml_table_find() for specific keys or
+///         // toml_iterator_init() and toml_iterator_next()
+///         // for all keys.
+///         // ...
+///       }
+///
+///       toml_table_cleanup( &table );
+///       if ( toml.error ) {
+///         fprintf( stderr,
+///           "%s:%u,%u: %s\n",
+///           toml_path, toml.loc.line, toml.loc.col, toml_error_msg( toml )
+///         );
+///       }
+///       toml_file_cleanup( &toml );
+///       fclose( ftoml );
+///     }
+/// @endparblock
+///
+/// @sa [TOML](https://toml.io/)
+/// @{
+///
+
+////////// enums //////////////////////////////////////////////////////////////
+
+// Enumerations have to be declared before typedefs of them since ISO C doesn't
+// allow forward declarations of enums.
+
+/**
+ * TOML error.
+ */
+enum toml_error {
+  TOML_ERR_NONE,                        ///< No error.
+  TOML_ERR_DUPLICATE_KEY,               ///< Duplicate key.
+  TOML_ERR_DUPLICATE_TABLE,             ///< Duplicate table name.
+  TOML_ERR_INVALID_CHAR,                ///< Invalid character.
+  TOML_ERR_INVALID_INT,                 ///< Invalid integer.
+  TOML_ERR_INVALID_KEY,                 ///< Invalid key.
+  TOML_ERR_INVALID_STRING,              ///< Invalid string.
+  TOML_ERR_INVALID_UNICODE,             ///< Invalid Unicode code-point.
+  TOML_ERR_UNEXPECTED_CHAR,             ///< Unexpected character.
+  TOML_ERR_UNEXPECTED_EOF,              ///< Unexpected end of file.
+};
+
+/**
+ * TOML value type.
+ */
+enum toml_type {
+  TOML_BOOL = 1,                        ///< Boolean type.
+  TOML_INT,                             ///< Integer type.
+  TOML_STRING,                          ///< String type.
+  TOML_ARRAY                            ///< Array type.
+};
+
+////////// typedefs ///////////////////////////////////////////////////////////
+
+typedef struct  toml_array      toml_array;
+typedef enum    toml_error      toml_error;
+typedef struct  toml_file       toml_file;
+typedef struct  toml_iterator   toml_iterator;
+typedef struct  toml_key        toml_key;
+typedef struct  toml_key_value  toml_key_value;
+typedef struct  toml_loc        toml_loc;
+typedef struct  toml_table      toml_table;
+typedef enum    toml_type       toml_type;
+typedef struct  toml_value      toml_value;
+
+////////// structs ////////////////////////////////////////////////////////////
+
+/**
+ * TOML array.
+ */
+struct toml_array {
+  toml_value *values;                   ///< Values.
+  unsigned    size;                     ///< Size of \ref values.
+};
+
+/**
+ * TOML table iterator.
+ */
+struct toml_iterator {
+  toml_table const *table;              ///< The TOML table being iterated.
+  unsigned          next_idx;           ///< The next index.
+};
+
+/**
+ * TOML file location.
+ */
+struct toml_loc {
+  unsigned  line;                       ///< Line number.
+  unsigned  col;                        ///< Column number (1 based).
+};
+
+/**
+ * TOML file.
+ */
+struct toml_file {
+  FILE         *file;                   ///< `FILE` to read.
+  toml_error    error;                  ///< Error code, if any.
+  char const   *error_msg;              ///< Error message, if any.
+  unsigned      array_depth;            ///< Array depth.
+  int           c_last;                 ///< Last character read, if any.
+  unsigned      col_prev;               ///< Previous column within file.
+  toml_loc      loc;                    ///< Current source location.
+  hash_table_t  table_names;            ///< Table names seen so far.
+};
+
+/**
+ * TOML key.
+ */
+struct toml_key {
+  char const *name;                     ///< Name.
+  toml_loc    loc;                      ///< Source file location.
+};
+
+/**
+ * TOML value.
+ */
+struct toml_value {
+  toml_type     type;                   ///< Type of value.
+  toml_loc      loc;                    ///< Source file location.
+  union {
+    bool        b;                      ///< The Boolean value.
+    long        i;                      ///< The integer value.
+    char       *s;                      ///< The string value.
+    toml_array  a;                      ///< The array value.
+  };
+};
+
+/**
+ * TOML key/value pair.
+ */
+struct toml_key_value {
+  toml_key    key;                      ///< Key.
+  toml_value  value;                    ///< Value.
+};
+
+/**
+ * TOML table.
+ */
+struct toml_table {
+  toml_key      key;                    ///< Table key.
+  hash_table_t  keys_values;            ///< Keys & values.
+
+  /**
+   * An array of toml_key_value pointers pointing at entries in \ref
+   * keys_values in file occurrence order.
+   */
+  array_t       ordered_kv_ptrs;
+};
+
+////////// extern functions ///////////////////////////////////////////////////
+
+/**
+ * Gets the error message corresponding to \ref toml_file::error "error".
+ *
+ * @param toml The toml_file to get the error message for.
+ * @return Returns said message.
+ */
+NODISCARD
+char const* toml_error_msg( toml_file const *toml );
+
+/**
+ * Cleans-up the resources of a toml_file.
+ *
+ * @param toml The toml_file to clean up.  If NULL, does nothing.
+ *
+ * @note The `FILE` that the toml_file was using is _not_ closed since
+ * toml_file_init() didn't open it.
+ *
+ * @sa toml_file_init()
+ */
+void toml_file_cleanup( toml_file *toml );
+
+/**
+ * Initializes a toml_file.
+ *
+ * @param toml The toml_file to initialize.
+ * @param file The `FILE` to read.
+ *
+ * @sa toml_file_cleanup()
+ */
+void toml_file_init( toml_file *toml, FILE *file );
+
+/**
+ * Initializes a toml_iterator.
+ *
+ * @param iter The toml_iterator to initialize.
+ * @param table The toml_table to iterate over.
+ *
+ * @sa toml_iterator_next()
+ */
+inline void toml_iterator_init( toml_iterator *iter, toml_table *table ) {
+  *iter = (toml_iterator){ .table = table };
+}
+
+/**
+ * Iterates to the next toml_key_value in the table, if any.
+ *
+ * @note The order in which keys are returned is unspecified.
+ *
+ * @param iter The toml_iterator.
+ * @return Returns a pointer to the next toml_key_value or NULL if the entire
+ * table was visited.
+ *
+ * @sa toml_iterator_init()
+ */
+NODISCARD
+inline toml_key_value const* toml_iterator_next( toml_iterator *iter ) {
+  array_t const *const ordered_kv_ptrs = &iter->table->ordered_kv_ptrs;
+  return iter->next_idx < ordered_kv_ptrs->len ?
+    *(toml_key_value**)array_at_nc( ordered_kv_ptrs, iter->next_idx++ ) :
+    NULL;
+}
+
+/**
+ * Cleans-up a toml_table.
+ *
+ * @param table The toml_table to clean up.  If NULL, does nothing.
+ *
+ * @sa toml_table_init()
+ */
+void toml_table_cleanup( toml_table *table );
+
+/**
+ * Gets whether \a table is empty.
+ *
+ * @param table The toml_table to check.
+ * @return Returns `true` only if \a table is empty.
+ */
+NODISCARD
+inline bool toml_table_empty( toml_table const *table ) {
+  return table->keys_values.size == 0;
+}
+
+/**
+ * Attempts to find \a key in \a table.
+ *
+ * @param table The toml_table to find \a key in.
+ * @param key The key to find in \a table.
+ * @return Returns the associated value if \a key is found or NULL if not.
+ */
+NODISCARD
+toml_value const* toml_table_find( toml_table const *table, char const *key );
+
+/**
+ * Initialzes a toml_table.
+ *
+ * @param table The toml_table to initialize.
+ *
+ * @sa toml_table_cleanup()
+ */
+void toml_table_init( toml_table *table );
+
+/**
+ * Gets the next table from \a toml, if any.
+ *
+ * @param toml The toml_file to get the next table from.
+ * @param table A pointer to receive the table.
+ * @return Returns `true` only if there is a next table and it was parsed
+ * successfully.
+ *
+ * @sa toml_table_cleanup()
+ * @sa toml_table_init()
+ */
+NODISCARD
+bool toml_table_next( toml_file *toml, toml_table *table );
+
+/**
+ * Gets the name for \a type.
+ *
+ * @param type The type to get the name for.
+ * @return Returns said name.
+ */
+NODISCARD
+char const* toml_type_name( toml_type type );
+
+///////////////////////////////////////////////////////////////////////////////
+
+/** @} */
+
+#endif /* pjl_toml_lite_h */
+/* vim:set et sw=2 ts=2: */

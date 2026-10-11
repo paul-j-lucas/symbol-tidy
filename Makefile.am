@@ -1,0 +1,99 @@
+##
+#	symbol-tidy -- Symbol tidier
+#	Makefile.am
+#
+#	Copyright (C) 2026  Paul J. Lucas
+#
+#	This program is free software: you can redistribute it and/or modify
+#	it under the terms of the GNU General Public License as published by
+#	the Free Software Foundation, either version 3 of the License, or
+#	(at your option) any later version.
+#
+#	This program is distributed in the hope that it will be useful,
+#	but WITHOUT ANY WARRANTY; without even the implied warranty of
+#	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#	GNU General Public License for more details.
+#
+#	You should have received a copy of the GNU General Public License
+#	along with this program.  If not, see <http://www.gnu.org/licenses/>.
+##
+
+ACLOCAL_AMFLAGS =	-I m4
+SUBDIRS =		etc lib src man test
+
+EXTRA_DIST =		bootstrap \
+			Doxygen.sed \
+			Doxyfile \
+			lcovrc \
+			m4/gnulib-cache.m4 \
+			m4/update_m4.sh \
+			makedoc.sh \
+			src/include-tidy.toml \
+			symbol-tidy.css \
+			README.md
+
+DOCS_DIR =		docs
+
+if ENABLE_COVERAGE
+COVERAGE_INFO =		$(top_builddir)/coverage.info
+COVERAGE_DIR =		coverage
+
+LCOV_FLAGS =		--capture \
+			--config-file "$(top_srcdir)/lcovrc" \
+			--directory "$(abs_top_builddir)" \
+			--exclude "src/color.c" \
+			--exclude "src/unit_test.c" \
+			--gcov-tool "$(GCOV)" \
+			--ignore-errors unused \
+			--output-file $(COVERAGE_INFO)
+
+GENHTML_FLAGS =	--legend \
+		--title "$(PACKAGE_NAME)-$(PACKAGE_VERSION) Code Coverage" \
+		--output-directory $(top_builddir)/$(COVERAGE_DIR)
+endif
+
+.PHONY:	clean-coverage clean-coverage-local \
+	distclean-coverage distclean-coverage-local \
+	doc docs \
+	update-gnulib
+
+check-coverage:
+if ENABLE_COVERAGE
+	$(MAKE) $(AM_MAKEFLAGS) clean-coverage
+	$(MAKE) $(AM_MAKEFLAGS) check
+	$(LCOV) $(LCOV_FLAGS)
+	$(GENHTML) $(GENHTML_FLAGS) $(COVERAGE_INFO)
+	@echo "file://$(abs_builddir)/$(COVERAGE_DIR)/index.html"
+else
+	@echo "Code coverage not enabled; to enable:"
+	@echo
+	@echo "    ./configure --enable-coverage"
+endif
+
+check-recursive: clean-coverage
+
+clean-local: clean-coverage-local
+	rm -fr $(DOCS_DIR)
+
+clean-coverage-local:
+if ENABLE_COVERAGE
+	rm -f $(COVERAGE_INFO)
+endif
+
+distclean-local: distclean-coverage-local
+
+distclean-coverage-local:
+if ENABLE_COVERAGE
+	rm -fr $(COVERAGE_DIR)
+endif
+
+dist-hook:
+	find $(distdir) -name .DS_Store -exec rm -f {} \;
+
+doc docs:
+	@./makedoc.sh $(PACKAGE) $(DOCS_DIR)
+
+update-gnulib:
+	gnulib-tool --add-import --no-vc-files
+
+# vim:set noet sw=8 ts=8:

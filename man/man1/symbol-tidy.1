@@ -1,0 +1,1185 @@
+.\"
+.\"     symbol-tidy -- Symbol tidier
+.\"     symbol-tidy.1: manual page
+.\"
+.\"     Copyright (C) 2026  Paul J. Lucas
+.\"
+.\"     This program is free software: you can redistribute it and/or modify
+.\"     it under the terms of the GNU General Public License as published by
+.\"     the Free Software Foundation, either version 3 of the License, or
+.\"     (at your option) any later version.
+.\"
+.\"     This program is distributed in the hope that it will be useful,
+.\"     but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\"     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\"     GNU General Public License for more details.
+.\"
+.\"     You should have received a copy of the GNU General Public License
+.\"     along with this program.  If not, see <http://www.gnu.org/licenses/>.
+.\"
+.\" ---------------------------------------------------------------------------
+.\" define code-start macro
+.de cS
+.sp
+.ps -2                                  \" shrink it
+.nf
+.RS 5
+.ft CW
+..
+.\" define code-end macro
+.de cE
+.ft
+.RE
+.fi
+.ps                                     \" restore original size
+.if !'\\$1'0' .sp
+..
+.\" ---------------------------------------------------------------------------
+.TH \f3symbol-tidy\fP 1 "September 18, 2026" "PJL TOOLS"
+.SH NAME
+symbol-tidy \(em Symbol tidier
+.SH SYNOPSIS
+.B symbol-tidy
+.BI "[\-Xtidy " tidy-option ]...
+.BI [ compiler-option ]...
+.IR source-file ...
+.br
+.B symbol-tidy
+.I other-option
+.SH DESCRIPTION
+.B symbol-tidy
+is a command-line tool
+that can be used to ``tidy'' the
+symbols
+used in a C
+or C++
+source file
+by TODO
+.SS General Use
+.B symbol-tidy
+should be run
+only on valid C or C++ files,
+i.e., files should compile successfully
+with a C or C++ compiler first.
+.PP
+.B symbol-tidy
+should be used on both header (\f(CW.h\fP)
+and source (\f(CW.c\fP or \f(CW.cpp)
+files
+since both should include what they use.
+(See the
+.B \-x
+option for additional filename extensions.)
+.SS Use with Make
+While
+.B symbol-tidy
+can be run on a per-file basis,
+it can alternatively be used with
+.BR make (1)
+in place of either your C
+or C++
+compiler.
+In your
+.BR Makefile ,
+have:
+.cS
+TIDY_FLAGS  = -Xtidy --verbose=f -Xtidy --error=never
+TIDY_CFLAGS = $(CFLAGS) $(AM_CFLAGS) $(CPPFLAGS) $(AM_CPPFLAGS)
+
+tidy:
+        symbol-tidy $(TIDY_FLAGS) $(TIDY_CFLAGS) *.[hc]
+.cE
+then simply
+.B make tidy
+to analyze all your source files
+at once.
+(For C++,
+substitute
+\f(CW.cpp\fP for \f(CW.c\fP,
+.B CXXFLAGS
+for
+.BR CFLAGS ,
+and
+.B AM_CXXFLAGS
+for
+.BR AM_CFLAGS .
+The
+.BR AM_
+variables are needed
+only when using
+.BR automake .)
+.PP
+The advantage of doing this
+is that
+.B symbol-tidy
+will be given all the options
+normally given to your compiler
+via your
+.BR Makefile ,
+specifically
+.B \-D
+(define macro)
+and
+.B \-I
+(include directory)
+options
+that affect compilation.
+.PP
+The
+.B \-\-verbose=f
+prints each source file's name
+(so you know which file
+any printed violations are for);
+.B \-\-error=never
+causes
+.B symbol-tidy
+always to exit with a zero status
+even for violations so
+.B make
+doesn't think anything went wrong.
+(See the
+.B \-\-error
+and
+.B \-\-verbose
+options below.)
+.SS Predefined Macro
+.B symbol-tidy
+implicitly defines a macro
+.B __symbol_tidy__
+that can be tested for
+in
+.IR source-file :
+.cS
+#ifdef __symbol_tidy__
+// ... code seen only by symbol-tidy ...
+#endif
+.cE
+This can be used in corner cases
+where other code in the same file
+references a symbol
+formed via the preprocessor's \f(CW##\fP (paste) operator,
+but defined in a header.
+(See
+.B Symbols via ##
+under
+.B BUGS
+for details
+and an example.)
+.SH OPTIONS
+.SS Option Kinds
+.B symbol-tidy
+has three kinds of command-line options:
+.sp
+.PD 0
+.nr step 1 1
+.IP \n[step]. 3
+.BR symbol-tidy -specific
+options.
+.IP \n+[step].
+C or C++ compiler options.
+.IP \n+[step].
+Other options.
+.PD
+.SS Include-Tidy-Specific Options
+Every
+.BR symbol-tidy -specific
+option
+.I must
+be preceded by an
+.B \-Xtidy
+option to distinguish it from a C or C++ compiler option.
+For example,
+in:
+.cS
+symbol-tidy -Xtidy --error=never \-I../lib source.c
+.cE
+the
+.BR \-\-error
+option
+is given only to
+.B symbol-tidy
+and the
+.B \-I../lib
+option is given only to the C compiler.
+.PP
+For the options below,
+an option argument
+.I d
+means
+.IR directory ,
+.I f
+means
+.IR file ,
+.I n
+means
+.IR "unsigned integer" ,
+and
+.I s
+means
+.IR string .
+.TP 6
+.BI \-\-color \f1=\fPs "\f1 | \fP" "" \-k " s"
+Sets when to colorize output to
+.I s
+(which is case-insensitive).
+(See the
+.B SYMBOL_TIDY_COLORS
+environment variable about colorization.)
+The choices for
+.I s
+are:
+.RS
+.TP 8
+.B always
+Always colorize.
+.TP
+.BR auto " | " isatty " | " tty
+Colorize only when standard output
+or error
+is connected to a TTY
+(terminal).
+.TP
+.B never
+Never colorize.
+.TP
+.BR not_file " | " not_isreg
+Colorize only when
+.I not
+writing to a regular file
+(hence writing to a TTY or pipe).
+(Specifically,
+.BR fstat (3)
+is called on standard output
+and error:
+colorize only if \f(CWS_IFREG\fP is false.)
+.IP
+This is more useful than
+.B isatty
+since it accommodates the common case of allowing color output to be piped to
+.BR less (1)
+and still display in color since
+.B less
+understands
+.I SGR
+(``Select Graphic Rendition'')
+ASCII terminal escape sequences
+that produce color.
+.RE
+.IP
+The default is
+.BR not_file .
+.TP
+.BI \-\-comment-style \f1=\fPs "\f1 | \fP" "" \-s " s"
+Specifies the comment style to use.
+The choices for
+.I s
+are:
+\f(CW//\fP,
+\f(CW/*\fP,
+or
+\f(CWnone\fP.
+The default is \f(CW//\fP.
+(Note that \f(CW/*\fP
+may need to be quoted
+to prevent shell expansion.)
+Comments for unnecessary headers
+are always printed.
+.TP
+.BI \-\-compiler \f1=\fPf "\f1 | \fP" "" \-C " f"
+Specifies the path to either the C or C++ compiler to use;
+or
+.B none
+not to use any
+in which case
+paths to system include directories
+must be specified explicitly
+via one or more of
+.BR \-I ,
+.BR \-isystem ,
+or related options.
+While
+.BR clang (1)
+or
+.BR clang++ (1)
+are the preferred compilers,
+.BR gcc (1)
+or
+.BR g++ (1)
+are also supported.
+.TP
+.BI \-\-config \f1=\fPf "\f1 | \fP" "" \-c " f"
+Specifies the path of the configuration file to use first.
+.TP
+.BI \-\-directory \f1=\fPd "\f1 | \fP" "" \-d " d"
+Change to directory
+.I d
+before tidying.
+.TP
+.BR \-\-debug " | " \-D
+Turns on
+.B symbol-tidy
+debugging output:
+.RS 6
+.IP \(bu 3
+If an error or warning message is printed,
+includes the
+.RI \f(CW[\fP file \f(CW:\fP line \f(CW]\fP
+of the code that generated said message.
+.RE
+.IP
+(This is a debugging aid for developers of
+.B symbol-tidy
+itself.)
+.TP
+.BI \-\-error \f1=\fPs "\f1 | \fP" "" \-e " s"
+When to exit with a non-zero status.
+The choices for
+.I s
+are:
+.RS 6
+.TP 12
+.PD 0
+.B always
+Always exit with non-zero.
+.TP
+.B never
+Always exit with zero.
+.TP
+.B violations
+Exit with non-zero only when violations.
+.RE
+.PD
+.IP
+Using
+.B never
+always exits with a zero status
+even for violations so
+.BR make (1)
+doesn't think anything went wrong.
+(See
+.BR "Use with Make" .)
+The default is
+.BR violations .
+.TP
+.BR \-\-no-config-layers " | " \-L
+Suppresses configuration file layering.
+Only the first configuration file found is used.
+(See
+.B Layering
+under
+.BR "CONFIGURATION FILES" .)
+.TP
+.BI \-\-verbose \f1=\fPs "\f1 | \fP" "" \-V " s"
+Specifies what to be verbose about.
+The choices for
+.I s
+are:
+.RS 6
+.TP 3
+.PD 0
+.B a
+Command-line arguments given to
+.B symbol-tidy
+and
+.BR libclang .
+.TP
+.B c
+Configuration files read or attempted.
+.TP
+.B C
+Libclang cursors.
+.TP
+.B d
+Directory changing to from the
+.B \-\-directory
+or
+.B \-d
+option.
+.TP
+.B f
+Name of
+.I source-file
+only if in violation.
+.TP
+.B F
+Name of
+.IR source-file .
+.TP
+.B s
+Symbols referenced
+and the include files
+declaring them.
+.TP
+.B S
+Configuration file symbols.
+.TP
+.B z
+Statistics.
+(See
+.BR STATISTICS .)
+.RE
+.PD
+.IP
+Multiple values may be given,
+one immediately after the other.
+(The order doesn't matter.)
+Alternatively,
+\f(CW*\fP may be given to mean ``all''
+or
+\f(CW-\fP may be given to mean ``none.''
+The default is none.
+.SS Compiler Options
+Options that are neither one of
+.B "Other Options"
+nor preceded by
+.B \-Xtidy
+are C or C++ compiler
+.RB ( libclang )
+options
+and are passed to it verbatim.
+Important C or C++ compiler options:
+.TP 6
+.BI \-x " s"
+Specifies the langauge
+.I s
+of
+.IR source-file ,
+either \f(CWc\fP or \f(CWc++\fP,
+overriding the language indicated
+by its filename extension,
+if any.
+.IP
+The extensions of \f(CW.h\fP and \f(CW.c\fP
+indicate a C source file;
+the extensions of
+\f(CW.h++\fP,
+\f(CW.hh\fP,
+\f(CW.hp\fP,
+\f(CW.hpp\fP,
+\f(CW.hxx\fP,
+\f(CW.c++\fP,
+\f(CW.cc\fP,
+\f(CW.cp\fP,
+\f(CW.cpp\fP,
+and
+\f(CW.cxx\fP
+indicate a C++ source file.
+If
+.I source-file
+has any other extension
+or no extension,
+you
+.I must
+use this option to specify the language.
+.IP
+Additionally,
+unlike with a C or C++ compiler,
+\f(CW.h\fP files are given directly as arguments to
+.BR symbol-tidy .
+If you use \f(CW.h\fP for C++ headers,
+you'll need to specify
+.B \-xc++
+explicitly.
+.SS Other Options
+These options are given directly as-is
+since they would never be ambiguous
+with C or C++ compiler options.
+.TP 6
+.BR \-\-help " | " \-h
+Prints a help message
+for command-line options
+and exits.
+.TP
+.BR \-\-version " | " \-v
+Prints the version number
+and exits.
+If given twice,
+additionally prints
+the set of configure
+feature & package options.
+.SH CONFIGURATION FILES
+A file named
+.B symbol-tidy.toml
+in the current working directory
+or
+.B config.toml
+in a subdirectory named
+.B symbol-tidy
+is used to configure
+.BR symbol-tidy .
+The file is a ``lite'' version of TOML.
+(See
+.B CAVEATS
+for unsupported TOML.)
+.SS Tables
+The file is broken down into sections
+(``tables'' in TOML parlance)
+where each section is started by a line of the form:
+.P
+.RS 5
+.RI [ table-name ]
+.RE
+.P
+that is a left bracket,
+a table name,
+and a right bracket.
+If a table name
+contains a character other than
+a valid TOML key character of
+\f(CW[A-Za-z0-9_-.]\fP
+(a letter, digit, underscore, dash, or dot),
+then the table name
+.I must
+be quoted.
+.PP
+Neither the order of the tables in a file
+nor the keys in a table matters.
+The type of table is determined
+by the first key in it
+since no two table types
+share keys.
+.PP
+For the keys below,
+a value
+.I b
+means Boolean
+(either \f(CWtrue\fP
+or \f(CWfalse\fP),
+.I f
+means a quoted file's relative path,
+.I n
+means an unsigned integer,
+and
+.I s
+means a quoted string.
+.SS symbol-tidy Table
+This table
+.I must
+be named
+.B symbol-tidy
+and is used to specify options,
+some the same as can be specified
+via the command-line,
+but without having to specify them
+via the command-line
+every time.
+.TP 6
+.BI add-c-includes " \f1=\fP " [ s " \f1[,\fP " s "\f1]*\fP ]"
+Like
+.BR std-c-includes ,
+but these are
+.I additionally
+to be considered ``standard'' C include files.
+.IP
+As one of only two special cases to configuration file layering,
+the include files given for
+.B add-c-includes
+are
+.I cumulative
+from all configuration files.
+.TP
+.BI add-cxx-includes " \f1=\fP " [ s " \f1[,\fP " s "\f1]*\fP ]"
+Like
+.BR std-cxx-includes ,
+but these are
+.I additionally
+to be considered ``standard'' C++ include files.
+.IP
+As one of only two special cases to configuration file layering,
+the include files given for
+.B add-cxx-includes
+are
+.I cumulative
+from all configuration files.
+.TP
+.BI align-column " \f1=\fP n"
+Same as the
+.B \-\-align-column
+command-line option.
+.TP
+.BI all-includes " \f1=\fP b"
+Same as the
+.B \-\-all-includes
+command-line option.
+.TP
+.BI color " \f1=\fP s"
+Same as the
+.B \-\-color
+command-line option.
+.TP
+.BI comment-style " \f1=\fP s"
+Same as the
+.B \-\-comment-style
+command-line option.
+.TP
+.BI comment-symbols " \f1=\fP s"
+Same as the
+.B \-\-comment-symbols
+command-line option.
+.TP
+.BI error " \f1=\fP s"
+Same as the
+.B \-\-error
+command-line option.
+.TP
+.BI line-length " \f1=\fP n"
+Same as the
+.B \-\-line-length
+command-line option.
+.TP
+.BI ignore-as-argument " \f1=\fP b"
+If true,
+the include file given for the table name
+is not checked for violations
+when given as
+.IR source-file .
+.IP
+This allows there to be include files
+you don't control
+(third-party or generated)
+present and not check them for violations
+yet still use \f(CW*.h\fP with a shell
+.B for
+loop.
+(See
+.B Use with Make
+above.)
+For example,
+the Autotools generated \f(CWconfig.h\fP
+should be ignored:
+.RS 5
+.cS
+[config.h]
+ignore-as-argument = true
+.cE
+.RE
+.TP
+.BI ignore-symbols " \f1=\fP s" "\f1 | \fP[" s " \f1[,\fP " s "\f1]*\fP ]"
+When referenced by the file given for the table name,
+the symbol name
+(that can be specified as a single string)
+or one or more symbol names
+(that are specified as a bracket-enclosed,
+comma-separated
+array of strings)
+are to be ignored,
+that is,
+even if the symbols are referenced from the file
+and so are apparently necessary,
+the include file declaring them,
+if omitted,
+will not be reported as a violation.
+.TP
+.BI keep " \f1=\fP b"
+If true,
+the include file given for the table name
+is to be ``kept,''
+that is,
+even if no symbols from it are referenced
+and so is apparently unnecessary,
+it will not be reported as a violation
+when included into other files.
+.SS Source Tables
+This type of table specifies a source file,
+either a \f(CW.c\fP or \f(CW.cpp\fP
+file.
+.TP 6
+.BI elide-includes " \f1=\fP s" "\f1 | \fP[" s " \f1[,\fP " s "\f1]*\fP ]"
+Same as in
+.BR "Header Tables" ,
+but for a source file.
+.TP
+.BI ignore-as-argument " \f1=\fP b"
+Same as in
+.BR "Header Tables" ,
+but for a source file.
+.TP
+.BI ignore-symbols " \f1=\fP s" "\f1 | \fP[" s " \f1[,\fP " s "\f1]*\fP ]"
+Same as in
+.BR "Header Tables" ,
+but for a source file.
+.TP
+.BI keep-includes " \f1=\fP s" "\f1 | \fP[" s " \f1[,\fP " s "\f1]*\fP ]"
+Same as in
+.BR "Header Tables" ,
+but for a source file.
+.SS Symbol Tables
+This type of table specifies a symbol name,
+e.g.,
+\f(CWNULL\fP
+or
+\f(CWsize_t\fP,
+is declared in multiple include files
+so including any one of them
+meets the
+.I include-what-you-use
+requirement
+thus averting a violation.
+.TP 6
+.BI ignore " \f1=\fP b"
+If true,
+the symbol name is to be ignored,
+that is,
+even if it's referenced from a file,
+the include file declaring it,
+if omitted,
+will not be reported as a violation.
+Note that:
+.RS 5
+.cS
+[\f2symbol\fP]
+ignore = true
+.cE 0
+.RE
+.IP
+ignores
+.I symbol
+in all files
+whereas:
+.RS 5
+.cS
+[\f2header.h\fP]
+ignore-symbols = "\f2symbol\fP"
+.cE 0
+.RE
+.IP
+ignores
+.I symbol
+only in
+.IR header.h .
+.TP
+.BR includes " \f1=\fP s" "\f1 | \fP[" s " \f1[,\fP " s "\f1]*\fP ]"
+Specifies that the symbol
+given for the table name
+is to be considered declared
+in one or more
+of the include files listed.
+For example,
+this:
+.RS 5
+.cS
+[NULL]
+includes = [
+    "locale.h",
+    "stddef.h",
+    "stdio.h",
+    "stdlib.h",
+    "string.h",
+    "time.h",
+    "wchar.h",
+]
+.cE 0
+.RE
+.IP
+says that \f(CWNULL\fP
+is declared in
+.I all
+of those files
+so including any
+.I one
+of them is sufficient.
+Note that:
+.RS 5
+.cS
+[\f2symbol\fP]
+includes = [ "\f2header.h\fP" ]
+.cE 0
+.RE
+.IP
+is equivalent to:
+.RS 5
+.cS
+[\f2header.h\fP]
+symbols = [ "\f2symbol\fP" ]
+.cE 0
+.RE
+.IP
+Use a header table to map one header to many symbols
+or a symbol table to map one symbol to many headers,
+whichever is preferred
+for a given set of headers
+and symbols.
+.SS Locations and Search Order
+One or more configuration files
+can be used to configure
+.B symbol-tidy
+by reading them
+on start-up.
+The files are searched for
+in the following locations
+in order:
+.nr step 1 1
+.IP \n[step]. 3
+The path given as the value for either the
+.B \-\-config
+or
+.B \-c
+option.
+(If specified, this path
+.I must
+exist.)
+.IP \n+[step].
+\f(CW$(dirname\fP
+.IR source-file \f(CW)/symbol-tidy.toml\fP.
+.IP \n+[step].
+.BR $PWD \f(CW/symbol-tidy.toml\fP.
+.IP \n+[step].
+.BR $XDG_CONFIG_HOME \f(CW/symbol-tidy/config.toml\fP.
+If
+.B XDG_CONFIG_HOME
+is unset or empty,
+it defaults to \f(CW~/.config\fP.
+.IP \n+[step].
+For each
+.I path
+in a colon separated list of paths in
+.BR XDG_CONFIG_DIRS ,
+the first of
+.IR path \f(CW/symbol-tidy/config.toml\fP
+to exist and be readable.
+If
+.B XDG_CONFIG_DIRS
+is unset or empty,
+it defaults to \f(CW/etc/xdg\fP.
+.PP
+If no configuration file is found,
+it's an error.
+.SS Layering
+Every configuration file found is read.
+Settings in files earier in order
+take precedence over the same settings
+in files later in order
+with the only exception of the
+.B add-c-includes
+option.
+For example,
+if in \f(CW./symbol-tidy.toml\fP,
+.B align-colum
+is set to 35,
+but in \f(CWconfig.toml\fP
+in \f(CW/etc/xdg/symbol-tidy\fP,
+it's set to 41,
+then 35
+(the value in the first file found in order)
+will be used.
+.PP
+However,
+if either the
+.B \-\-no-config-layers
+or
+.B \-L
+option is given,
+then
+.I only
+the first configuration file found
+is read.
+.SH STATISTICS
+Including
+.B z
+in the argument to the
+.B \-\-verbose
+or
+.B \-v
+option
+prints statistics
+for
+.IR source-file .
+(These are of interest for developers of
+.B symbol-tidy
+itself.)
+.TP 6
+.B is-size
+The total number of files included.
+.TP
+.B is-path
+The path of the include file having the most symbols from it referenced.
+.TP
+.B isss-load-factor
+The load factor for the symbol hash table for
+.BR is-path .
+.TP
+.B isss-size
+The total number of relevant symbols referenced from
+.BR is-path .
+.TP
+.B ss-load-factor
+The load factor for the symbol hash table.
+.TP
+.B ss-size
+The total number of relevant symbols.
+.TP
+.B tm-load-factor
+The load factor for the \f(CWtypedef\fP hash table.
+.TP
+.B tm-size
+The total number of useful \f(CWtypedef\fPs.
+.SH EXIT STATUS
+.PD 0
+.IP 0
+No violations or the
+.B \-\-error=never
+option was given.
+.IP 1
+One or more violations.
+.IP 2
+No violations, but the
+.B \-\-error=always
+option was given.
+.IP 64
+Command-line usage error.
+.IP 65
+.I source-file
+has one or more errors.
+.IP 66
+Open file error.
+.IP 69
+Either could not invoke the compiler
+or get the current working directory.
+.IP 70
+Internal software error.
+(Please report the bug.)
+.IP 71
+Operating system error.
+.IP 74
+I/O error.
+.IP 78
+Configuration file error.
+.PD
+.SH ENVIRONMENT
+.TP
+.BR CPATH " | " C_INCLUDE_PATH " | " CPLUS_INCLUDE_PATH
+Same as in
+.BR clang (1).
+.TP
+.B HOME
+Used only when
+.B XDG_CONFIG_HOME
+is empty or unset
+to locate a configuration file in
+\f(CW~/.config/symbol-tidy/config.toml\fP.
+If
+.B HOME
+is also empty or unset,
+the home directory is obtained from the password database entry
+for the effective user.
+If that fails,
+no default configuration file
+under the user's home directory
+is read.
+.TP
+.B SYMBOL_TIDY_COLORS
+Specifies the colors and other attributes
+used to highlight various parts of the output
+in a manner similar to the
+.B GCC_COLORS
+variable
+used by
+.BR gcc .
+.IP
+As with
+.BR gcc ,
+the value is composed of a colon-separated sequence of capabilities.
+Each capability is of the form
+.IR name [= SGR ]
+where
+.I name
+is a capability name
+and
+.IR SGR ,
+if present,
+is a
+``Select Graphic Rendition''
+value
+that is a semicolon-separated list of integers
+in the range 0\-255.
+An example SGR value is \f(CW31;1\fP
+that specifies a bold red foreground
+on the terminal's default background.
+.IP
+Capability names containing upper-case letters are unique to
+.BR symbol-tidy ;
+those in all lower-case are upwards compatible with
+.BR gcc .
+.RS
+.TP 17
+.BI caret= SGR
+SGR for the caret pointing to the error on the line above
+(as with
+.BR gcc ).
+The default is \f(CW32;1\fP
+(bold green foreground over current terminal background).
+.TP
+.BI error= SGR
+SGR for the word ``error.''
+The default is \f(CW31;1\fP
+(bold red foreground over current terminal background).
+.TP
+.BI locus= SGR
+SGR for location information in error and warning messages.
+The default is \f(CW1\fP
+(bold current foreground over current terminal background).
+.TP
+.BI warning= SGR
+SGR for the word ``warning.''
+The default is \f(CW33;1\fP
+(bold yellow foreground over current terminal background).
+.RE
+.IP
+The term ``color'' is used loosely.
+In addition to colors,
+other character attributes
+such as bold, underlined, reverse video, etc.,
+may be possible depending on the capabilities of the terminal.
+.TP
+.B SYMBOL_TIDY_TEST
+Facilitates testing
+when set to a non-empty value
+of one
+or more
+of the following letters
+(case-sensitive):
+.RS 7
+.TP 3
+.PD 0
+.B h
+Don't read files
+under the user's home directory.
+.TP
+.B e
+Don't read files under \f(CW/etc/xdg/symbol-tidy\fP.
+.RE
+.PD
+.IP
+Multiple letters may be given,
+one immediately after the other.
+(The order doesn't matter.)
+Alternatively,
+\f(CW*\fP may be given to mean ``all''
+or
+\f(CW-\fP may be given to mean ``none.''
+.IP
+Additionally when set,
+most paths printed as part of verbose output are relative
+rather than the default of absolute.
+.TP
+.B XDG_CONFIG_DIRS
+If set to a colon separated list of paths,
+then for each
+.I path
+in it,
+the first of
+.IR path \f(CW/symbol-tidy/config.toml\fP
+to exist
+and be readable
+is used as a configuration file.
+.TP
+.B XDG_CONFIG_HOME
+If set to a path
+of a directory
+and
+\f(CW$XDG_CONFIG_HOME/symbol-tidy/config.toml\fP
+exists and is readable,
+then that used as a configuration file.
+.PD
+.SH FILES
+.PD 0
+.TP
+\f(CW./symbol-tidy.toml\fP
+.TP
+\f(CW$XDG_CONFIG_HOME/symbol-tidy/config.toml\fP
+.TP
+\f(CW~/.config/symbol-tidy/config.toml\fP
+.TP
+\f(CW/etc/xdg/symbol-tidy/config.toml\fP
+.PD
+Configuration files.
+.SH BUGS
+.SS Symbols via ##
+Symbols formed via the preprocessor's \f(CW##\fP (paste) operator
+aren't ``seen'' by
+.BR libclang .
+Consequently,
+if such a symbol is declared in a header is referenced
+and no other symbols from that header
+are referenced,
+.B symbol-tidy
+won't think the header is necessary.
+For example:
+.cS
+#include <readline/readline.h>
+
+#define RL_PROMPT_IGNORE(SBUF, WHEN) \\
+  strbuf_putc( (SBUF), RL_PROMPT_ ## WHEN ## _IGNORE )
+
+void prompt_create( strbuf_t *sbuf ) {
+  RL_PROMPT_IGNORE( sbuf, START );
+  // ...
+.cE
+The expansion of \f(CWRL_PROMPT_IGNORE\fP
+will create \f(CWRL_PROMPT_START_IGNORE\fP
+that's declared in \f(CWreadline.h\fP.
+If no other symbols from it are referenced,
+.B symbol-tidy
+will incorrectly think the header is unnecessary.
+.PP
+As an alternative to not using \f(CW##\fP here,
+you can add dummy code
+seen only by
+.B symbol-tidy
+(and
+.BR libclang ):
+.cS
+#ifdef __symbol_tidy__
+void explicitly_reference_symbols() {
+  (void)RL_PROMPT_START_IGNORE;
+}
+#endif
+.cE
+By explicitly referencing such a symbol directly
+via dummy code,
+.B libclang
+will ``see'' it
+and
+.B symbol-tidy
+will correctly think the header is necessary.
+Because such code is never compiled,
+the code can be anything
+(but it still has to be legal
+and should not generate warnings).
+.SS See Also
+.nh
+\f(CWhttps://github.com/paul-j-lucas/symbol-tidy/issues\fP
+.hy
+.SH CAVEATS
+.SS Unsupported TOML
+The following parts of TOML are
+.I not
+supported
+because they aren't needed
+to configure
+.BR symbol-tidy :
+.sp
+.PD 0
+.IP \(bu 3
+Array of tables.
+.IP \(bu
+Dates or times.
+.IP \(bu
+Floating-point numbers.
+.IP \(bu
+Inline tables.
+.IP \(bu
+Multi-line strings.
+.IP \(bu
+Unicode.
+.PD
+.SH AUTHOR
+Paul J. Lucas
+.RI < paul@lucasmail.org >
+.SH SEE ALSO
+.BR automake (1),
+.BR clang (1),
+.BR gcc (1),
+.BR make (1),
+.BR sysexits (3)
+.\" vim:set et sw=2 ts=2:

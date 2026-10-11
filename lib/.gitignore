@@ -1,0 +1,13 @@
+.dirstamp
+/assert.h
+/errno.h
+/fcntl.h
+/getopt-cdefs.h
+/getopt.h
+/stddef.h
+/stdint.h
+/stdlib.h
+/string.h
+/sys
+/sysexits.h
+/unistd.h

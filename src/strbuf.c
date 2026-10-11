@@ -1,0 +1,221 @@
+/*
+**      PJL Library
+**      src/strbuf.c
+**
+**      Copyright (C) 2021-2026  Paul J. Lucas
+**
+**      This program is free software: you can redistribute it and/or modify
+**      it under the terms of the GNU General Public License as published by
+**      the Free Software Foundation, either version 3 of the License, or
+**      (at your option) any later version.
+**
+**      This program is distributed in the hope that it will be useful,
+**      but WITHOUT ANY WARRANTY; without even the implied warranty of
+**      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+**      GNU General Public License for more details.
+**
+**      You should have received a copy of the GNU General Public License
+**      along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+/**
+ * @file
+ * Defines functions for manipulating a string buffer.
+ */
+
+// local
+#include "pjl_config.h"                 /* must go first */
+#include "strbuf.h"
+#include "path_util.h"
+#include "util.h"
+
+/// @cond DOXYGEN_IGNORE
+
+// standard
+#include <assert.h>
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>                     /* for free(3) */
+#include <string.h>
+#include <sysexits.h>
+
+/// @endcond
+
+/**
+ * @addtogroup strbuf-group
+ * @{
+ */
+
+////////// macros /////////////////////////////////////////////////////////////
+
+#define STRBUF_CAP_MIN            4     /**< Minimum buffer capacity. */
+
+/**
+ * Directly appends \a N bytes from \a S onto \a SBUF, no questions asked.
+ *
+ * @param SBUF A pointer to the \ref strbuf to append onto.
+ * @param S The string to append.
+ * @param N The number of bytes of \a s to append.
+ */
+#define STRBUF_DIRECT_PUTSN(SBUF,S,N)               \
+  do {                                              \
+    memcpy( (SBUF)->str + (SBUF)->len, (S), (N) );  \
+    (SBUF)->len += (N);                             \
+    (SBUF)->str[ (SBUF)->len ] = '\0';              \
+  } while (0)
+
+////////// extern functions ///////////////////////////////////////////////////
+
+void strbuf_cleanup( strbuf_t *sbuf ) {
+  if ( sbuf != NULL ) {
+    free( sbuf->str );
+    strbuf_init( sbuf );
+  }
+}
+
+char* strbuf_paths( strbuf_t *sbuf, char const *component ) {
+  assert( sbuf != NULL );
+  assert( component != NULL );
+
+  size_t comp_len = strlen( component );
+  if ( comp_len == 0 )
+    return sbuf->str;
+
+  if ( sbuf->len > 0 ) {
+    if ( sbuf->str[ sbuf->len - 1 ] == '/' ) {
+      if ( path_is_absolute( component ) ) {
+        ++component;
+        --comp_len;
+      }
+    }
+    else {
+      if ( path_is_relative( component ) ) {
+        strbuf_reserve( sbuf, comp_len + 1 );
+        sbuf->str[ sbuf->len++ ] = '/';
+        STRBUF_DIRECT_PUTSN( sbuf, component, comp_len );
+        return sbuf->str;
+      }
+    }
+  }
+
+  return strbuf_putsn( sbuf, component, comp_len );
+}
+
+char* strbuf_printf( strbuf_t *sbuf, char const *format, ... ) {
+  assert( sbuf != NULL );
+  assert( format != NULL );
+
+  va_list args;
+  va_start( args, format );
+  char *const rv = strbuf_vprintf( sbuf, format, args );
+  va_end( args );
+  return rv;
+}
+
+char* strbuf_putsn( strbuf_t *sbuf, char const *s, size_t n ) {
+  assert( s != NULL );
+
+  n = strnlen( s, n );
+  strbuf_reserve( sbuf, n );
+  STRBUF_DIRECT_PUTSN( sbuf, s, n );
+  return sbuf->str;
+}
+
+bool strbuf_reserve( strbuf_t *sbuf, size_t res_len ) {
+  assert( sbuf != NULL );
+  if ( res_len < sbuf->cap - sbuf->len )
+    return false;
+  if ( sbuf->cap == 0 )
+    sbuf->cap = STRBUF_CAP_MIN;
+  size_t const min_cap = sbuf->len + res_len;
+  //
+  // Why not grow by 2x?  The problem is that the size of each new allocation
+  // is always > the sum of all previous allocations combined, which means
+  // malloc can't reuse even a block coalesced from previous allocations.
+  //
+  // For example, given the previous allocations of 4, 8, and 16 (summing to
+  // 28), the next allocation will be 32, but 32 > 28, so malloc can't reuse
+  // that block.
+  //
+  // In contrast, growing by 1.5x yields allocations 4, 6, and 9 (summing to
+  // 19), and the next allocation will be 13, and 13 <= 19, so malloc can reuse
+  // that block.
+  //
+  while ( sbuf->cap <= min_cap )
+    sbuf->cap += sbuf->cap >> 1;        // grow by ~1.5x
+  REALLOC( sbuf->str, sbuf->cap );
+  return true;
+}
+
+void strbuf_reset( strbuf_t *sbuf ) {
+  assert( sbuf != NULL );
+  if ( sbuf->str != NULL )
+    sbuf->str[0] = '\0';
+  sbuf->len = 0;
+}
+
+void strbuf_sepsn_putsn( strbuf_t *sbuf, char const *sep, size_t sep_len,
+                         bool *sep_flag, char const *s, size_t s_len ) {
+  assert( sep_flag != NULL );
+
+  if ( true_or_set( sep_flag ) ) {
+    strbuf_reserve( sbuf, sep_len + s_len );
+    strbuf_putsn( sbuf, sep, sep_len );
+  }
+
+  strbuf_putsn( sbuf, s, s_len );
+}
+
+char* strbuf_vprintf( strbuf_t *sbuf, char const *format, va_list args ) {
+  assert( sbuf != NULL );
+  assert( format != NULL );
+
+  char *buf = sbuf->str == NULL ? NULL: sbuf->str + sbuf->len;
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-nonliteral"
+
+  //
+  // Attempt to concatenate onto the existing buffer: vsnprintf() returns the
+  // number of characters that _would_ have been printed if the buffer were
+  // unlimited.
+  //
+  va_list args_copy;
+  va_copy( args_copy, args );
+  int raw_len = vsnprintf( buf, sbuf->cap - sbuf->len, format, args_copy );
+  va_end( args_copy );
+  PERROR_EXIT_IF( raw_len < 0, EX_IOERR );
+
+  //
+  // Then reserve that number of characters: if strbuf_reserve() returns false,
+  // it means the buffer was already big enough and so all the characters were
+  // put into it by vsnprintf() which means we're done; otherwise, it means the
+  // buffer wasn't big enough so all the characters didn't fit, but the buffer
+  // was grown so they _will_ fit if we vsnprintf() again.
+  //
+  size_t const args_len = STATIC_CAST( size_t, raw_len );
+  if ( strbuf_reserve( sbuf, args_len ) ) {
+    buf = sbuf->str + sbuf->len;
+    raw_len = vsnprintf( buf, args_len + 1/*'\0'*/, format, args );
+    PERROR_EXIT_IF( raw_len < 0, EX_IOERR );
+  }
+
+#pragma GCC diagnostic pop
+
+  sbuf->len += args_len;
+  return sbuf->str;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+/** @} */
+
+extern inline void strbuf_init( strbuf_t* );
+extern inline char* strbuf_putc( strbuf_t*, char );
+extern inline char* strbuf_puts( strbuf_t*, char const* );
+extern inline void strbuf_sepsn_puts( strbuf_t*, char const*, size_t, bool*,
+                                      char const* );
+extern inline char* strbuf_take( strbuf_t* );
+
+/* vim:set et sw=2 ts=2: */

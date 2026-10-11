@@ -1,0 +1,78 @@
+/*
+**      symbol-tidy -- Symbol tidier
+**      src/symbol-tidy.h
+**
+**      Copyright (C) 2026  Paul J. Lucas, et al.
+**
+**      This program is free software: you can redistribute it and/or modify
+**      it under the terms of the GNU General Public License as published by
+**      the Free Software Foundation, either version 3 of the License, or
+**      (at your option) any later version.
+**
+**      This program is distributed in the hope that it will be useful,
+**      but WITHOUT ANY WARRANTY; without even the implied warranty of
+**      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+**      GNU General Public License for more details.
+**
+**      You should have received a copy of the GNU General Public License
+**      along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+#ifndef tidy_symbol_tidy_h
+#define tidy_symbol_tidy_h
+
+/**
+ * @file
+ * Declares miscellaneous macros and global variables.
+ */
+
+// local
+#include "pjl_config.h"
+
+/**
+ * @defgroup misc-globals Miscellaneous Globals
+ * Miscellaneous global macros and variables.
+ * @{
+ */
+
+////////// macros /////////////////////////////////////////////////////////////
+
+/**
+ * **symbol-tidy** primary author.
+ */
+#define TIDY_AUTHOR               "Paul J. Lucas"
+
+/**
+ * **symbol-tidy** latest copyright year.
+ */
+#define TIDY_COPYRIGHT_YEAR       "2026"
+
+/**
+ * **symbol-tidy** license.
+ *
+ * @sa #TIDY_LICENSE_URL
+ */
+#define TIDY_LICENSE              "GPLv3+: GNU GPL version 3 or later"
+
+/**
+ * **symbol-tidy** license URL.
+ *
+ * @sa #TIDY_LICENSE
+ */
+#define TIDY_LICENSE_URL          "https://gnu.org/licenses/gpl.html"
+
+/**
+ * Hash table load factor statistic `printf` format.
+ */
+#define TIDY_STAT_LF_FMT          "%4.2f"
+
+////////// extern variables ///////////////////////////////////////////////////
+
+extern char const  *prog_name;          ///< Program name.
+
+///////////////////////////////////////////////////////////////////////////////
+
+/** @} */
+
+#endif /* tidy_symbol_tidy_h */
+/* vim:set et sw=2 ts=2: */

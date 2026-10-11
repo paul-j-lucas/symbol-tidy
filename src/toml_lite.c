@@ -1,0 +1,1402 @@
+/*
+**      PJL Library
+**      src/toml_lite.c
+**
+**      Copyright (C) 2026  Paul J. Lucas
+**
+**      This program is free software: you can redistribute it and/or modify
+**      it under the terms of the GNU General Public License as published by
+**      the Free Software Foundation, either version 3 of the License, or
+**      (at your option) any later version.
+**
+**      This program is distributed in the hope that it will be useful,
+**      but WITHOUT ANY WARRANTY; without even the implied warranty of
+**      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+**      GNU General Public License for more details.
+**
+**      You should have received a copy of the GNU General Public License
+**      along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+/**
+ * @file
+ * Defines types and functions for reading a TOML file.
+ */
+
+// local
+#include "pjl_config.h"
+#include "toml_lite.h"
+#include "array.h"
+#include "fnv1a.h"
+#include "hash_table.h"
+#include "strbuf.h"
+#include "unicode.h"
+#include "util.h"
+
+/// @cond DOXYGEN_IGNORE
+
+// standard
+#include <assert.h>
+#include <ctype.h>
+#include <errno.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/// @endcond
+
+/**
+ * @addtogroup toml-group
+ * @{
+ */
+
+////////// macros /////////////////////////////////////////////////////////////
+
+/**
+ * Minimum array capacity.
+ */
+#define TOML_ARRAY_CAP_MIN        4
+
+/**
+ * Map any invalid character to this.
+ *
+ * @sa toml_getc()
+ * @sa toml_is_invalid_char()
+ */
+#define TOML_CHAR_INVALID         -2
+
+/**
+ * Rather than use a separate `bool is_newline_pending` in toml_file, use a
+ * special value in \ref toml_file::c_last "c_last".
+ */
+#define TOML_CHAR_PENDING_NEWLINE -3
+
+/**
+ * Maximum decimal digits.
+ */
+#define TOML_INT_DIGITS_MAX       MAX_DEC_INT_DIGITS( long )
+
+/**
+ * Maximum string length.
+ */
+#define TOML_STRING_LEN_MAX       1024
+
+////////// local constants ////////////////////////////////////////////////////
+
+/**
+ * TOML error messages.
+ *
+ * @note If \ref toml_file::error_msg is non-NULL, it overrides this message
+ * with a more specific one.
+ */
+static char const *const TOML_ERROR_MSGS[] = {
+  [ TOML_ERR_NONE             ] = "no error",
+  [ TOML_ERR_DUPLICATE_KEY    ] = "duplicate key",
+  [ TOML_ERR_DUPLICATE_TABLE  ] = "duplicate table",
+  [ TOML_ERR_INVALID_CHAR     ] = "invalid character",
+  [ TOML_ERR_INVALID_INT      ] = "invalid integer",
+  [ TOML_ERR_INVALID_KEY      ] = "invalid key",
+  [ TOML_ERR_INVALID_STRING   ] = "invalid string",
+  [ TOML_ERR_INVALID_UNICODE  ] = "invalid Unicode code-point",
+  [ TOML_ERR_UNEXPECTED_CHAR  ] = "unexpected character",
+  [ TOML_ERR_UNEXPECTED_EOF   ] = "unexpected end of file",
+};
+
+/// @cond DOXYGEN_IGNORE
+
+static char const TOML_ERR_MSG_BARE_KEY_NO_BEGIN_DOT[] =
+  "bare key can not begin with '.'";
+static char const TOML_ERR_MSG_BARE_KEY_NO_CONSECUTIVE_DOTS[] =
+  "bare key can not contain \"..'\"";
+static char const TOML_ERR_MSG_BARE_KEY_NO_END_DOT[] =
+  "bare key can not end with '.'";
+static char const TOML_ERR_MSG_EMPTY_KEY[] = "empty key";
+static char const TOML_ERR_MSG_EXTRA_COMMA[] =
+  "unexpected character (extra ',')";
+static char const TOML_ERR_MSG_INT_TOO_MANY_DIGITS[] =
+  "integer has too many digits";
+static char const TOML_ERR_MSG_INVALID_ESCAPE_SEQUENCE[] =
+  "invalid escape sequence";
+static char const TOML_ERR_MSG_MISSING_COMMA[] =
+  "unexpected character (missing ',')";
+static char const TOML_ERR_MSG_UNTERMINATED_STRING[] = "unterminated string";
+
+/// @endcond
+
+////////// local functions ////////////////////////////////////////////////////
+
+NODISCARD
+static bool toml_space_comments_skip( toml_file* ),
+            toml_space_skip( toml_file* ),
+            toml_string_parse( toml_file*, int, strbuf_t* ),
+            toml_unicode_parse( toml_file*, unsigned, strbuf_t* ),
+            toml_value_parse( toml_file*, toml_value* );
+
+NODISCARD
+static int  toml_getc( toml_file* );
+
+static void toml_comment_parse( toml_file* );
+static void toml_recover( toml_file* );
+static void toml_value_cleanup( toml_value* );
+
+////////// inline functions ///////////////////////////////////////////////////
+
+/**
+ * Gets whether \a c is a binary digit.
+ *
+ * @param c The character to check.
+ * @return Returns `true` only if \a c is either `'0'` or `'1'`.
+ *
+ * @sa is_ident()
+ * @sa isodigit()
+ */
+NODISCARD
+static inline bool isbdigit( int c ) {
+  return c == '0' || c == '1';
+}
+
+/**
+ * Gets whether \a c is an octal digit.
+ *
+ * @param c The character to check.
+ * @return Returns `true` only if \a c is one of `01234567`.
+ *
+ * @sa is_ident()
+ * @sa isbdigit()
+ */
+NODISCARD
+static inline bool isodigit( int c ) {
+  return c >= '0' && c <= '7';
+}
+
+/**
+ * Gets whether \a c is an identifier character, i.e., alphanumeric or `'_'`.
+ *
+ * @param c The character to check.
+ * @return Returns `true` only if \a c is an identifier character.
+ *
+ * @sa isbdigit()
+ * @sa isodigit()
+ */
+NODISCARD
+static inline bool is_ident( int c ) {
+  return isalnum( STATIC_CAST( unsigned char, c ) ) || c == '_';
+}
+
+/**
+ * Increments the toml_file's column.
+ *
+ * @param toml The toml_file to use.
+ */
+static inline void toml_col_inc( toml_file *toml ) {
+  toml->col_prev = toml->loc.col++;
+}
+
+/**
+ * Gets whether \a c is valid as part of a bare TOML key.
+ *
+ * @param c The character to check.
+ * @return Returns `true` only if \a c is valid as part of a bare TOML key.
+ */
+NODISCARD
+static inline bool toml_is_bare_key_char( int c ) {
+  return  (c >= 'a' && c <= 'z') ||
+          (c >= 'A' && c <= 'Z') ||
+          (c >= '0' && c <= '9') ||
+          (c == '-' || c == '_');
+}
+
+/**
+ * Gets whether \a c is an invalid TOML character.
+ *
+ * @param c The character to check.
+ * @return Returns `true` only if \a c is invalid.
+ */
+NODISCARD
+static inline bool toml_is_invalid_char( int c ) {
+  unsigned const uc = STATIC_CAST( unsigned, c );
+  // Replace several branches for range checks with a shift-and-mask.
+  return unlikely(
+    uc < ' ' ?
+      ( (1u << uc) & ((1u << '\n') | (1u << '\r') | (1u << '\t')) ) == 0 :
+      uc == 0x7F
+  );
+}
+
+/**
+ * Performs a newline.
+ *
+ * @param toml The toml_file to use.
+ */
+static inline void toml_newline( toml_file *toml ) {
+  ++toml->loc.line;
+  toml->col_prev = toml->loc.col;
+  toml->loc.col = 0;
+}
+
+/**
+ * Ungets \a c.
+ *
+ * @remarks Storing the "ungotten" character ourselves is significantly faster
+ * than calling **ungetc**(3).
+ *
+ * @param toml The toml_file to unget \a c.
+ * @param c The character to unget.
+ *
+ * @sa toml_getc()
+ * @sa toml_peekc()
+ */
+static inline void toml_ungetc( toml_file *toml, int c ) {
+  toml->c_last = c;
+  toml->loc.col = toml->col_prev;
+}
+
+/**
+ * Peeks at the next character, if any.
+ *
+ * @param toml The toml_file to peek the next character from.
+ * @return Returns the next character or `EOF`.
+ *
+ * @sa toml_getc()
+ * @sa toml_ungetc()
+ */
+static inline int toml_peekc( toml_file *toml ) {
+  int const c = toml_getc( toml );
+  if ( likely( c != EOF ) )
+    toml_ungetc( toml, c );
+  return c;
+}
+
+////////// local functions ////////////////////////////////////////////////////
+
+/**
+ * Cleans-up a toml_array.
+ *
+ * @param array The toml_array to clean up.  If NULL, does nothing.
+ */
+static void toml_array_cleanup( toml_array *array ) {
+  if ( likely( array != NULL ) ) {
+    // Force hoist of array-> out of loop.
+    size_t const size = array->size;
+    toml_value *const values = array->values;
+
+    for ( unsigned i = 0; i < size; ++i )
+      toml_value_cleanup( &values[i] );
+    free( values );
+  }
+}
+
+/**
+ * Parses a TOML array.
+ *
+ * @note Assumes the caller has already parsed the `[`.
+ *
+ * @param toml The toml_file to use.
+ * @param rv_a The toml_array to parse into.
+ * @return Returns `true` only if all values were parsed successfully.
+ */
+NODISCARD
+static bool toml_array_parse( toml_file *toml, toml_array *rv_a ) {
+  assert( toml != NULL );
+  assert( rv_a != NULL );
+
+  unsigned    array_cap = TOML_ARRAY_CAP_MIN;
+  toml_array  array = { .values = MALLOC( toml_value, array_cap ) };
+  bool        ok = false;
+  bool        need_comma = false;
+
+  ++toml->array_depth;
+
+  for (;;) {
+    if ( !toml_space_comments_skip( toml ) )
+      goto done;
+    int const c = toml_getc( toml );
+    switch ( c ) {
+      case '#': // impossible due to toml_space_comments_skip() above
+        INTERNAL_ERROR( "unexpected '#'\n" );
+      case ',':
+        if ( !need_comma ) {
+          toml->error = TOML_ERR_UNEXPECTED_CHAR;
+          toml->error_msg = TOML_ERR_MSG_EXTRA_COMMA;
+          goto done;
+        }
+        need_comma = false;
+        continue;
+      case ']':
+        ok = true;
+        goto done;
+      case EOF:
+        toml->error = TOML_ERR_UNEXPECTED_EOF;
+        goto done;
+      case TOML_CHAR_INVALID: // impossible due to toml_space_comments_skip()
+        INTERNAL_ERROR( "unexpected invalid character\n" );
+      default:
+        if ( need_comma ) {
+          toml->error = TOML_ERR_UNEXPECTED_CHAR;
+          toml->error_msg = TOML_ERR_MSG_MISSING_COMMA;
+          goto done;
+        }
+        toml_ungetc( toml, c );
+        break;
+    } // switch
+
+    toml_value value;
+    if ( !toml_value_parse( toml, &value ) )
+      break;
+    if ( array.size + 1 >= array_cap ) {
+      //
+      // Why not grow by 2x?  The problem is that the size of each new
+      // allocation is always > the sum of all previous allocations combined,
+      // which means malloc can't reuse even a block coalesced from previous
+      // allocations.
+      //
+      // For example, given the previous allocations of 4, 8, and 16 (summing
+      // to 28), the next allocation will be 32, but 32 > 28, so malloc can't
+      // reuse that block.
+      //
+      // In contrast, growing by 1.5x yields allocations 4, 6, and 9 (summing
+      // to 19), and the next allocation will be 13, and 13 <= 19, so malloc
+      // can reuse that block.
+      //
+      array_cap += array_cap >> 1;
+      REALLOC( array.values, array_cap );
+    }
+    array.values[ array.size++ ] = value;
+    need_comma = true;
+  } // for
+
+done:
+  --toml->array_depth;
+  if ( ok )
+    *rv_a = array;
+  else
+    toml_array_cleanup( &array );
+  return ok;
+}
+
+/**
+ * Parses a TOML Boolean value.
+ *
+ * @param toml The toml_file to use.
+ * @param c The first character parsed.
+ * @param rv_b The `bool` to parse into.
+ * @return Returns `true` only upon success.
+ */
+NODISCARD
+static bool toml_bool_parse( toml_file *toml, int c, bool *rv_b ) {
+  assert( toml != NULL );
+  assert( rv_b != NULL );
+
+  toml_loc const err_loc = {
+    .line = toml->loc.line,
+    .col  = toml->loc.col - 1
+  };
+  bool const is_t = c == 't';
+
+  for ( char const *want = is_t ? "rue" : "alse"; *want != '\0'; ++want ) {
+    if ( toml_getc( toml ) != *want )
+      goto error;
+  } // for
+
+  // Ensure it's not part of a longer identifier (e.g., "truest").
+  c = toml_peekc( toml );
+  if ( is_ident( c ) )
+    goto error;
+
+  *rv_b = is_t;
+  return true;
+
+error:
+  toml_recover( toml );
+  toml->loc = err_loc;
+  toml_col_inc( toml );
+  toml->error = TOML_ERR_UNEXPECTED_CHAR;
+  return false;
+}
+
+/**
+ * Parses a character.
+ *
+ * @note Assumes the caller has already called toml_space_comments_skip() that
+ * checks for #TOML_CHAR_INVALID.
+ *
+ * @param toml The toml_file to use.
+ * @param want_c The character wanted.
+ * @return Returns `true` only if \a want_c was parsed successfully.
+ */
+NODISCARD
+static bool toml_char_parse( toml_file *toml, char want_c ) {
+  assert( toml != NULL );
+
+  int const c = toml_getc( toml );
+  if ( c == want_c )
+    return true;
+
+  switch ( c ) {
+    case EOF:
+      toml->error = TOML_ERR_UNEXPECTED_EOF;
+      break;
+    case TOML_CHAR_INVALID: // impossible due to toml_space_comments_skip()
+      INTERNAL_ERROR( "unexpected invalid character\n" );
+    default:
+      toml->error = TOML_ERR_UNEXPECTED_CHAR;
+      break;
+  } // switch
+  return false;
+}
+
+/**
+ * Parses a TOML comment.
+ *
+ * @note Assumes the caller has already parsed the `#`.
+ *
+ * @param toml The toml_file to use.
+ */
+static void toml_comment_parse( toml_file *toml ) {
+  assert( toml != NULL );
+
+  for ( int c; likely( (c = fgetc( toml->file )) != EOF ); ) {
+    if ( c == '\n' ) {
+      toml_newline( toml );
+      break;
+    }
+  } // for
+}
+
+/**
+ * Gets the next character, if any.
+ *
+ * @param toml The toml_file to get the next character from.
+ * @return
+ *  + The next valid character; or:
+ *  + `EOF` for end-of-file; or:
+ *  + #TOML_CHAR_INVALID for any invalid TOML character.
+ *
+ * @sa toml_is_invalid_char()
+ * @sa toml_peekc()
+ * @sa toml_ungetc()
+ */
+NODISCARD
+static int toml_getc( toml_file *toml ) {
+  assert( toml != NULL );
+
+  bool const is_newline_pending = toml->c_last == TOML_CHAR_PENDING_NEWLINE;
+
+  int c = !is_newline_pending && likely( toml->c_last != EOF ) ?
+    toml->c_last :
+    fgetc( toml->file );
+
+  if ( toml_is_invalid_char( c ) )
+    c = TOML_CHAR_INVALID;
+
+  toml->c_last = EOF;
+
+  if ( likely( c != EOF ) ) {
+    if ( is_newline_pending )
+      toml_newline( toml );
+    if ( c == '\n' )
+      toml->c_last = TOML_CHAR_PENDING_NEWLINE;
+    toml_col_inc( toml );
+  }
+
+  return c;
+}
+
+/**
+ * Parses a TOML integer.
+ *
+ * @param toml The toml_file to use.
+ * @param c The first character parsed.
+ * @param rv_i The integer to parse into.
+ * @return Returns `true` only if an integer was parsed successfully.
+ */
+NODISCARD
+static bool toml_int_parse( toml_file *toml, int c, long *rv_i ) {
+  assert( toml != NULL );
+  assert( rv_i != NULL );
+
+  int     base = 10;
+  char    buf[ TOML_INT_DIGITS_MAX + 1/*'\0'*/ ];
+  size_t  buf_len = 0;
+  char    c_prev;
+
+  switch ( c ) {                        // can't be EOF
+    case '+':
+      break;
+    case '-':
+      buf[ buf_len++ ] = '-';
+      break;
+
+    case '0':
+      c = toml_getc( toml );
+      switch ( c ) {
+        case 'b':
+          base = 2;
+          break;
+        case 'o':
+          base = 8;
+          break;
+        case 'x':
+          base = 16;
+          break;
+
+        case '#':
+        case ',':
+        case ']':
+        case ' ':
+        case '\n':
+        case '\r':
+        case '\t':
+          toml_ungetc( toml, c );
+          FALLTHROUGH;
+        case EOF:
+          *rv_i = 0;
+          return true;
+
+        default:
+          toml->error = TOML_ERR_INVALID_INT;
+          return false;
+      } // switch
+      break;
+
+    case TOML_CHAR_INVALID:
+      unreachable();                    // since caller got a valid char
+
+    default:
+      toml_ungetc( toml, c );
+  } // switch
+
+  for (;;) {
+    c_prev = STATIC_CAST( char, c );
+    c = toml_getc( toml );
+    switch ( c ) {
+      case '#':
+      case ',':
+      case ']':
+      case ' ':
+      case '\n':
+      case '\r':
+      case '\t':
+        toml_ungetc( toml, c );
+        FALLTHROUGH;
+      case EOF:
+        if ( c_prev == '_' )
+          goto error;
+        // An EOF here isn't necessarily an error.  It could just mean there is
+        // nothing after this integer.
+        goto done;
+      case TOML_CHAR_INVALID:
+        toml->error = TOML_ERR_INVALID_CHAR;
+        return false;
+      case '_':
+        switch ( c_prev ) {
+          case '+':
+          case '-':
+          case '_':
+          case 'b':
+          case 'o':
+          case 'x':
+            goto error;
+        } // switch
+        continue;
+    } // switch
+
+    switch ( base ) {
+      case 2:
+        if ( !isbdigit( c ) )
+          goto error;
+        break;
+      case 8:
+        if ( !isodigit( c ) )
+          goto error;
+        break;
+      case 10:
+        if ( !isdigit( c ) )
+          goto error;
+        break;
+      case 16:
+        if ( !isxdigit( c ) )
+          goto error;
+        break;
+    } // switch
+
+    if ( buf_len + 1 == TOML_INT_DIGITS_MAX ) {
+      toml->error_msg = TOML_ERR_MSG_INT_TOO_MANY_DIGITS;
+      goto error;
+    }
+    buf[ buf_len++ ] = STATIC_CAST( char, c );
+  } // for
+
+done:
+  buf[ buf_len ] = '\0';
+  errno = 0;
+  long const value = strtol( buf, /*endptr=*/NULL, base );
+  if ( errno == 0 ) {
+    *rv_i = value;
+    return true;
+  }
+
+error:;
+  toml_loc const err_loc = toml->loc;
+  toml_recover( toml );
+  toml->loc = err_loc;
+  toml->error = TOML_ERR_INVALID_INT;
+  return false;
+}
+
+/**
+ * Cleans-up a toml_key.
+ *
+ * @param key The toml_key to clean-up. If NULL, does nothing.
+ */
+static void toml_key_cleanup( toml_key *key ) {
+  if ( likely( key != NULL ) ) {
+    FREE( key->name );
+    key->name = NULL;
+  }
+}
+
+/**
+ * Parses a TOML key.
+ *
+ * @note Assumes the caller has already called toml_space_comments_skip() that
+ * checks for #TOML_CHAR_INVALID.
+ *
+ * @param toml The toml_file to use.
+ * @param rv_key The key to parse into.
+ * @param rv_key_len If not NULL, receives the key's length.
+ * @return Returns `true` only if a key was parsed successfully.
+ */
+NODISCARD
+static bool toml_key_parse( toml_file *toml, toml_key *rv_key,
+                            size_t *rv_key_len ) {
+  assert( toml != NULL );
+  assert( rv_key != NULL );
+
+  int c = toml_getc( toml );
+
+  switch ( c ) {
+    case TOML_CHAR_INVALID: // impossible due to toml_space_comments_skip()
+      unreachable();
+    case EOF:
+      // An EOF here isn't necessarily an error.  It could just mean there are
+      // no more keys (and values).
+      return false;
+  } // switch
+
+  unsigned const  first_col = toml->loc.col;
+  bool            is_dot_allowed = false;
+  strbuf_t        key_buf = STRBUF_INIT();
+
+  while ( c != EOF ) {
+    if ( c == ' ' || c == '\t' ) {
+      if ( !toml_space_comments_skip( toml ) )
+        goto error;
+      c = toml_getc( toml );
+      continue;
+    }
+
+    if ( c == '.' ) {
+      if ( !is_dot_allowed ) {
+        toml->error = TOML_ERR_INVALID_KEY;
+        toml->error_msg = key_buf.len == 0 ?
+          TOML_ERR_MSG_BARE_KEY_NO_BEGIN_DOT :
+          TOML_ERR_MSG_BARE_KEY_NO_CONSECUTIVE_DOTS;
+        goto error;
+      }
+      strbuf_putc( &key_buf, '.' );
+      is_dot_allowed = false;
+      c = toml_getc( toml );
+      continue;
+    }
+
+    if ( is_dot_allowed ) {
+      //
+      // If a '.' is allowed, it means:
+      //
+      //  + We're NOT at the beginning since '.' can't start a key; and:
+      //  + We've just parsed a complete key segment, e.g. foo or "bar".
+      //
+      // Now, there are only two possible cases.
+      //
+      //  1. The key can continue after a dot separator --- which means a
+      //     consecutive dot is NOT allowed (is_dot_allowed == false), hence
+      //     this "if" would not be true and we won't break; or:
+      //
+      //  2. The key has ended (is followed by '=', ']', or an unexpected
+      //     character).  A dot WOULD be allowed (is_dot_allowed == true) if
+      //     there were more segments --- but since there aren't more, break.
+      //
+      break;
+    }
+
+    if ( c == '"' || c == '\'' ) {
+      if ( !toml_string_parse( toml, c, &key_buf ) )
+        goto error;
+      is_dot_allowed = true;
+      c = toml_getc( toml );
+      continue;
+    }
+
+    if ( toml_is_bare_key_char( c ) ) {
+      do {
+        strbuf_putc( &key_buf, STATIC_CAST( char, c ) );
+        c = toml_getc( toml );
+        if ( c == TOML_CHAR_INVALID )
+          goto error;
+      } while ( toml_is_bare_key_char( c ) );
+      is_dot_allowed = true;
+      continue;
+    }
+
+    break;
+  } // while
+
+  if ( key_buf.len == 0 ) {
+    toml->error = TOML_ERR_INVALID_KEY;
+    toml->error_msg = TOML_ERR_MSG_EMPTY_KEY;
+    goto error;
+  }
+
+  if ( !is_dot_allowed ) {              // means the last char was '.'
+    toml->loc.col = first_col + STATIC_CAST( unsigned, key_buf.len ) - 1;
+    toml->error = TOML_ERR_INVALID_KEY;
+    toml->error_msg = TOML_ERR_MSG_BARE_KEY_NO_END_DOT;
+    goto error;
+  }
+
+  if ( c != EOF )
+    toml_ungetc( toml, c );
+
+  if ( rv_key_len != NULL )
+    *rv_key_len = key_buf.len;
+  rv_key->name = strbuf_take( &key_buf );
+  rv_key->loc.col = first_col;
+  return true;
+
+error:
+  strbuf_cleanup( &key_buf );
+  return false;
+}
+
+/**
+ * Cleans-up a toml_key_value.
+ *
+ * @param kv The toml_key_value to clean-up. If NULL, does nothing.
+ */
+static void toml_key_value_cleanup( toml_key_value *kv ) {
+  if ( likely( kv != NULL ) ) {
+    toml_key_cleanup( &kv->key );
+    toml_value_cleanup( &kv->value );
+  }
+}
+
+/**
+ * Compares two toml_key_value objects.
+ *
+ * @param i_kv The first toml_key_value.
+ * @param j_kv The second toml_key_value.
+ * @return Returns a number less than 0, 0, or greater than 0 if the key of \a
+ * i_kv is less than, equal to, or greater than the key of \a j_kv,
+ * respectively.
+ */
+NODISCARD
+static int toml_key_value_cmp( toml_key_value *i_kv, toml_key_value *j_kv ) {
+  assert( i_kv != NULL );
+  assert( j_kv != NULL );
+  return strcmp( i_kv->key.name, j_kv->key.name );
+}
+
+/**
+ * Calculates the hash of \a kv.
+ *
+ * @param kv The toml_key_value to hash.
+ * @return Returns said hash.
+ */
+NODISCARD
+static ht_hash_val_t toml_key_value_hash( toml_key_value const *kv ) {
+  return fnv1a_s( kv->key.name );
+}
+
+/**
+ * Parses a TOML _key_ `=` _value_.
+ *
+ * @note Assumes the caller has already called toml_space_comments_skip() that
+ * checks for #TOML_CHAR_INVALID.
+ *
+ * @param toml The toml_file to use.
+ * @param rv_kv The toml_key_value to parse into.
+ * @return Returns `true` only if both a key and value were parsed
+ * successfully.
+ */
+NODISCARD
+static bool toml_key_value_parse( toml_file *toml, toml_key_value *rv_kv ) {
+  assert( toml != NULL );
+  assert( rv_kv != NULL );
+
+  toml_key    key = { .loc = toml->loc };
+  toml_value  value = { 0 };
+
+  if ( !toml_key_parse( toml, &key, /*rv_key_len=*/NULL ) )
+    return false;
+
+  bool const ok =
+    toml_space_comments_skip( toml ) &&
+    toml_char_parse( toml, '=' ) &&
+    toml_space_comments_skip( toml ) &&
+    toml_value_parse( toml, &value );
+
+  if ( ok )
+    *rv_kv = (toml_key_value){ .key = key, .value = value };
+  else
+    toml_key_cleanup( &key );
+
+  return ok;
+}
+
+/**
+ * Try to recover from a parsing error by reading and discarding non-structural
+ * characters.
+ *
+ * @param toml The toml_file to use.
+ */
+static void toml_recover( toml_file *toml ) {
+  assert( toml != NULL );
+
+  for (;;) {
+    int const c = toml_getc( toml );
+    switch ( c ) {
+      case '\t':
+      case '\n':
+      case '\r':
+      case ' ':
+      case '#':
+      case ',':
+      case '=':
+      case '[':
+      case ']':
+        toml_ungetc( toml, c );
+        FALLTHROUGH;
+      case EOF:
+        return;
+    } // switch
+  } // for
+}
+
+/**
+ * Skips all whitespace and comments.
+ *
+ * @param toml The toml_file to use.
+ * @return Returns `true` only upon success.
+ *
+ * @sa toml_space_skip()
+ */
+static bool toml_space_comments_skip( toml_file *toml ) {
+  assert( toml != NULL );
+  for (;;) {
+    if ( !toml_space_skip( toml ) )
+      break;
+    int const c = toml_getc( toml );
+    if ( c == '#' ) {
+      toml_comment_parse( toml );
+      continue;
+    }
+    if ( likely( c != EOF ) )
+      toml_ungetc( toml, c );
+    break;
+  } // for
+
+  return toml->error == TOML_ERR_NONE;
+}
+
+/**
+ * Skips all whitespace.
+ *
+ * @param toml The toml_file to use.
+ * @return Returns `true` only upon success.
+ *
+ * @sa toml_space_comments_skip()
+ */
+NODISCARD
+static bool toml_space_skip( toml_file *toml ) {
+  assert( toml != NULL );
+
+  for (;;) {
+    int const c = toml_getc( toml );
+    switch ( c ) {
+      case TOML_CHAR_INVALID:
+        toml->error = TOML_ERR_INVALID_CHAR;
+        return false;
+      case ' ':
+      case '\t':
+      case '\n':
+        break;
+      default:
+        toml_ungetc( toml, c );
+        FALLTHROUGH;
+      case EOF:
+        return true;
+    }
+  } // for
+}
+
+/**
+ * Parses a TOML string.
+ *
+ * @note Assumes the caller has already parsed the `"`.
+ *
+ * @param toml The toml_file to use.
+ * @param quote The quote character to use as the delimiter.
+ * @param sbuf The strbuf_t to append the string onto.
+ * @return Returns `true` only if a string was parsed successfully.
+ */
+NODISCARD
+static bool toml_string_parse( toml_file *toml, int quote, strbuf_t *sbuf ) {
+  assert( toml != NULL );
+  assert( quote == '"' || quote == '\'' );
+  assert( sbuf != NULL );
+
+  for (;;) {
+    int c = toml_getc( toml );
+    switch ( c ) {
+      case EOF:
+        toml->error = TOML_ERR_UNEXPECTED_EOF;
+        return false;
+      case TOML_CHAR_INVALID:
+        toml->error = TOML_ERR_INVALID_CHAR;
+        return false;
+      case '\r':
+      case '\n':
+        toml->error = TOML_ERR_INVALID_STRING;
+        toml->error_msg = TOML_ERR_MSG_UNTERMINATED_STRING;
+        return false;
+      case '"':
+      case '\'':
+        if ( c == quote )
+          return true;
+        break;
+      case '\\':
+        if ( quote != '\'' ) {
+          c = toml_getc( toml );
+          switch ( c ) {
+            case '"'  : c = '"';  break;
+            case 'b'  : c = '\b'; break;
+            case 'e'  : c = 0x1B; break;
+            case 'f'  : c = '\f'; break;
+            case 'n'  : c = '\n'; break;
+            case 'r'  : c = '\r'; break;
+            case 't'  : c = '\t'; break;
+            case '\\' : c = '\\'; break;
+
+            case 'u':
+              if ( !toml_unicode_parse( toml, 4, sbuf ) )
+                return false;
+              continue;
+            case 'U':
+              if ( !toml_unicode_parse( toml, 8, sbuf ) )
+                return false;
+              continue;
+            case 'x':
+              if ( !toml_unicode_parse( toml, 2, sbuf ) )
+                return false;
+              continue;
+
+            case EOF:
+              toml->error = TOML_ERR_UNEXPECTED_EOF;
+              return false;
+            case TOML_CHAR_INVALID:
+              toml->error = TOML_ERR_INVALID_CHAR;
+              return false;
+            default:
+              toml->error = TOML_ERR_INVALID_STRING;
+              toml->error_msg = TOML_ERR_MSG_INVALID_ESCAPE_SEQUENCE;
+              return false;
+          } // switch
+        }
+        break;
+    } // switch
+
+    strbuf_putc( sbuf, STATIC_CAST( char, c ) );
+  } // for
+}
+
+/**
+ * Parses a table header.
+ *
+ * @note Assumes the caller has already parsed the `[`.
+ *
+ * @param toml The toml_file to use.
+ * @param rv_key The toml_key to parse into.
+ * @param rv_name_len Receives the table name's length.
+ * @return Returns `true` only if a table name was parsed successfully.
+ */
+NODISCARD
+static bool toml_table_header_parse( toml_file *toml, toml_key *rv_key,
+                                     size_t *rv_name_len ) {
+  assert( toml != NULL );
+  assert( rv_key != NULL );
+  assert( rv_name_len != NULL );
+
+  if ( !toml_space_comments_skip( toml ) )
+    return false;
+
+  toml_key key;
+  if ( !toml_key_parse( toml, &key, rv_name_len ) ) {
+    if ( toml->error == TOML_ERR_NONE ) {
+      //
+      // If we didn't parse a key, but there is no error, it must mean we've
+      // encountered EOF.  Ordinarily, not parsing a key isn't an error, but it
+      // is when parsing a table header.
+      //
+      toml->error = TOML_ERR_UNEXPECTED_EOF;
+    }
+    return false;
+  }
+
+  if ( !(toml_space_comments_skip( toml ) && toml_char_parse( toml, ']' )) ) {
+    toml_key_cleanup( &key );
+    return false;
+  }
+
+  *rv_key = key;
+  return true;
+}
+
+/**
+ * Parses the hexadecimal digits comprising a TOML escape sequence for a
+ * Unicode code-point.
+ *
+ * @param toml The toml_file to use.
+ * @param n The number of hexadecimal digits to parse: 2, 4, or 8.
+ * @param sbuf Only if the parse is successful and the code-point is valid,
+ * appends the UTF-8 bytes for the parsed Unicode code-point to this buffer.
+ * @return Returns `true` only if \a n hexadecimal digits were parsed
+ * successfully and the Unicode code-point is valid.
+ */
+NODISCARD
+static bool toml_unicode_parse( toml_file *toml, unsigned n, strbuf_t *sbuf ) {
+  assert( toml != NULL );
+  assert( sbuf != NULL );
+
+  toml_loc const err_loc = {
+    .line = toml->loc.line,
+    .col  = toml->loc.col - 1
+  };
+
+  char32_t cp = 0;
+  for ( unsigned i = 0; i < n; ++i ) {
+    int const c = toml_getc( toml );
+    if ( unlikely( c == EOF ) ) {
+      toml->error = TOML_ERR_UNEXPECTED_EOF;
+      return false;
+    }
+    if ( !isxdigit( c ) ) {
+      toml->error = TOML_ERR_INVALID_STRING;
+      toml->error_msg = TOML_ERR_MSG_INVALID_ESCAPE_SEQUENCE;
+      return false;
+    }
+
+    int const nibble = isalpha( c ) ? toupper( c ) - 'A' + 10 : c - '0';
+    cp = (cp << 4) | STATIC_CAST( unsigned, nibble );
+  } // for
+
+  if ( !cp_is_valid( cp ) ) {
+    toml->error = TOML_ERR_INVALID_UNICODE;
+    toml->loc = err_loc;
+    return false;
+  }
+
+  char8_t u8c[ UTF8_CHAR_SIZE_MAX ];
+  n = utf32c_8c( cp, u8c );
+  assert( n > 0 );
+  strbuf_putsn( sbuf, POINTER_CAST( char const*, u8c ), n );
+  return true;
+}
+
+/**
+ * Cleans-up a toml_value.
+ *
+ * @param value The toml_value to clean-up.  If NULL, does nothing.
+ */
+static void toml_value_cleanup( toml_value *value ) {
+  if ( likely( value != NULL ) ) {
+    switch ( value->type ) {
+      case TOML_ARRAY:
+        toml_array_cleanup( &value->a );
+        break;
+      case TOML_BOOL:
+      case TOML_INT:
+        // nothing to do
+        break;
+      case TOML_STRING:
+        free( value->s );
+        break;
+    } // switch
+  }
+}
+
+/**
+ * Parses a TOML value.
+ *
+ * @note Assumes the caller has already checked for for #TOML_CHAR_INVALID.
+ *
+ * @param toml The toml_file to use.
+ * @param rv_value The toml_value to parse into.
+ * @return Returns `true` only if the value parsed successfully.
+ */
+NODISCARD
+static bool toml_value_parse( toml_file *toml, toml_value *rv_value ) {
+  assert( toml != NULL );
+  assert( rv_value != NULL );
+
+  for (;;) {
+    int const c = toml_getc( toml );
+    toml_loc const value_loc = toml->loc;
+    switch ( c ) {
+      case '"':
+      case '\'':;
+        strbuf_t sbuf = STRBUF_INIT();
+        if ( toml_string_parse( toml, c, &sbuf ) ) {
+          *rv_value = (toml_value){
+            .type = TOML_STRING,
+            .loc = value_loc,
+            .s = strbuf_take( &sbuf )
+          };
+          return true;
+        }
+        strbuf_cleanup( &sbuf );
+        return false;
+
+      case '#': // impossible since caller called toml_space_comments_skip()
+        INTERNAL_ERROR( "unexpected '#'\n" );
+
+      case '+':
+      case '-':
+      case '0':
+      case '1':
+      case '2':
+      case '3':
+      case '4':
+      case '5':
+      case '6':
+      case '7':
+      case '8':
+      case '9':;
+        long i;
+        if ( !toml_int_parse( toml, c, &i ) )
+          return false;
+        *rv_value = (toml_value){
+          .type = TOML_INT,
+          .loc = value_loc,
+          .i = i
+        };
+        return true;
+
+      case 'f':
+      case 't':;
+        bool b;
+        if ( !toml_bool_parse( toml, c, &b ) )
+          return false;
+        *rv_value = (toml_value){
+          .type = TOML_BOOL,
+          .loc = value_loc,
+          .b = b
+        };
+        return true;
+
+      case '[':;
+        toml_array a;
+        if ( !toml_array_parse( toml, &a ) )
+          return false;
+        *rv_value = (toml_value){
+          .type = TOML_ARRAY,
+          .loc = value_loc,
+          .a = a
+        };
+        return true;
+
+      case TOML_CHAR_INVALID:
+        INTERNAL_ERROR( "unexpected invalid character\n" );
+
+      default:
+        toml->error = TOML_ERR_UNEXPECTED_CHAR;
+        return false;
+    } // switch
+  } // for
+}
+
+////////// extern functions ///////////////////////////////////////////////////
+
+char const* toml_error_msg( toml_file const *toml ) {
+  assert( toml != NULL );
+  if ( toml->error_msg != NULL )
+    return toml->error_msg;
+  assert( toml->error < ARRAY_SIZE( TOML_ERROR_MSGS ) );
+  char const *const msg = TOML_ERROR_MSGS[ toml->error ];
+  assert( msg != NULL );
+  return msg;
+}
+
+void toml_file_cleanup( toml_file *toml ) {
+  if ( likely( toml != NULL ) ) {
+    // Table names are copied into the entries, so nothing to free.
+    ht_table_cleanup( &toml->table_names, /*free_fn=*/NULL );
+    *toml = (toml_file){ 0 };
+  }
+}
+
+void toml_file_init( toml_file *toml, FILE *file ) {
+  assert( toml != NULL );
+  assert( file != NULL );
+
+  *toml = (toml_file){
+    .c_last = EOF,
+    .file = file,
+    .loc = {
+      .line = 1,
+      // Explicitly initialize col to 0 so it doesn't look like an omission.
+      // Upon reading the first character, this will be incremented to 1.
+      .col = 0
+    }
+  };
+
+  ht_table_init(
+    &toml->table_names, HT_DINT, 2.0, 32,
+    POINTER_CAST( ht_cmp_fn_t, &strcmp ),
+    POINTER_CAST( ht_hash_fn_t, &fnv1a_s )
+  );
+}
+
+void toml_table_cleanup( toml_table *table ) {
+  if ( likely( table != NULL ) ) {
+    toml_key_cleanup( &table->key );
+    ht_table_cleanup(
+      &table->keys_values,
+      POINTER_CAST( ht_free_fn_t, &toml_key_value_cleanup )
+    );
+    array_cleanup( &table->ordered_kv_ptrs, /*free_fn=*/NULL );
+  }
+}
+
+toml_value const* toml_table_find( toml_table const *table, char const *key ) {
+  assert( table != NULL );
+  assert( key != NULL );
+
+  toml_key_value const kv = { .key = { .name = key } };
+  ht_entry_t const *const found_ht = ht_table_find( &table->keys_values, &kv );
+  if ( found_ht == NULL )
+    return NULL;
+  toml_key_value const *const found_kv = HT_DINT( found_ht );
+  return &found_kv->value;
+}
+
+void toml_table_init( toml_table *table ) {
+  assert( table != NULL );
+  table->key = (toml_key){ 0 };
+  ht_table_init(
+    &table->keys_values, HT_DINT, 2.0, 64,
+    POINTER_CAST( ht_cmp_fn_t, &toml_key_value_cmp ),
+    POINTER_CAST( ht_hash_fn_t, &toml_key_value_hash )
+  );
+  array_init( &table->ordered_kv_ptrs, sizeof(toml_key_value*) );
+}
+
+bool toml_table_next( toml_file *toml, toml_table *table ) {
+  assert( toml != NULL );
+  assert( table != NULL );
+
+  toml_table_cleanup( table );
+
+  if ( !toml_space_comments_skip( toml ) )
+    return false;
+
+  toml_key  table_key;
+  size_t    table_name_len;
+
+  toml_loc const header_loc = toml->loc;
+  int c = toml_getc( toml );
+
+  switch ( c ) {
+    case '[':
+      if ( !toml_table_header_parse( toml, &table_key, &table_name_len ) )
+        return false;
+      break;
+    case TOML_CHAR_INVALID: // impossible due to toml_space_comments_skip()
+      INTERNAL_ERROR( "unexpected invalid character\n" );
+    case EOF:
+      // An EOF here isn't an error.  It just means there are no more tables.
+      return false;
+    default:
+      toml_ungetc( toml, c );
+      table_key = (toml_key){ .name = NULL };
+      table_name_len = 0;
+      break;
+  } // switch
+
+  if ( table_key.name != NULL ) {
+    ht_insert_rv_t const hti = ht_table_insert(
+      &toml->table_names,
+      CONST_CAST( char*, table_key.name ), table_name_len + 1
+    );
+    if ( !hti.inserted ) {
+      toml->error = TOML_ERR_DUPLICATE_TABLE;
+      toml->loc.col = table_key.loc.col;
+      toml_key_cleanup( &table_key );
+      return false;
+    }
+  }
+
+  toml_table_init( table );
+  // Note: table->key takes ownership of table_key.name.
+  table->key = (toml_key){ .name = table_key.name, .loc = header_loc };
+
+  while ( toml_space_comments_skip( toml ) ) {
+    c = toml_peekc( toml );
+    if ( c == EOF || c == '[' )
+      return true;
+
+    toml_key_value new_kv;
+    if ( !toml_key_value_parse( toml, &new_kv ) )
+      break;
+
+    ht_insert_rv_t const hti =
+      ht_table_insert( &table->keys_values, &new_kv, sizeof new_kv );
+    if ( !hti.inserted ) {
+      toml->loc = new_kv.key.loc;
+      toml->error = TOML_ERR_DUPLICATE_KEY;
+      toml_key_value_cleanup( &new_kv );
+      break;
+    }
+    toml_key_value *const kv = HT_DINT( hti.entry );
+    *(toml_key_value**)array_push_back( &table->ordered_kv_ptrs ) = kv;
+  } // while
+
+  toml_table_cleanup( table );
+  return false;
+}
+
+char const* toml_type_name( toml_type type ) {
+  switch ( type ) {
+    case TOML_BOOL  : return "boolean";
+    case TOML_INT   : return "integer";
+    case TOML_STRING: return "string";
+    case TOML_ARRAY : return "array";
+  } // switch
+  UNEXPECTED_INT_VALUE( type );
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+/** @} */
+
+/// @cond DOXYGEN_IGNORE
+
+extern inline void toml_iterator_init( toml_iterator*, toml_table* );
+extern inline toml_key_value const* toml_iterator_next( toml_iterator* );
+extern inline bool toml_table_empty( toml_table const* );
+
+/// @endcond
+
+/* vim:set et sw=2 ts=2: */

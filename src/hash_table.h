@@ -1,0 +1,544 @@
+/*
+**      PJL Library
+**      src/hash_table.h
+**
+**      Copyright (C) 2025-2026  Paul J. Lucas
+**
+**      This program is free software: you can redistribute it and/or modify
+**      it under the terms of the GNU General Public License as published by
+**      the Free Software Foundation, either version 3 of the License, or
+**      (at your option) any later version.
+**
+**      This program is distributed in the hope that it will be useful,
+**      but WITHOUT ANY WARRANTY; without even the implied warranty of
+**      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+**      GNU General Public License for more details.
+**
+**      You should have received a copy of the GNU General Public License
+**      along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+#ifndef pjl_hash_table_h
+#define pjl_hash_table_h
+
+/**
+ * @file
+ * Declares a type for a hash table as well as functions for manipulating said
+ * hash table.
+ *
+ * @sa [Hash Table](https://en.wikipedia.org/wiki/Hash_table)
+ */
+
+// local
+#include "pjl_config.h"
+
+/// @cond DOXYGEN_IGNORE
+
+// standard
+#include <stdalign.h>
+#include <stdbool.h>
+#include <stddef.h>                     /* for max_align_t */
+#include <stdint.h>
+
+#ifndef NODISCARD
+# define NODISCARD                      /* nothing */
+#endif /* NODISCARD */
+#ifndef PJL_DISCARD
+# define PJL_DISCARD                    /* nothing */
+#endif /* PJL_DISCARD */
+
+/// @endcond
+
+///
+/// @defgroup hash-table-group Hash Table
+/// A type for a hash table and functions for manipulating said hash table.
+///
+/// @remarks
+/// @parblock
+/// Unlike many hash table implementations that map keys to values, this one
+/// contains only entries, hence it's more a hash _set_ than a hash _map_.
+/// However, entries can be of any type including structures where any
+/// member(s) can comprise the "key" (that which is hashed) and, optionally,
+/// any other member(s) can comprise the "value."  To this implementation,
+/// entries are opaque.
+///
+/// Also unlike many hash table implementations, this one allows user code to
+/// choose whether entries' data are stored "internally" with the entry itself
+/// or as only a pointer to data elsewhere.  (See ht_dloc.)  Entries can be of
+/// different sizes even when data are stored internally.
+/// @endparblock
+///
+/// @note This implementaiton uses separate chaining.
+///
+/// @par Example
+/// @parblock
+/// A hash table of word counts.
+///
+///       struct word_count {
+///         char     *word;
+///         unsigned  count;
+///       };
+///
+///       int word_count_cmp( void const *p_i, void const *p_j ) {
+///         struct word_count const *const wc_i = p_i;
+///         struct word_count const *const wc_j = p_j;
+///         return strcmp( wc_i->word, wc_j->word );
+///       }
+///
+///       ht_hash_val_t word_count_hash( void const *p ) {
+///         struct word_count const *const wc = p;
+///         return fnv1a_s( wc->word );
+///       }
+///
+///       void word_count_cleanup( void const *p ) {
+///         if ( p != NULL ) {
+///           struct word_count const *const wc = p;
+///           free( wc->word );
+///         }
+///       }
+///
+///       void add_word( hash_table_t *table, char const *word ) {
+///         struct word_count ins_wc = { .word = word, .count = 1 };
+///         ht_insert_rv_t const hti =
+///           ht_table_insert( table, &ins_wc, sizeof *ins_wc );
+///         if ( hti.inserted ) {
+///           struct word_count *const new_wc = HT_DINT( hti.entry );
+///           new_wc->word = strdup( word );
+///         }
+///       }
+///
+///       int main() {
+///         hash_table_t table;
+///         ht_table_init( &table, HT_DINT, 2.0, 10,
+///                        &word_count_cmp, &word_count_hash );
+///         add_word( &table, "hello" );
+///         ht_table_cleanup( &table, &word_count_cleanup );
+///       }
+///
+/// **Notes**:
+///
+/// + The example assumes the existence of a string hash function `fnv1a_s`.
+///
+/// + \ref ht_cmp_fn_t "Comparison functions" return 0 when two entries are
+///   equal (just like `strcmp` does with strings).
+///
+/// + Since this hash table stores data internally (\ref ht_dloc::HT_DINT
+///   "HT_DINT"), this clean-up function frees only `word` and _not_ the
+///   `word_count` structure itself.
+///
+/// + For `ins_wc` (the `word_count` potentially being inserted), its `word` is
+///   not duplicated before insertion since the duplication will be pointless
+///   if the word already exists (if `inserted` is false) and it would have to
+///   be freed.  Instead, `word` is duplicated only if `inserted` is true.
+/// @endparblock
+///
+/// @par Example
+/// @parblock
+/// For comparison, here's the same hash table of word counts, but now storing
+/// data via pointer (\ref ht_dloc::HT_DPTR "HT_DPTR").  Only the differences
+/// from the previous example are shown:
+///
+///       void word_count_free( void const *p ) {
+///         if ( p != NULL ) {
+///           struct word_count const *const wc = p;
+///           free( wc->word );
+///           free( wc );
+///         }
+///       }
+///
+///       void add_word_count( hash_table_t *table, struct word_count *wc ) {
+///         ht_insert_rv_t const hti = ht_table_insert( table, wc, 0 );
+///         if ( !hti.inserted ) {
+///           wc = HT_DPTR( hti.entry );
+///           ++wc->count;
+///         }
+///       }
+///
+///       int main() {
+///         hash_table_t table;
+///         ht_table_init( &table, HT_DPTR, 2.0, 10,
+///                        &word_count_cmp, &word_count_hash );
+///
+///         struct word_count *const wc = malloc( sizeof *wc );
+///         *wc = (struct word_count){ .word = strdup( "hello" ), .count = 1 };
+///
+///         add_word_count( &table, "hello" );
+///
+///         ht_table_cleanup( &table, &word_count_free );
+///
+///         word_count_free( wc );
+///       }
+///
+/// **Notes**:
+///
+/// + Now, `word_count_free` frees both `word` _and_ the `word_count` object
+///   itself.
+///
+/// + Now, `add_word_count` adds a pointer to an existing `word_count` so the
+///   argument of the `data_size` parameter doesn't matter (since it's always
+///   the size of a pointer) and so can be 0.
+///
+/// + Now, `NULL` is passed to \ref ht_table_cleanup since `word_count` objects
+///   are being managed outside the tree.
+/// @endparblock
+///
+/// @sa [Hash Table](https://en.wikipedia.org/wiki/Hash_table)
+/// @{
+///
+
+////////// macros /////////////////////////////////////////////////////////////
+
+/**
+ * Gets a pointer to the internal data of \a ENTRY for when \ref
+ * ht_dloc::HT_DINT "HT_DINT" was used with ht_table_init().
+ *
+ * @param ENTRY The ht_entry to get a pointer to the data of.
+ * @return Returns a pointer to the data internal to \a ENTRY.
+ *
+ * @warning The entry's \ref ht_entry::data "data" _must not_ be modified if
+ * that would change the entry's hash value according to its \ref
+ * hash_table::hash_fn "hash_fn".
+ *
+ * @sa #HT_DPTR()
+ */
+#define HT_DINT(ENTRY)            ( (void*)(ENTRY)->data )
+
+/**
+ * Gets an lvalue reference to a pointer to the external data of \a ENTRY for
+ * when \ref ht_dloc::HT_DPTR "HT_DPTR" was used with ht_table_init().
+ *
+ * @remarks As an lvalue reference, `HT_DPTR` can appear on the left-hand side
+ * of an `=` and be assigned to.
+ *
+ * @param ENTRY The ht_entry to get a pointer to the data of.
+ * @return Returns a pointer to the data \a ENTRY points to.
+ *
+ * @warning The entry's \ref ht_entry::data "data" _must not_ be modified if
+ * that would change the entry's hash value according to its \ref
+ * hash_table::hash_fn "hash_fn".
+ *
+ * @sa #HT_DINT()
+ */
+#define HT_DPTR(ENTRY)            ( *(void**)HT_DINT( (ENTRY) ) )
+
+////////// enums //////////////////////////////////////////////////////////////
+
+/**
+ * Hash table entry data location.
+ */
+enum ht_dloc {
+  /**
+   * Entries contain data internally.  The advantages are:
+   *
+   *  + No separate call to `malloc()` is needed to allocate the data and no
+   *    separate call to `free()` is needed to deallocate it.
+   *  + The data can be accessed faster since it's already been loaded with the
+   *    entry (cache hit).
+   *
+   * The disadvantages are:
+   *
+   *  - Inserting data into a tree requires copying it into an entry.
+   *  - If you want to delete an entry from the tree but keep its data, you
+   *    have to copy it out first.
+   */
+  HT_DINT,
+
+  /**
+   * Entries contain a pointer to the data.  The advantages are:
+   *
+   *  + Inserting data into a tree requires copying only a pointer into an
+   *    entry.
+   *  + Hence, the lifetime of data is separate from the tree.
+   *
+   * The disadvantages are:
+   *
+   *  - A separate call to `malloc()` is needed to allocate the data and a
+   *    separate call to `free()` is needed to deallocate it.
+   *  - Accessing the data is slower since it's in a different memory location
+   *    than the entry (cache miss).
+   */
+  HT_DPTR
+};
+
+////////// typedefs ///////////////////////////////////////////////////////////
+
+typedef struct hash_table     hash_table_t;
+typedef enum   ht_dloc        ht_dloc_t;
+typedef struct ht_entry       ht_entry_t;
+typedef uint64_t              ht_hash_val_t;
+typedef struct ht_insert_rv   ht_insert_rv_t;
+typedef struct ht_iterator    ht_iterator_t;
+
+/**
+ * The signature for a function passed to ht_table_init() used to compare entry
+ * data.
+ *
+ * @remarks This function need only compare for equality; neither less nor
+ * greater than comparisons are necessary.
+ *
+ * @param i_data A pointer to data.
+ * @param j_data A pointer to data.
+ * @return Returns 0 only if the data pointed to by \a i_data equals that
+ * pointed to by \a j_data; non-zero otherwise.
+ *
+ * @note The return value of 0 meaning equal allows a 3-way comparison function
+ * like **strcmp**(3) to be used directly when the data are strings.
+ */
+typedef int (*ht_cmp_fn_t)( void const *i_data, void const *j_data );
+
+/**
+ * The signature for a function passed to ht_table_cleanup() used to free data
+ * associated with each entry (if necessary).
+ *
+ * @param data A pointer to the data to free.
+ */
+typedef void (*ht_free_fn_t)( void *data );
+
+/**
+ * The signature for a function pass to ht_table_init() used to hash entry
+ * data.
+ *
+ * @param data A pointer to the data to hash.
+ * @return Returns a hash value for \a data.
+ */
+typedef ht_hash_val_t (*ht_hash_fn_t)( void const *data );
+
+////////// structures /////////////////////////////////////////////////////////
+
+/**
+ * A hash table.
+ */
+struct hash_table {
+  ht_entry_t   *buckets;                ///< Buckets.
+  ht_cmp_fn_t   cmp_fn;                 ///< Comparison function.
+  ht_hash_fn_t  hash_fn;                ///< Hash function.
+  double        max_lf;                 ///< Maximum load factor.
+  ht_dloc_t     dloc;                   ///< Entry data location.
+  unsigned      size;                   ///< Number of entries.
+  unsigned      prime_idx;              ///< Index into HT_PRIME.
+};
+
+/**
+ * A hash table entry.
+ *
+ * @remarks Once created, `ht_entry` objects don't move even if the hash table
+ * grows, so pointers to them remain valid until either deleted or the hash
+ * table is cleaned up.
+ *
+ * @warning Only \ref data may be accessed by user code.  All other fields are
+ * for internal use only.
+ */
+struct ht_entry {
+  ht_entry_t   *next;                   ///< Next entry, if any.
+  ht_entry_t   *prev;                   ///< Previous entry, if any.
+  ht_hash_val_t hash;                   ///< Entry hash.
+
+  /**
+   * User data.
+   *
+   * @remarks This field should _not_ be accessed directly.  Instead, use
+   * either the #HT_DINT() or #HT_DPTR() macro.
+   *
+   * @warning The data _must not_ be modified if that would change the entry's
+   * hash value according to the hash table's \ref hash_table::hash_fn
+   * "hash_fn".  For example, if `data` is a `struct` like:
+   *
+   *      struct word_count {
+   *        char     *word;
+   *        unsigned  count;
+   *      };
+   *
+   * then, assuming the \ref hash_table::hash_fn "hash_fn" hashes only `word`,
+   * user code may then only safely modify `count`.
+   */
+  alignas(max_align_t) char data[];
+};
+
+/**
+ * The return value of ht_table_insert().
+ */
+struct ht_insert_rv {
+  /**
+   * The \ref ht_entry "entry" either found or inserted.  Use \ref inserted to
+   * know which.
+   *
+   * @warning Even though this is a pointer to a non-`const` \ref ht_entry, the
+   * entry's \ref ht_entry::data "data" _must not_ be modified if that would
+   * change the entry's hash value according to the table's \ref
+   * hash_table::hash_fn "hash_fn".
+   */
+  ht_entry_t *entry;
+
+  /**
+   * If `true`, \ref entry refers to the newly inserted entry; if `false`, \ref
+   * entry refers to the existing entry having the same \ref ht_entry::data
+   * "data" according to the table's \ref hash_table::cmp_fn "cmp_fn".
+   */
+  bool inserted;
+};
+
+/**
+ * An iterator for a hash_table.
+ *
+ * @warning The hash table _must not_ have entries either added or removed
+ * while being iterated over.
+ *
+ * @sa ht_iterator_init()
+ */
+struct ht_iterator {
+  hash_table_t const *table;            ///< Hash table being iterated over.
+  ht_entry_t         *next;             ///< Next entry, if any.
+  unsigned            bucket_idx;       ///< Current bucket index.
+  unsigned            n_buckets;        ///< Number of buckets.
+};
+
+////////// extern functions ///////////////////////////////////////////////////
+
+/**
+ * Gets a pointer to an \a entry's data.
+ *
+ * @param table A pointer to the hash_table of \a entry.
+ * @param entry The ht_entry to get the data of.
+ * @return Returns said data.
+ *
+ * @note Normally, either #HT_DINT() or #HT_DPTR() is used to get a pointer to
+ * an entry's data.  This function would only be used in code that should work
+ * with a table using either data location.
+ *
+ * @sa #HT_DINT()
+ * @sa #HT_DPTR()
+ */
+NODISCARD
+inline void* ht_entry_data( hash_table_t const *table,
+                            ht_entry_t const *entry ) {
+  return table->dloc == HT_DINT ? HT_DINT( entry ) : HT_DPTR( entry );
+}
+
+/**
+ * Initializes a hash table iterator.
+ *
+ * @param it The hash table iterator to initialize.
+ * @param table The hash table to iterate over.
+ *
+ * @sa ht_iterator_next()
+ */
+void ht_iterator_init( ht_iterator_t *it, hash_table_t const *table );
+
+/**
+ * Gets the next hash table entry, if any.
+ *
+ * @remarks The order entries are returned is in bucket order that is seemingly
+ * arbitrary.
+ *
+ * @param it The hash table iterator.
+ * @return Returns a pointer to the data of the next entry or NULL if none.
+ */
+NODISCARD
+void* ht_iterator_next( ht_iterator_t *it );
+
+/**
+ * Cleans-up a hash table.
+ *
+ * @param table The hash table to clean up.  If NULL, does nothing.
+ * @param free_fn A pointer to a function used to free data associated with
+ * each entry or NULL if unnecessary.
+ *
+ * @sa ht_table_init()
+ */
+void ht_table_cleanup( hash_table_t *table, ht_free_fn_t free_fn );
+
+/**
+ * Deletes an entry from a hash table.
+ *
+ * @remarks
+ * @parblock
+ * This function deletes _only_ the entry from \a table.  If \ref
+ * ht_entry::data "data" also needs to be deleted because \ref hash_table::dloc
+ * "dloc" is \ref ht_dloc::HT_DPTR "HT_DPTR", the caller must delete it
+ * explicitly.  For example, for some type `T` that is an entry's \ref
+ * ht_entry::data "data":
+ *
+ *      ht_entry_t *const entry = ht_table_find( table, find_data );
+ *      if ( entry != NULL ) {
+ *        T *const found_t = ht_entry_data( entry );
+ *        T_cleanup( found_t );         // if necessary
+ *        free( found_t );
+ *        ht_table_delete( table, entry );
+ *      }
+ * @endparblock
+ *
+ * @param table The hash table to delete from.
+ * @param entry The entry to delete.
+ */
+void ht_table_delete( hash_table_t *table, ht_entry_t *entry );
+
+/**
+ * Attempts to find \a data within a hash table.
+ *
+ * @param table The hash table to search.
+ * @param data The data to search for.
+ * @return Returns a pointer to the entry containing \a data or NULL if not
+ * found.
+ */
+NODISCARD
+ht_entry_t* ht_table_find( hash_table_t const *table, void const *data );
+
+/**
+ * Initializes a hash table.
+ *
+ * @param table The hash table to initialize.
+ * @param dloc Where data for each entry is stored.
+ * @param max_lf The maximum load factor.  Since this implementation uses
+ * separate chaining, the value that gives best performance is typically
+ * between 1 and 3.
+ * @param est_size The estimated number of entries.
+ * @param cmp_fn The comparison function to use.
+ * @param hash_fn The hash function to use.
+ *
+ * @sa ht_table_cleanup()
+ * @sa [Cornell CS 312 Lecture 20: Hash tables and amortized analysis](https://www.cs.cornell.edu/courses/cs312/2008sp/lectures/lec20.html)
+ */
+void ht_table_init( hash_table_t *table, ht_dloc_t dloc, double max_lf,
+                    unsigned est_size, ht_cmp_fn_t cmp_fn,
+                    ht_hash_fn_t hash_fn );
+
+/**
+ * Attempts to insert \a data into \a table.
+ *
+ * @param table The hash table to insert into.
+ * @param data The data to insert.
+ * @param data_size If \a table's \ref hash_table::dloc "dloc" is:
+ *  + \ref ht_dloc::HT_DINT "HT_DINT": The size of \a data.  If an entry is
+ *    inserted, then this number of bytes are copied from \a data into the new
+ *    entry's \ref ht_entry::data "data".
+ *  + \ref ht_dloc::HT_DPTR "HT_DPTR": Not used.  If an entry is inserted, then
+ *    the pointer value of \a data itself is copied into the new entry's \ref
+ *    ht_entry::data "data".
+ *
+ * @return Returns an \ref ht_insert_rv where its \ref ht_insert_rv::entry
+ * "entry" points to either the newly inserted entry or the existing entry
+ * having the same \ref ht_entry::data "data" and \ref ht_insert_rv::inserted
+ * "inserted" is `true` only if \ref ht_entry::data "data" was inserted.
+ */
+PJL_DISCARD
+ht_insert_rv_t ht_table_insert( hash_table_t *table, void *data,
+                                size_t data_size );
+
+/**
+ * Calculates the current load factor of \a table.
+ *
+ * @param table The hash table to calculate the load factor of.
+ * @return Returns the load factor of \a table.
+ */
+NODISCARD
+inline double ht_table_load_factor( hash_table_t const *table ) {
+  extern unsigned const HT_PRIME[];
+  return (double)table->size / HT_PRIME[ table->prime_idx ];
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+/** @} */
+
+#endif /* pjl_hash_table_h */
+/* vim:set et sw=2 ts=2: */

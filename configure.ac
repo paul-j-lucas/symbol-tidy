@@ -1,0 +1,256 @@
+# Process this file with autoconf to produce a configure script.
+
+##
+#       symbol-tidy -- Symbol tidier
+#       configure.ac
+#
+#       Copyright (C) 2026  Paul J. Lucas
+#
+#       This program is free software: you can redistribute it and/or modify
+#       it under the terms of the GNU General Public License as published by
+#       the Free Software Foundation, either version 3 of the License, or
+#       (at your option) any later version.
+#
+#       This program is distributed in the hope that it will be useful,
+#       but WITHOUT ANY WARRANTY; without even the implied warranty of
+#       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#       GNU General Public License for more details.
+#
+#       You should have received a copy of the GNU General Public License
+#       along with this program.  If not, see <http://www.gnu.org/licenses/>.
+##
+
+AC_PREREQ([2.70])
+AC_INIT([symbol-tidy], [1.0], [https://github.com/paul-j-lucas/symbol-tidy/issues],,[https://github.com/paul-j-lucas/symbol-tidy])
+AC_CONFIG_MACRO_DIR([m4])
+AM_INIT_AUTOMAKE
+AM_EXTRA_RECURSIVE_TARGETS([clean-coverage distclean-coverage])
+
+# Testing feature: code coverage (disabled by default)
+AC_ARG_ENABLE([coverage],
+  AS_HELP_STRING([--enable-coverage], [enable code coverage])
+)
+AS_IF([test "x$enable_coverage" = xyes],
+  #
+  # When code coverage is desired, we have to set CFLAGS so it doesn't include
+  # -O2 (so we can add -O0 later in src/Makefile.am) before AC_PROG_CC is
+  # called as directed by "Autconf 5.10.3: C Compiler Characteristics":
+  #
+  #     If output variable CFLAGS was not already set, set it to -g -O2 for the
+  #     GNU C compiler ....  If your package does not like this default, then
+  #     it is acceptable to insert the line ': ${CFLAGS=""}' after AC_INIT and
+  #     before AC_PROG_CC to select an empty default instead.
+  #
+  # There's still more to do after AC_PROG_CC is called and sets $GCC.  This is
+  # handed below in part 2.
+  #
+  [: ${CFLAGS=""}]
+)
+
+# Checks for programs.
+AC_LANG(C)
+ac_cv_prog_cc_c23=no                    # We don't want C23.
+AC_PROG_CC
+AS_IF([test "x$ac_cv_prog_cc_c11" = xno],
+  [AC_MSG_ERROR([a C11 compiler is required to compile $PACKAGE_NAME])])
+gl_EARLY
+AC_PROG_INSTALL
+
+# External dependency: llvm-config (and libclang)
+AC_ARG_WITH([llvm-config],
+  [AS_HELP_STRING([--with-llvm-config=PATH], [path to llvm-config program])],
+  [
+    AS_CASE(["x$with_llvm_config"],
+      [xno],  [AC_MSG_ERROR([llvm-config is required])],
+      [xyes], [:],
+      [LLVM_CONFIG="$with_llvm_config"] # User provided a path
+    )
+  ]
+)
+AC_PATH_PROGS([LLVM_CONFIG], [llvm-config], [no])
+AS_IF([test x$LLVM_CONFIG = xno || test ! -x "$LLVM_CONFIG"], [
+  AC_MSG_ERROR([llvm-config not found; install LLVM development packages])
+])
+llvm_config_min_version="21.0.0"
+PJL_PROG_LLVM_CONFIG_VERSION([$llvm_config_min_version], [],
+    [AC_MSG_ERROR([llvm-config version $llvm_config_min_version or later required])])
+
+LIBCLANG_CPPFLAGS=`$LLVM_CONFIG --cppflags`
+LIBCLANG_LIBDIR=`$LLVM_CONFIG --libdir`
+LIBCLANG_LDFLAGS=`$LLVM_CONFIG --ldflags`
+LIBCLANG_LIBS="-lclang"
+
+# Checks for headers.
+save_CPPFLAGS="$CPPFLAGS"
+CPPFLAGS="$LIBCLANG_CPPFLAGS $CPPFLAGS"
+AC_CHECK_HEADER([clang-c/Index.h], [], [
+  AC_MSG_ERROR([libclang headers not found; use --with-libclang=DIR])
+])
+CPPFLAGS="$save_CPPFLAGS"
+AC_CHECK_HEADERS([getopt.h])
+AC_CHECK_HEADERS([pwd.h])
+AC_CHECK_HEADERS([sysexits.h])
+AC_HEADER_ASSERT
+AC_HEADER_STDBOOL
+gl_INIT
+
+# Checks for typedefs, structures, and compiler characteristics.
+AC_C__GENERIC
+AS_IF([test "x$ac_cv_c__Generic" != xyes], [
+  AC_MSG_ERROR([C11 _Generic support required to compile $PACKAGE_NAME])
+])
+AC_C_TYPEOF
+AC_TYPE_SIZE_T
+AC_TYPE_SSIZE_T
+AC_TYPE_UINT64_T
+AC_CHECK_MEMBERS([struct passwd.pw_dir],[],[],[[#include <pwd.h>]])
+PJL_COMPILE([__builtin_expect],[], [(void)__builtin_expect(1,1);])
+PJL_COMPILE([char8_t],
+  [#include <uchar.h>
+  ],
+  [char8_t c;]
+)
+PJL_COMPILE([char32_t],
+  [#include <uchar.h>
+  ],
+  [char32_t c;]
+)
+PJL_COMPILE([__VA_OPT__],
+  [#define VA_OPT_TEST(...) __VA_OPT__(int) __VA_ARGS__
+  ],
+  [int x1 = VA_OPT_TEST() 1; VA_OPT_TEST(x2 = 2);]
+)
+
+# Checks for library functions.
+AC_CHECK_FUNCS([geteuid getpwuid perror strerror])
+save_LDFLAGS="$LDFLAGS"
+save_LIBS="$LIBS"
+LDFLAGS="$LIBCLANG_LDFLAGS $LDFLAGS"
+LIBS="$LIBCLANG_LIBS $LIBS"
+AC_CHECK_LIB([clang], [clang_createIndex], [:], [
+  AC_MSG_ERROR([libclang library not found; use --with-libclang=DIR])
+])
+LDFLAGS="$save_LDFLAGS"
+LIBS="$save_LIBS"
+
+# Testing feature: Address Sanitizer (ASan)
+AC_ARG_ENABLE([asan],
+  AS_HELP_STRING([--enable-asan], [enable Address Sanitizer for debugging])
+)
+AS_IF([test "x$enable_asan" = xyes], [
+  AC_DEFINE([ENABLE_ASAN], [1], [Define to 1 if Address Sanitizer is enabled.])
+])
+
+# Testing feature: Memory Sanitizer (MSan)
+AC_ARG_ENABLE([msan],
+  AS_HELP_STRING([--enable-msan], [enable Memory Sanitizer for debugging])
+)
+AS_IF([test "x$enable_msan" = xyes], [
+  AC_DEFINE([ENABLE_MSAN], [1],
+    [Define to 1 if Memory Sanitizer is enabled.])
+])
+
+# Testing feature: Undefined Behavior Sanitizer (UBSan)
+AC_ARG_ENABLE([ubsan],
+  AS_HELP_STRING([--enable-ubsan], [enable Undefined Bahavior Sanitizer for debugging])
+)
+AS_IF([test "x$enable_ubsan" = xyes], [
+  AC_DEFINE([ENABLE_UBSAN], [1],
+    [Define to 1 if Undefined Bahavior Sanitizer is enabled.])
+])
+
+# Testing feature: code coverage, part 2
+AS_IF([test "x$enable_coverage" = xyes], [
+  AS_IF([test "x$GCC" != xyes], [
+    AC_MSG_ERROR([gcc is required for code coverage])
+  ])
+  AC_CHECK_TOOL([GCOV], [gcov], [gcov])
+  AS_IF([test "x$GCOV" = "x:"], [
+    AC_MSG_ERROR([required program "gcov" for code coverage not found])
+  ])
+  AC_CHECK_PROG([LCOV], [lcov], [lcov])
+  AS_IF([test "x$LCOV" = x], [
+    AC_MSG_ERROR([required program "lcov" for code coverage not found])
+  ])
+  AC_CHECK_PROG([GENHTML], [genhtml], [genhtml])
+  AS_IF([test "x$GENHTML" = x], [
+    AC_MSG_ERROR([required program "genhtml" for code coverage not found])
+  ])
+  AC_DEFINE([ENABLE_COVERAGE], [1], [Define to 1 if code coverage is enabled.])
+])
+
+# Makefile conditionals.
+AM_CONDITIONAL([ENABLE_ASAN],     [test "x$enable_asan"     = xyes])
+AM_CONDITIONAL([ENABLE_COVERAGE], [test "x$enable_coverage" = xyes])
+AM_CONDITIONAL([ENABLE_MSAN],     [test "x$enable_msan"     = xyes])
+AM_CONDITIONAL([ENABLE_UBSAN],    [test "x$enable_ubsan"    = xyes])
+
+# Miscellaneous.
+AX_C___ATTRIBUTE__
+
+# Compiler warnings.
+SYMBOL_TIDY_CFLAGS="-D_ISOC11_SOURCE"
+AX_CFLAGS_WARN_ALL([SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wcast-align], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wcast-function-type], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wcomma], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wconditional-type-mismatch], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wconditional-uninitialized], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wconversion], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wduplicate-enum], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wembedded-directive], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wenum-enum-conversion], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wenum-float-conversion], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wextra], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wfloat-equal], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wfor-loop-analysis], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wformat-nonliteral], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wformat-signedness], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wformat-type-confusion], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wformat=2], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Widiomatic-parentheses], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wimplicit-fallthrough], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wlogical-op-parentheses], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wmisleading-indentation], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wnewline-eof], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wno-format-zero-length], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wredundant-decls], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wreserved-identifier], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wshadow], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wshift-sign-overflow], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wshorten-64-to-32], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wsign-compare], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wsign-conversion], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wsometimes-uninitialized], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wstring-conversion], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wtautological-compare], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wtautological-type-limit-compare], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wundef], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wuninitialized], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wunreachable-code-break], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wunreachable-code-return], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wunreachable-code], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wunused], [SYMBOL_TIDY_CFLAGS])
+PJL_CHECK_COMPILE_FLAG([-Wwrite-strings], [SYMBOL_TIDY_CFLAGS])
+
+# Generate files.
+AC_SUBST([SYMBOL_TIDY_CFLAGS])
+AC_SUBST([LIBCLANG_CPPFLAGS])
+AC_SUBST([LIBCLANG_LDFLAGS])
+AC_SUBST([LIBCLANG_LIBDIR])
+AC_SUBST([LIBCLANG_LIBS])
+AH_TOP([#ifndef tidy_config_h
+#define tidy_config_h])
+AH_BOTTOM([#endif /* tidy_config_h */])
+AC_CONFIG_HEADERS([src/config.h])
+AC_CONFIG_FILES([
+  Makefile
+  lib/Makefile
+  src/Makefile
+  man/Makefile
+  man/man1/Makefile
+  test/Makefile
+])
+AC_OUTPUT
+
+# vim:set et sw=2 ts=2:

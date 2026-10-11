@@ -1,0 +1,1255 @@
+/*
+**      symbol-tidy -- Symbol tidier
+**      src/cli_options.c
+**
+**      Copyright (C) 2026  Paul J. Lucas
+**
+**      This program is free software: you can redistribute it and/or modify
+**      it under the terms of the GNU General Public License as published by
+**      the Free Software Foundation, either version 3 of the License, or
+**      (at your option) any later version.
+**
+**      This program is distributed in the hope that it will be useful,
+**      but WITHOUT ANY WARRANTY; without even the implied warranty of
+**      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+**      GNU General Public License for more details.
+**
+**      You should have received a copy of the GNU General Public License
+**      along with this program.  If not, see <http
+*/
+
+/**
+ * @file
+ * Defines macros and functions for command-line options.
+ */
+
+// local
+#include "pjl_config.h"                 /* must go first */
+#include "cli_options.h"
+#include "array.h"
+#include "file_ext.h"
+#include "options.h"
+#include "path_util.h"
+#include "print.h"
+#include "source.h"
+#include "str_util.h"
+#include "strbuf.h"
+#include "symbol-tidy.h"
+#include "util.h"
+#include "verbose.h"
+
+/// @cond DOXYGEN_IGNORE
+
+// libclang
+#include <clang-c/Index.h>
+
+// standard
+#include <assert.h>
+#include <ctype.h>                      /* for isalnum(), isprint() */
+#include <errno.h>
+#include <getopt.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>                     /* for exit() */
+#include <string.h>                     /* for str...() */
+#include <sys/wait.h>
+#include <sysexits.h>
+#include <unistd.h>                     /* for chdir(2) */
+
+/// @endcond
+
+/**
+ * @addtogroup cli-options-group
+ * @{
+ */
+
+////////// macros /////////////////////////////////////////////////////////////
+
+/**
+ * When given the `-v` (verbose) option, both `clang` and `gcc` emit this line
+ * followed by a list of default system include search paths.
+ *
+ * @sa add_compiler_include_paths()
+ * @sa #COMPILER_SEARCH_END
+ */
+#define COMPILER_SEARCH_START  "#include <...> search starts here:"
+
+/**
+ * When given the `-v` (verbose) option, both `clang` and `gcc` emit this line
+ * following a list of default system include search paths.
+ *
+ * @sa add_compiler_include_paths()
+ * @sa #COMPILER_SEARCH_START
+ */
+#define COMPILER_SEARCH_END    "End of search list."
+
+/**
+ * Convenience macro for iterating over all command-line options.
+ *
+ * @param VAR The `struct option` loop variable.
+ */
+#define FOREACH_CLI_OPTION(VAR, OPTIONS) \
+  for ( struct option const *VAR = (OPTIONS); (VAR)->name != NULL; ++(VAR) )
+
+////////// local constants ////////////////////////////////////////////////////
+
+/**
+ * Shared partial error message for an invalid `-Xtidy` option.
+ */
+static char const INVALID_XTIDY_OPTION[] =
+  "invalid -Xtidy option; use --help or -h for help";
+
+/**
+ * Command-line options.
+ *
+ * @sa OPTIONS_HELP
+ */
+static struct option const OPTIONS[] = {
+  { "color",            required_argument,  NULL, COPT(COLOR)             },
+  { "compiler",         required_argument,  NULL, COPT(COMPILER)          },
+  { "config",           required_argument,  NULL, COPT(CONFIG)            },
+  { "debug",            no_argument,        NULL, COPT(DEBUG)             },
+  { "directory",        required_argument,  NULL, COPT(DIRECTORY)         },
+  { "error",            required_argument,  NULL, COPT(ERROR)             },
+  { "help",             no_argument,        NULL, COPT(HELP)              },
+  { "no-config-layers", no_argument,        NULL, COPT(NO_CONFIG_LAYERS)  },
+  { "verbose",          required_argument,  NULL, COPT(VERBOSE)           },
+  { "version",          no_argument,        NULL, COPT(VERSION)           },
+  { NULL,               0,                  NULL, 0                       }
+};
+
+/**
+ * Command-line options help.
+ *
+ * @note It is indexed by short option characters.
+ *
+ * @sa get_opt_help()
+ * @sa OPTIONS
+ */
+static char const *const OPTIONS_HELP[] = {
+  [ COPT(COLOR) ] = "When to colorize output; default=\"not_file\"",
+  [ COPT(COMPILER) ] = "Path of compiler to use or \"none\"; default=\"" OPT_COMPILER_DEFAULT "\"",
+  [ COPT(CONFIG) ] = "Configuration file path",
+  [ COPT(DEBUG) ] = "Print " PACKAGE " debug output",
+  [ COPT(DIRECTORY) ] = "Change directory before tidying",
+  [ COPT(ERROR) ] = "When to exit with a non-zero status",
+  [ COPT(HELP) ] = "Print this help and exit",
+  [ COPT(NO_CONFIG_LAYERS) ] = "Don't do configuration file layering",
+  [ COPT(VERBOSE) ] = "Print verbose output",
+  [ COPT(VERSION) ] = "Print version and exit",
+};
+
+////////// local variables ////////////////////////////////////////////////////
+
+static bool is_opt_set[ 128 ];          ///< Table of options that were set.
+
+////////// local functions ////////////////////////////////////////////////////
+
+NODISCARD
+static char const*  get_long_opt_value( int, char const *const[], char const*,
+                                        int* ),
+                 *  get_opt_format( int ),
+                 *  get_short_opt_value( int, char const *const[], int, int* );
+
+NODISCARD
+static struct option const
+                 *  get_option_long( char const* ),
+                 *  get_option_short( int );
+
+static void         insert_argv( int*, char const**[], size_t, size_t,
+                                 char const *const[] );
+
+NODISCARD
+static bool         is_Xtidy_opt( int, char const *const[], int* );
+
+/////////// local functions ///////////////////////////////////////////////////
+
+/**
+ * Calls the C or C++ compiler, either **clang**(1) or **gcc**(1), and parses
+ * its verbose output to get the list of include search paths that are inserted
+ * into \a *pargv.
+ *
+ * @param pargc A pointer to the argument count from `main()`.  The count is
+ * incremented by the number of include search paths inserted.
+ * @param pargv A pointer to the argument values from `main()`.  An argument of
+ * the form <tt>-isystem</tt><i>path</i> is inserted for each search path.
+ * @param compiler_path The path of the C or C++ compiler to use.
+ * @param lang The language to use.
+ */
+static void add_compiler_include_paths( int *pargc, char const **pargv[],
+                                        char const *compiler_path,
+                                        enum CXLanguageKind lang ) {
+  assert(  pargc != NULL );
+  assert( *pargc > 0 );
+  assert(  pargv != NULL );
+  assert( *pargv != NULL );
+  assert(  compiler_path != NULL );
+  assert(  lang != CXLanguage_Invalid );
+  ASSERT_RUN_ONCE();
+
+  static char const COMMAND[] =
+    "%s"          // compiler path
+    " -E"         // run only the preprocessor stage
+    " -v"         // show verbose output
+    " -x%s"       // set language: c or c++
+    " -"          // read from stdin
+    " </dev/null" // set stdin to /dev/null
+    " 2>&1";      // redirect stderr to stdout
+
+  char *command = NULL;
+  asprintf_or_exit(
+    &command, COMMAND, compiler_path,
+    lang == CXLanguage_CPlusPlus ? "c++" : "c"
+  );
+
+  FILE *const fcompiler = popen( command, "r" );
+  free( command );
+  if ( fcompiler == NULL )
+    goto error;                         // LCOV_EXCL_LINE
+
+  bool    found_search_start = false;
+  bool    found_search_end = false;
+  char   *line_buf = NULL;
+  size_t  line_cap = 0;
+
+  while ( getline( &line_buf, &line_cap, fcompiler ) != -1 ) {
+    if ( strcmp( line_buf, COMPILER_SEARCH_START "\n" ) == 0 ) {
+      found_search_start = true;
+      break;
+    }
+  } // while
+  if ( !found_search_start )
+    goto done;
+
+  // Find the index to insert the new -isystem option before the last argv that
+  // is not an option (the filename).
+  size_t isystem_argi = STATIC_CAST( size_t, *pargc );
+  for ( int i = *pargc - 1/*NULL*/; i > 0; --i ) {
+    if ( (*pargv)[i][0] != '-' ) {
+      isystem_argi = STATIC_CAST( size_t, i );
+      break;
+    }
+  } // for
+
+  ssize_t line_len;
+  while ( (line_len = getline( &line_buf, &line_cap, fcompiler )) != -1 ) {
+    if ( strcmp( line_buf, COMPILER_SEARCH_END "\n" ) == 0 ) {
+      found_search_end = true;
+      break;
+    }
+
+#ifdef __APPLE__
+    // On macOS, the C compiler's include search paths include frameworks
+    // directories denoted by having paths followed by " (framework
+    // directory)".  These don't contain .h files directly, so there's no point
+    // in including them.
+    static char FRAMEWORK_DIR[] = "(framework directory)\n";
+    if ( str_ends_with( line_buf, FRAMEWORK_DIR, STRLITLEN( FRAMEWORK_DIR ) ) )
+      continue;
+#endif /* __APPLE__ */
+
+    char const *const include_path =
+      strn_trim( line_buf, STATIC_CAST( size_t, line_len ) );
+    if ( unlikely( path_is_relative( include_path ) ) )
+      continue;                         // LCOV_EXCL_LINE
+
+    char *new_arg = NULL;
+    asprintf_or_exit( &new_arg, "-isystem%s", include_path );
+    insert_argv( pargc, pargv, isystem_argi++, 1,
+                 CONST_CAST( char const**, &new_arg ) );
+  } // while
+
+  (*pargv)[ *pargc ] = NULL;
+
+done:
+  // To prevent a SIGPIPE, drain the pipe by reading any remaining output.
+  while ( getline( &line_buf, &line_cap, fcompiler ) != -1 )
+    ;
+  free( line_buf );
+  int status = pclose( fcompiler );
+  if ( status == -1 )
+    goto error;                         // LCOV_EXCL_LINE
+
+  if ( WIFEXITED( status ) ) {
+    status = WEXITSTATUS( status );
+    switch ( status ) {
+      case 0:
+        if ( !found_search_start ) {
+          print_warning(
+            "\"" COMPILER_SEARCH_START "\" not found in \"%s\" output\n",
+            compiler_path
+          );
+        }
+        else if ( !found_search_end ) {
+          print_warning(
+            "\"" COMPILER_SEARCH_END "\" not found in \"%s\" output\n",
+            compiler_path
+          );
+        }
+        return;
+      case 127:                         // POSIX shell "file not found"
+        errno = ENOENT;
+        goto error;
+      default:
+        // LCOV_EXCL_START
+        fatal_error( EX_UNAVAILABLE,
+          "\"%s\": invocation failed with status %d\n", compiler_path, status
+        );
+        // LCOV_EXCL_STOP
+    } // switch
+  }
+
+  // LCOV_EXCL_START
+  if ( WIFSIGNALED( status ) ) {
+    int const sig = WTERMSIG( status );
+    fatal_error( EX_UNAVAILABLE,
+      "shell executing \"%s\" killed by signal %d: %s\n",
+      compiler_path, sig, strsignal( sig )
+    );
+  }
+  else {
+    fatal_error( EX_UNAVAILABLE,
+      "shell executing \"%s\" terminated abnormally\n",
+      compiler_path
+    );
+  }
+  // LCOV_EXCL_STOP
+
+error:
+  fatal_error( EX_UNAVAILABLE,
+    "\"%s\": invocation failed: %s\n", compiler_path, STRERROR()
+  );
+}
+
+/**
+ * If \a short_opt was given, checks that _only_ it was given and, if not,
+ * prints an error message and exits; if \a short_opt was not given, does
+ * nothing.
+ *
+ * @param short_opt The option to check for.
+ */
+static void check_opt_exclusive( int short_opt ) {
+  if ( !option_is_set( short_opt ) )
+    return;
+  for ( int curr_opt = '0'; curr_opt < 128; ++curr_opt ) {
+    if ( curr_opt == short_opt )
+      continue;
+    if ( option_is_set( curr_opt ) ) {
+      fatal_error( EX_USAGE,
+        "%s can be given only by itself\n",
+        get_opt_format( short_opt )
+      );
+    }
+  } // for
+}
+
+/**
+ * Checks option combinations for semantic errors.
+ */
+static void check_options( void ) {
+  check_opt_exclusive( COPT(HELP) );
+  check_opt_exclusive( COPT(VERSION) );
+}
+
+/**
+ * Gets the path to the C/C++ compiler, if given.
+ *
+ * @param argc The command-line argument count from `main()`.
+ * @param argv The command-line argument values from `main()`.
+ * @return Returns the path to the compiler or NULL if it's `"none"`.
+ */
+NODISCARD
+static char const* get_compiler_path( int argc, char const *const argv[] ) {
+  assert( argc > 0 );
+  assert( argv != NULL );
+
+  struct option const *const compiler_option =
+    get_option_short( COPT(COMPILER) );
+  assert( compiler_option != NULL );
+  char const *const compiler_long_opt = compiler_option->name;
+
+  for ( int i = 1; i < argc; ++i ) {
+    if ( !is_Xtidy_opt( argc, argv, &i ) )
+      continue;
+    char const *compiler_path =
+      get_short_opt_value( argc, argv, COPT(COMPILER), &i );
+    if ( compiler_path == NULL )
+      compiler_path = get_long_opt_value( argc, argv, compiler_long_opt, &i );
+    if ( compiler_path != NULL )
+      return strcmp( compiler_path, "none" ) == 0 ? NULL : compiler_path;
+  } // for
+
+  return OPT_COMPILER_DEFAULT;
+}
+
+/**
+ * Checks whether the \a argv[\a *pargi] is a long option \a long_opt having an
+ * argument: if so, returns that argument.
+ *
+ * @param argc The command-line argument count from `main()`.
+ * @param argv The command-line argument values from `main()`.
+ * @param long_opt The long option (without the `--`).
+ * @param pargi A pointer to the current argument index variable.
+ * @return Returns the value of the argument or NULL if \a argv[\a *pargi] is
+ * not \a long_opt.
+ *
+ * @sa get_short_opt_value()
+ */
+NODISCARD
+static char const* get_long_opt_value( int argc, char const *const argv[],
+                                       char const *long_opt, int *pargi ) {
+  assert(     argc > 0 );
+  assert(     argv != NULL );
+  assert( long_opt != NULL );
+  assert(    pargi != NULL );
+  assert(   *pargi > 0 );
+
+  char const *const arg = argv[ *pargi ];
+
+  if ( STRNCMPLIT( arg, "--" ) != 0 )
+    return NULL;
+  size_t const long_opt_len = strlen( long_opt );
+  if ( strncmp( arg + STRLITLEN( "--" ), long_opt, long_opt_len ) != 0 )
+    return NULL;
+  if ( arg[ STRLITLEN( "--" ) + long_opt_len ] == '=' ) {
+    char const *const value = arg + STRLITLEN( "--" ) + long_opt_len + 1;
+    if ( value[0] != '\0' )
+      return value;
+  }
+  else if ( ++*pargi < argc ) {
+    char const *const value = argv[ *pargi ];
+    if ( value != NULL && value[0] != '\0' && value[0] != '-' )
+      return value;
+  }
+
+  fatal_error( EX_USAGE, "\"--%s\" requires an argument\n", long_opt );
+}
+
+/**
+ * Formats an option as `--%%s/-%%c` where `%%s` is the long option and `%%c`
+ * is the short option.
+ *
+ * @param short_opt The short option (along with its corresponding long option)
+ * to format.
+ * @return Returns the formatted string.
+ *
+ * @warning The pointer returned is to one of a small number of static buffers,
+ * so you can't do something like call this more than twice in the same
+ * `printf()` statement.
+ */
+NODISCARD
+static char const* get_opt_format( int short_opt ) {
+  static strbuf_t sbufs[2];
+  static unsigned buf_index;
+
+  strbuf_t *const sbuf = &sbufs[ buf_index++ % ARRAY_SIZE( sbufs ) ];
+  strbuf_reset( sbuf );
+
+  struct option const *const option = get_option_short( short_opt );
+  char const *const long_opt = option != NULL ? option->name : "";
+  return strbuf_printf(
+    sbuf, "%s%s%s-%c",
+    long_opt[0] != '\0' ? "--" : "",
+    long_opt,
+    long_opt[0] != '\0' ? "/" : "",
+    short_opt
+  );
+}
+
+/**
+ * Gets the help message for \a short_opt.
+ *
+ * @param short_opt The option to get the help for.
+ * @return Returns said help message.
+ */
+NODISCARD
+static char const* get_opt_help( int short_opt ) {
+  assert( short_opt > 0 );
+  assert( STATIC_CAST( size_t, short_opt ) < ARRAY_SIZE( OPTIONS_HELP ) );
+  char const *const help = OPTIONS_HELP[ short_opt ];
+  assert( help != NULL );
+  return help;
+}
+
+/**
+ * Gets the `option` corresponding to \a long_opt.
+ *
+ * @param long_opt The long option to get the option for.
+ * @return Returns the corresponding `option` or NULL if not found.
+ *
+ * @sa get_option_short()
+ */
+NODISCARD
+static struct option const* get_option_long( char const *long_opt ) {
+  assert( long_opt != NULL );
+  char const *const equal = strchr( long_opt, '=' );
+  size_t const n = equal != NULL ?
+    STATIC_CAST( size_t, equal - long_opt ) : strlen( long_opt );
+
+  FOREACH_CLI_OPTION( option, OPTIONS ) {
+    if ( strncmp( option->name, long_opt, n ) == 0 )
+      return option;
+  } // for
+  return NULL;
+}
+
+/**
+ * Gets the `option` corresponding to \a short_opt.
+ *
+ * @param short_opt The short option to get the option for.
+ * @return Returns the corresponding `option` or NULL if not found.
+ *
+ * @sa get_option_long()
+ */
+NODISCARD
+static struct option const* get_option_short( int short_opt ) {
+  assert( short_opt > 0 && short_opt < 128 );
+  FOREACH_CLI_OPTION( option, OPTIONS ) {
+    if ( option->val == short_opt )
+      return option;
+  } // for
+  return NULL;
+}
+
+/**
+ * Checks whether the \a argv[\a *pargi] is a short option \a short_opt having
+ * an argument: if so, returns that argument.
+ *
+ * @param argc The command-line argument count from `main()`.
+ * @param argv The command-line argument values from `main()`.
+ * @param short_opt The short option character.
+ * @param pargi A pointer to the current argument index variable.
+ * @return Returns the value of the argument or NULL if \a argv[\a *pargi] is
+ * not \a short_opt.
+ *
+ * @sa get_long_opt_value()
+ */
+NODISCARD
+static char const* get_short_opt_value( int argc, char const *const argv[],
+                                        int short_opt, int *pargi ) {
+  assert(   argc > 0 );
+  assert(   argv != NULL );
+  assert(  pargi != NULL );
+  assert( *pargi > 0 );
+  assert( short_opt > 0 && short_opt < 128 );
+
+  if ( argv[ *pargi ][0] != '-' || argv[ *pargi ][1] != short_opt )
+    return NULL;
+  if ( argv[ *pargi ][2] != '\0' )    // -x<arg>, not -x <arg>
+    return argv[ *pargi ] + 2;
+  if ( ++*pargi < argc ) {
+    char const *const value = argv[ *pargi ];
+    if ( value != NULL && value[0] != '\0' && value[0] != '-' )
+      return value;
+  }
+
+  fatal_error( EX_USAGE, "\"-%c\" requires an argument\n", short_opt );
+}
+
+/**
+ * Gets the likely source path from \a argv.
+ *
+ * @param argc The argument count from `main()`.
+ * @param argv The argument values from `main()`.
+ * @return Returns the source path or NULL if none.
+ */
+NODISCARD
+static char const* get_source_path( int argc, char const *argv[] ) {
+  assert( argc > 0 );
+  assert( argv != NULL );
+
+  // The source path tends to be last (or near it), so iterate backwards.
+  for ( int i = argc - 1; i >= 1; --i ) {
+    char const *const argv_i = argv[i];
+    if ( argv_i[0] != '\0' && argv_i[0] != '-' )
+      return argv_i;
+  } // for
+
+  return NULL;
+}
+
+/**
+ * Gets the language of the compiler's `-x` option, if given.
+ *
+ * @param argc The command-line argument count from `main()`.
+ * @param argv The command-line argument values from `main()`.
+ * @return Returns the language of the compiler's `-x` option or
+ * `CXLanguage_Invalid` if not given.
+ */
+NODISCARD
+static enum CXLanguageKind get_x_language( int argc,
+                                           char const *const argv[] ) {
+  assert( argc > 0 );
+  assert( argv != NULL );
+
+  for ( int i = 1; i < argc; ++i ) {
+    char const *const lang = get_short_opt_value( argc, argv, 'x', &i );
+    if ( lang == NULL )
+      continue;
+    if ( strcmp( lang, "c" ) == 0 )
+      return CXLanguage_C;
+    if ( strcmp( lang, "c++" ) == 0 )
+      return CXLanguage_CPlusPlus;
+    fatal_error( EX_USAGE,
+      "\"%s\": invalid value for -x; must be either \"c\" or \"c++\"\n", lang
+    );
+  } // for
+
+  return CXLanguage_Invalid;
+}
+
+/**
+ * Inserts \a args into \a *pargv at \a argi.
+ *
+ * @param pargc A pointer to the argument count from `main()`.  It is
+ * incremented by 1.
+ * @param pargv A pointer to the argument values from `main()`.
+ * @param argi The index to insert \a args into \a *pargv at.
+ * @param args_len The length of \a args.
+ * @param args The arguments to insert.
+ *
+ * @warning This must only be used on the `argc` and `argv` values that come
+ * from `main()`.
+ */
+static void insert_argv( int *pargc, char const **pargv[], size_t argi,
+                         size_t args_len, char const *const args[] ) {
+  assert(  pargc != NULL );
+  assert( *pargc > 0 );
+  assert(  pargv != NULL );
+  assert( *pargv != NULL );
+  assert(  argi <= STATIC_CAST( size_t, *pargc ) );
+
+  if ( unlikely( args_len == 0 ) )
+    return;                             // LCOV_EXCL_LINE
+
+  size_t const old_argc = STATIC_CAST( size_t, *pargc );
+  size_t const new_argc = old_argc + args_len;
+
+  static bool is_argv_on_heap = false;
+  if ( false_set( &is_argv_on_heap ) ) {
+    // We can't realloc the argv passed to main(), so in order to insert an
+    // argument, we first have to duplicate it into the heap.
+    char const **const heap_argv = MALLOC( char*, new_argc + 1/*NULL*/ );
+    memcpy( heap_argv, *pargv, old_argc * sizeof(char*) );
+    *pargv = heap_argv;
+  }
+  else {
+    REALLOC( *pargv, new_argc + 1/*NULL*/ );
+  }
+
+  if ( argi < old_argc ) {
+    memmove( &(*pargv)[argi + args_len], &(*pargv)[argi],
+             (old_argc - argi) * sizeof(char*) );
+  }
+  memcpy( &(*pargv)[argi], args, args_len * sizeof(char*) );
+
+  *pargc = STATIC_CAST( int, new_argc );
+  (*pargv)[ new_argc ] = NULL;
+}
+
+/**
+ * Checks whether the \a argv[\a *pargi] is `-Xtidy` and followed by a
+ * subsequent option.
+ *
+ * @param argc The command-line argument count from `main()`.
+ * @param argv The command-line argument values from `main()`.
+ * @param pargi A pointer to the current argument index variable.  It's
+ * incremented only if returning `true`.
+ * @return Returns `true` only if `argv[*pargi]` is `-Xtidy` and is followed by
+ * a subsequent option.
+ */
+NODISCARD
+static bool is_Xtidy_opt( int argc, char const *const argv[], int *pargi ) {
+  assert(   argc > 0 );
+  assert(   argv != NULL );
+  assert(  pargi != NULL );
+  assert( *pargi < argc );
+
+  if ( strcmp( argv[ *pargi ], "-Xtidy" ) != 0 )
+    return false;
+  if ( ++*pargi >= argc )               // -Xtidy (nothing)
+    goto error;
+  if ( argv[ *pargi ][0] != '-' )       // -Xtidy A (non-option)
+    goto error;
+  if ( isalnum( argv[ *pargi ][1] ) )   // -Xtidy -A (short option)
+    return true;
+  if ( argv[ *pargi ][1] == '-' && isalnum( argv[ *pargi ][2] ) )
+    return true;                        // -Xtidy --A (long option)
+
+error:
+  fatal_error( EX_USAGE, "-Xtidy requires subsequent option\n" );
+}
+
+/**
+ * Makes the `optstring` (short option) equivalent of \a opts for the third
+ * argument of `getopt_long()`.
+ *
+ * @param options An array of options to make the short option string from.
+ * Its last element must be all zeros.
+ * @param extra_opts Extra options to add.  May be NULL.
+ * @return Returns the `optstring` for the third argument of `getopt_long()`.
+ *
+ * @note The caller is responsible for freeing the returned string.
+ */
+NODISCARD
+static char* make_short_opts( struct option const options[static const 2],
+                              char const *extra_opts ) {
+  extra_opts = empty_if_null( extra_opts );
+  size_t const extra_opts_len = strlen( extra_opts );
+
+  // pre-flight to calculate string length
+  size_t len = 1 /* for leading ':' */ + extra_opts_len;
+  FOREACH_CLI_OPTION( option, options ) {
+    assert( option->has_arg >= 0 && option->has_arg <= 2 );
+    len += 1 + STATIC_CAST( unsigned, option->has_arg );
+  } // for
+
+  char *const short_opts = MALLOC( char, len + 1/*\0*/ );
+  char *s = short_opts;
+
+  *s++ = ':';                           // return missing argument as ':'
+  FOREACH_CLI_OPTION( option, options ) {
+    assert( option->val > 0 && option->val < 128 );
+    *s++ = STATIC_CAST( char, option->val );
+    switch ( option->has_arg ) {
+      case optional_argument:
+        // LCOV_EXCL_START: tidy doesn't currently have any optional arguments.
+        *s++ = ':';
+        FALLTHROUGH;
+        // LCOV_EXCL_STOP
+      case required_argument:
+        *s++ = ':';
+    } // switch
+  } // for
+
+  strcpy( s, extra_opts );
+  s += extra_opts_len;
+  *s = '\0';
+
+  return short_opts;
+}
+
+/**
+ * Moves **symbol-tidy** specific command-line options to a separate array.
+ *
+ * @remarks
+ * @parblock
+ * Command-line options of the form:
+ *
+ *  + <tt>-Xtidy</tt> _option_ have <tt>-Xtidy</tt> removed and _option_ moved
+ *    to \a *ptidy_argv.
+ *  + <tt>--help</tt>, <tt>-h</tt>, <tt>--version</tt>, or <tt>-v</tt> are
+ *    moved to \a *ptidy_argv.
+ *
+ * All other options and arguments are left as-is in \a argv.  Examples:
+ *
+ *      symbol-tidy --help
+ *
+ *          argc = 1
+ *          argv[0] = "symbol-tidy"
+ *          argv[1] = NULL
+ *
+ *          tidy_argc = 2
+ *          tidy_argv[0] = "symbol-tidy"
+ *          tidy_argv[1] = "--help"
+ *          tidy_argv[2] = NULL
+ *
+ *      symbol-tidy -Xtidy --foo -DNDEBUG -I/opt/local/include bar.c
+ *
+ *          argc = 4
+ *          argv[0] = "symbol-tidy"
+ *          argv[1] = "-DNDEBUG"
+ *          argv[2] = "-I/opt/local/include"
+ *          argv[3] = "bar.c"
+ *          argv[4] = NULL
+ *
+ *          tidy_argc = 3
+ *          tidy_argv[0] = "symbol-tidy"
+ *          tidy_argv[1] = "--foo"
+ *          tidy_argv[2] = NULL
+ * @endparblock
+ *
+ * @param pargc A pointer to `argc`.
+ * @param argv A copy of `argv`.
+ * @param ptidy_argc A pointer to an `argc` for **symbol-tidy** specific
+ * options.
+ * @param ptidy_argv A pointer to an `argv` for **symbol-tidy** specific
+ * options.  The caller is responsible for free'ing the array of pointers to
+ * strings, but _not_ the strings themselves.
+ */
+static void move_tidy_args( int *pargc, char const *argv[],
+                            int *ptidy_argc, char const **ptidy_argv[] ) {
+  assert(  pargc != NULL );
+  assert( *pargc > 0 );
+  assert(   argv != NULL );
+  assert(  ptidy_argc != NULL );
+  assert(  ptidy_argv != NULL );
+
+  int const argc = *pargc;
+  int new_argc = 1, tidy_argc = 1;
+  char const *opt = NULL;
+
+  char const **const tidy_argv =
+    MALLOC( char*, STATIC_CAST( size_t, argc ) + 1/*NULL*/ );
+  tidy_argv[0] = argv[0];
+
+  for ( int i = 1; i < argc; ++i ) {
+
+    if ( is_Xtidy_opt( argc, argv, &i ) ) {
+      tidy_argv[ tidy_argc++ ] = argv[i];
+      if ( isalnum( argv[i][1] ) ) {            // short opt
+        for ( opt = &argv[i][1]; *opt != '\0'; ++opt ) {
+          struct option const *const option = get_option_short( *opt );
+          if ( option == NULL )
+            fatal_error( EX_USAGE, "'%c': %s\n", *opt, INVALID_XTIDY_OPTION );
+          if ( option->has_arg == required_argument ) {
+            if ( opt[1] != '\0' )               // -<opt><arg>
+              break;
+            if ( ++i >= argc || argv[i][0] == '-' )
+              goto short_opt_requires_argument;
+            tidy_argv[ tidy_argc++ ] = argv[i]; // -<opt> <arg>
+            break;
+          }
+        } // for
+      }
+      else {                                    // must be long opt
+        assert( argv[i][1] == '-' );
+        opt = &argv[i][2];
+        struct option const *const option = get_option_long( opt );
+        if ( option == NULL )
+          fatal_error( EX_USAGE, "\"%s\": %s\n", opt, INVALID_XTIDY_OPTION );
+        if ( option->has_arg == required_argument ) {
+          char *const equal = strchr( opt, '=' );
+          if ( equal != NULL ) {                // --<long_opt>=<value>
+            if ( equal[1] == '\0' ) {
+              *equal = '\0';
+              goto long_opt_requires_argument;
+            }
+          }
+          else {                                // --<long_opt> <value>
+            if ( ++i >= argc || argv[i][0] == '-' )
+              goto long_opt_requires_argument;
+            tidy_argv[ tidy_argc++ ] = argv[i];
+          }
+        }
+      }
+      continue;
+    }
+
+    static char const *const OTHER_OPTIONS[] = {
+      "--help",     "-h",
+      "--version",  "-v",
+    };
+
+    FOREACH_ARRAY_ELEMENT( char const*, popt, OTHER_OPTIONS ) {
+      size_t const opt_len = strlen( *popt );
+      if ( strncmp( argv[i], *popt, opt_len ) == 0 ) {
+        tidy_argv[ tidy_argc++ ] = argv[i];
+        goto next_argv;
+      }
+    } // for
+
+    argv[ new_argc++ ] = argv[i];
+
+next_argv:;
+  } // for
+
+  argv[ new_argc ] = tidy_argv[ tidy_argc ] = NULL;
+
+  *pargc = new_argc;
+  *ptidy_argc = tidy_argc;
+  *ptidy_argv = tidy_argv;
+  return;
+
+long_opt_requires_argument:
+  assert( opt != NULL );
+  if ( opt[0] == '-' )
+    fatal_error( EX_USAGE, "\"%s\" requires an argument\n", opt );
+  fatal_error( EX_USAGE, "\"--%s\" requires an argument\n", opt );
+
+short_opt_requires_argument:
+  assert(  opt != NULL );
+  assert( isalnum( *opt ) );
+  fatal_error( EX_USAGE, "\"-%c\" requires an argument\n", *opt );
+}
+
+/**
+ * Prints the usage message to standard error and exits.
+ *
+ * @param status The status to exit with.  If it is `EX_OK`, prints to standard
+ * output; otherwise prints to standard error.
+ */
+_Noreturn
+static void print_usage( int status ) {
+  // pre-flight to calculate longest long option length
+  size_t longest_opt_len = 0;
+  FOREACH_CLI_OPTION( option, OPTIONS ) {
+    size_t long_opt_len = strlen( option->name );
+    switch ( option->has_arg ) {
+      case no_argument:
+        break;
+      case optional_argument:
+        // LCOV_EXCL_START: tidy doesn't currently have any optional arguments.
+        long_opt_len += STRLITLEN( "[=ARG]" );
+        break;
+        // LCOV_EXCL_STOP
+      case required_argument:
+        long_opt_len += STRLITLEN( "=ARG" );
+        break;
+    } // switch
+    if ( long_opt_len > longest_opt_len )
+      longest_opt_len = long_opt_len;
+  } // for
+
+  FILE *const fout = status == EX_OK ? stdout : stderr;
+
+  fprintf( fout,
+    "usage: %s [-Xtidy tidy-option]... [compiler-option]... source-file\n"
+    "       %s other-option\n"
+    "\n"
+    "tidy options:\n"
+    , prog_name, prog_name
+  );
+
+  FOREACH_CLI_OPTION( option, OPTIONS ) {
+    switch ( option->val ) {
+      case COPT(HELP):
+      case COPT(VERSION):
+        // These are special in that they are allowed directly rather than
+        // following -Xtidy.  Consequently, they must be printed seperately
+        // (below).
+        continue;
+    } // switch
+    fprintf( fout, "  --%s", option->name );
+    size_t long_opt_len = strlen( option->name );
+    switch ( option->has_arg ) {
+      case no_argument:
+        break;
+      case optional_argument:
+        // LCOV_EXCL_START: tidy doesn't currently have any optional arguments.
+        long_opt_len += STATIC_CAST( size_t, fprintf( fout, "[=ARG]" ) );
+        break;
+        // LCOV_EXCL_STOP
+      case required_argument:
+        long_opt_len += STATIC_CAST( size_t, fprintf( fout, "=ARG" ) );
+        break;
+    } // switch
+    assert( long_opt_len <= longest_opt_len );
+    FPUTNSP( longest_opt_len - long_opt_len, fout );
+    fprintf( fout, " (-%c) %s.\n", option->val, get_opt_help( option->val ) );
+  } // for
+
+  fputs( "\nother options:\n", fout );
+
+  FOREACH_CLI_OPTION( option, OPTIONS ) {
+    switch ( option->val ) {
+      case COPT(HELP):
+      case COPT(VERSION):
+        break;
+      default:
+        continue;
+    } // switch
+    fprintf( fout, "  --%s", option->name );
+    size_t const long_opt_len = strlen( option->name );
+    assert( option->has_arg == no_argument );
+    assert( long_opt_len <= longest_opt_len );
+    FPUTNSP( longest_opt_len - long_opt_len, fout );
+    fprintf( fout, " (-%c) %s.\n", option->val, get_opt_help( option->val ) );
+  } // for
+
+  fputs(
+    "\n"
+    PACKAGE_NAME " home page: " PACKAGE_URL "\n"
+    "Report bugs to: " PACKAGE_BUGREPORT "\n",
+    fout
+  );
+
+  exit( status );
+}
+
+/**
+ * Convenience macro for printing a `configure` option.
+ *
+ * @param OPT The option string literal to print (without the leading `--`).
+ */
+#define PUT_CONFIG_OPT(OPT) BLOCK( \
+  PUTS( "\n  --" OPT ); printed_opt = true; )
+
+// LCOV_EXCL_START
+/**
+ * Prints the **symbol-tidy** version.
+ *
+ * @param verbose If `true`, prints configure feature &amp; package options.
+ */
+static void print_version( bool verbose ) {
+  PUTS(
+    PACKAGE_STRING "\n"
+    "Copyright (C) " TIDY_COPYRIGHT_YEAR " " TIDY_AUTHOR "\n"
+    "License " TIDY_LICENSE " <" TIDY_LICENSE_URL ">.\n"
+    "This is free software: you are free to change and redistribute it.\n"
+    "There is NO WARRANTY to the extent permitted by law.\n"
+  );
+  if ( !verbose )
+    return;
+
+  PUTS( "\nconfigure feature & package options:" );
+  bool printed_opt = false;
+#ifdef NDEBUG
+  PUT_CONFIG_OPT( "disable-assert" );
+#endif /* NDEBUG */
+#ifdef ENABLE_ASAN
+  PUT_CONFIG_OPT( "enable-asan" );
+#endif /* ENABLE_ASAN */
+#ifdef ENABLE_COVERAGE
+  PUT_CONFIG_OPT( "enable-coverage" );
+#endif /* ENABLE_COVERAGE */
+#ifdef ENABLE_MSAN
+  PUT_CONFIG_OPT( "enable-msan" );
+#endif /* ENABLE_MSAN */
+#ifdef ENABLE_UBSAN
+  PUT_CONFIG_OPT( "enable-ubsan" );
+#endif /* ENABLE_UBSAN */
+  if ( !printed_opt )
+    PUTS( " none" );
+  putchar( '\n' );
+}
+// LCOV_EXCL_STOP
+
+////////// extern functions ///////////////////////////////////////////////////
+
+tidy_source cli_options_init( int *pargc, char const **pargv[] ) {
+  assert(  pargc != NULL );
+  assert( *pargc > 0 );
+  assert(  pargv != NULL );
+  assert( *pargv != NULL );
+  ASSERT_RUN_ONCE();
+
+  // Ordinarily, a program would parse all options first, increment argv past
+  // them, then look at (the new) argv[1] for the file.
+  //
+  // The order that we have to parse command-line arguments is necessitated to
+  // be unconventional because:
+  //
+  // + The source file (typically the last argument) may be needed before
+  //   parsing options because its language (based on its filename extension)
+  //   affects the list of system include files and the corresponding
+  //   `-isystem` options needed by the compiler.
+  //
+  // + We also need to pre-scan all options looking for the compiler's
+  //   -x<language> option because that has priority over whatever language is
+  //   indicated by the source file's extension.
+  //
+  // + We have to call the compiler to get the list of system include paths it
+  //   uses and insert `-isystem` options for them since libclang doesn't start
+  //   out with any include paths.
+
+  char const *const source_path = get_source_path( *pargc, *pargv );
+  char const *const compiler_path = get_compiler_path( *pargc, *pargv );
+  char const *const source_ext =
+    source_path != NULL ? path_ext( source_path ) : NULL;
+  enum CXLanguageKind source_lang = get_x_language( *pargc, *pargv );
+  if ( source_lang == CXLanguage_Invalid && source_ext != NULL ) {
+    tidy_file_ext const *const file_ext = file_ext_find( source_ext );
+    if ( file_ext != NULL )
+      source_lang = file_ext->lang;
+  }
+  if ( compiler_path != NULL && source_lang != CXLanguage_Invalid )
+    add_compiler_include_paths( pargc, pargv, compiler_path, source_lang );
+
+  strbuf_t      err_buf = STRBUF_INIT();
+  char const   *opt_directory = NULL;
+  bool          opt_help = false;
+  unsigned      opt_version = 0;
+  int           short_opt;
+  char   *const short_opts = make_short_opts( OPTIONS, SOPT(INCLUDE) ":" );
+  int           tidy_argc;
+  char const  **tidy_argv;
+
+  move_tidy_args( pargc, *pargv, &tidy_argc, &tidy_argv );
+
+  opterr = 0;                           // suppress default error message
+  for (;;) {
+    short_opt = getopt_long(
+      tidy_argc, CONST_CAST( char**, tidy_argv ), short_opts, OPTIONS,
+      /*longindex=*/NULL
+    );
+    if ( short_opt == -1 )
+      break;
+    switch ( short_opt ) {
+      case COPT(COLOR):
+        if ( !opt_color_parse( optarg ) ) {
+          fatal_error( EX_USAGE,
+            "\"%s\": invalid value for %s\n",
+            optarg, get_opt_format( short_opt )
+          );
+        }
+        break;
+      case COPT(COMPILER):              // already handled
+        break;
+      case COPT(CONFIG):
+        opt_config_path = optarg;
+        break;
+      case COPT(DEBUG):
+        opt_debug = true;
+        break;
+      case COPT(DIRECTORY):
+        opt_directory = optarg;
+        break;
+      case COPT(ERROR):
+        if ( !opt_error_parse( optarg ) ) {
+          fatal_error( EX_USAGE,
+            "\"%s\": invalid value for %s;"
+            " must be one of \"violations\", \"always\", or \"never\"\n",
+            optarg, get_opt_format( short_opt )
+          );
+        }
+        break;
+      case COPT(HELP):
+        opt_help = true;
+        break;
+      case COPT(INCLUDE):
+        break;
+      case COPT(NO_CONFIG_LAYERS):
+        opt_config_layers = false;
+        break;
+      case COPT(VERBOSE):
+        if ( !opt_verbose_parse( optarg ) ) {
+          fatal_error( EX_USAGE,
+            "\"%s\": invalid value for %s; must be [" OPT_VERBOSE_ALL "]+\n",
+            optarg, get_opt_format( short_opt )
+          );
+        }
+        break;
+      case COPT(VERSION):
+        ++opt_version;
+        break;
+
+      case ':':
+        // LCOV_EXCL_START: move_tidy_args() checks for missing arguments out
+        // of necessity, so this case is never executed; but keep the code just
+        // in case.
+        fatal_error( EX_USAGE,
+          "\"%s\" requires an argument\n",
+          get_opt_format( short_opt == ':' ? optopt : short_opt )
+        );
+        // LCOV_EXCL_STOP
+
+      case '?':;
+        // Determine whether the invalid option was short or long.
+        char const *const invalid_opt = tidy_argv[ optind - 1 ];
+        if ( invalid_opt != NULL && STRNCMPLIT( invalid_opt, "--" ) == 0 )
+          strbuf_printf( &err_buf, "\"%s\"", invalid_opt + STRLITLEN( "--" ) );
+        else
+          strbuf_printf( &err_buf, "'%c'", optopt );
+        fatal_error( EX_USAGE, "%s: %s\n", err_buf.str, INVALID_XTIDY_OPTION );
+
+      default:
+        // LCOV_EXCL_START
+        if ( isprint( short_opt ) )
+          strbuf_printf( &err_buf, "'%c'", short_opt );
+        else
+          strbuf_printf( &err_buf, "%d", short_opt );
+        INTERNAL_ERROR(
+          "%s: unhandled getopt_long() return value\n", err_buf.str
+        );
+        // LCOV_EXCL_STOP
+    } // switch
+
+    option_mark_set( short_opt );
+  } // for
+
+  free( short_opts );
+  check_options();
+
+  if ( IS_VERBOSE( SRC_FILE_ALWAYS ) ) {
+    verbose_section_begin( /*printed_header=*/NULL );
+    verbose_printf( "source file = \"%s\"\n", source_path );
+  }
+
+  // Keep a copy of *pargc as it is now for --help and --version below before
+  // adding options for libclang via clang_parseTranslationUnit2() in
+  // trans_unit.c.  Do this now so --verbose=a prints all command-line
+  // arguments including these.
+  int const argc = *pargc;
+  static char const *const LIBCLANG_ARGS[] = {
+    "-D__include_tidy__",
+    "-Qunused-arguments",
+    "-Wno-unknown-warning-option",
+  };
+  insert_argv( pargc, pargv, 1, ARRAY_SIZE( LIBCLANG_ARGS ), LIBCLANG_ARGS );
+
+  if ( IS_VERBOSE( ARGS ) ) {
+    // LCOV_EXCL_START: -I, -isystem, etc., options contain absolute paths.
+    verbose_print_argv( "libclang", *pargc, *pargv );
+    verbose_print_argv( "tidy", tidy_argc, tidy_argv );
+    // LCOV_EXCL_STOP
+  }
+
+  tidy_argc -= optind - 1;
+  free( tidy_argv );
+
+  if ( opt_help )
+    print_usage( argc > 1 ? EX_USAGE : EX_OK );
+  if ( opt_version > 0 ) {
+    if ( argc > 1 )                     // symbol-tidy --version foo
+      print_usage( EX_USAGE );
+    // LCOV_EXCL_START
+    print_version( /*verbose=*/opt_version > 1 );
+    exit( EX_OK );
+    // LCOV_EXCL_STOP
+  }
+  if ( tidy_argc != 1 || source_path == NULL )
+    print_usage( EX_USAGE );
+
+  if ( source_lang == CXLanguage_Invalid ) {
+    if ( source_path != NULL )
+      strbuf_printf( &err_buf, "\"%s\": ", source_path );
+    if ( source_ext == NULL )
+      strbuf_puts( &err_buf, "missing" );
+    else
+      strbuf_printf( &err_buf, "\"%s\": unknown", source_ext );
+    strbuf_puts( &err_buf, " extension; must be one of " );
+    bool comma = false;
+    FOREACH_FILE_EXT( file_ext )
+      strbuf_sepsn_puts( &err_buf, ", ", 2, &comma, file_ext->ext );
+    strbuf_puts( &err_buf, "; or use -xc[++]" );
+    fatal_error( EX_USAGE, "%s\n", err_buf.str );
+  }
+
+  if ( opt_directory != NULL ) {
+    if ( IS_VERBOSE( DIRECTORY ) ) {
+      verbose_section_begin( /*printed_header=*/NULL );
+      verbose_printf( "directory = \"%s\"\n", opt_directory );
+    }
+    if ( chdir( opt_directory ) != 0 )
+      fatal_error( EX_IOERR, "\"%s\": %s\n", opt_directory, STRERROR() );
+  }
+
+  // argv[argc-1] is the source file, but we've already copied it into
+  // source_path, so just NULL it out.
+  (*pargv)[ --*pargc ] = NULL;
+
+  return (tidy_source){
+    .path = source_path,
+    .lang = source_lang
+  };
+}
+
+bool option_is_set( int short_opt ) {
+  assert( short_opt > 0 );
+  assert( STATIC_CAST( size_t, short_opt ) < ARRAY_SIZE( is_opt_set ) );
+  return is_opt_set[ short_opt ];
+}
+
+void option_mark_set( int short_opt ) {
+  assert( short_opt > 0 );
+  assert( STATIC_CAST( size_t, short_opt ) < ARRAY_SIZE( is_opt_set ) );
+  assert( isalnum( short_opt ) );
+  is_opt_set[ short_opt ] = true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+/** @} */
+
+/* vim:set et sw=2 ts=2: */

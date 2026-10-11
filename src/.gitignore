@@ -1,0 +1,7 @@
+/*.dSYM
+/*.gcda
+/*.gcno
+/*_test
+/config.h
+/stamp-h1
+/symbol-tidy
