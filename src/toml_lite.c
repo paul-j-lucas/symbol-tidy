@@ -60,28 +60,59 @@
 #define TOML_ARRAY_CAP_MIN        4
 
 /**
- * Map any invalid character to this.
- *
- * @sa toml_getc()
- * @sa toml_is_invalid_char()
- */
-#define TOML_CHAR_INVALID         -2
-
-/**
- * Rather than use a separate `bool is_newline_pending` in toml_file, use a
- * special value in \ref toml_file::c_last "c_last".
- */
-#define TOML_CHAR_PENDING_NEWLINE -3
-
-/**
  * Maximum decimal digits.
  */
 #define TOML_INT_DIGITS_MAX       MAX_DEC_INT_DIGITS( long )
 
+////////// enums //////////////////////////////////////////////////////////////
+
 /**
- * Maximum string length.
+ * Declares a small set of special "character" values.
+ *
+ * @remarks
+ * @parblock
+ * The integer values used must be distinct from every valid character (which
+ * means they must be negative) and also distinct from `EOF`.  However,
+ * according to the C11 standard 7.21.1-3:
+ *
+ * <blockquote>
+ * `EOF` which expands to an integer constant expression, with type `int` and
+ * a negative value ...
+ * </blockquote>
+ *
+ * all that's guaranteed about `EOF` is that it's negative and not its
+ * particular value.  While it _could_ be _any_ negative value, e.g., -42,
+ * `INT_MIN`, it's _very_ likely just -1, so values like -2, -3, etc., should
+ * be OK.
+ * @endparblock
+ *
+ * @sa toml_getc()
  */
-#define TOML_STRING_LEN_MAX       1024
+enum toml_special_chars {
+  /**
+   * Any invalid TOML character is mapped to this.
+   *
+   * @sa toml_is_invalid_char()
+   */
+  TOML_CHAR_INVALID         = -2,
+
+  /**
+   * A special value for \ref toml_file::c_last "c_last" to indicate that a
+   * newline was recently read and so is "pending."
+   *
+   * @remarks
+   * @parblock
+   * If we read a newline, immediately called toml_newline(), and it turns out
+   * the newline is unexpected, the error location would be the first column of
+   * the next line --- which is wrong.
+   *
+   * To fix this, we want to defer calling toml_newline() until after we know
+   * it's not unexpected.  We use this special value for \ref toml_file::c_last
+   * "c_last" instead of a separate `is_newline_pending` flag to indicate this.
+   * @endparblock
+   */
+  TOML_CHAR_PENDING_NEWLINE = -3
+};
 
 ////////// local constants ////////////////////////////////////////////////////
 
@@ -314,8 +345,6 @@ static bool toml_array_parse( toml_file *toml, toml_array *rv_a ) {
       goto done;
     int const c = toml_getc( toml );
     switch ( c ) {
-      case '#': // impossible due to toml_space_comments_skip() above
-        INTERNAL_ERROR( "unexpected '#'\n" );
       case ',':
         if ( !need_comma ) {
           toml->error = TOML_ERR_UNEXPECTED_CHAR;
@@ -330,8 +359,6 @@ static bool toml_array_parse( toml_file *toml, toml_array *rv_a ) {
       case EOF:
         toml->error = TOML_ERR_UNEXPECTED_EOF;
         goto done;
-      case TOML_CHAR_INVALID: // impossible due to toml_space_comments_skip()
-        INTERNAL_ERROR( "unexpected invalid character\n" );
       default:
         if ( need_comma ) {
           toml->error = TOML_ERR_UNEXPECTED_CHAR;
@@ -340,6 +367,9 @@ static bool toml_array_parse( toml_file *toml, toml_array *rv_a ) {
         }
         toml_ungetc( toml, c );
         break;
+      case '#':
+      case TOML_CHAR_INVALID:
+        unreachable();  // we called toml_space_comments_skip()
     } // switch
 
     toml_value value;
@@ -438,11 +468,11 @@ static bool toml_char_parse( toml_file *toml, char want_c ) {
     case EOF:
       toml->error = TOML_ERR_UNEXPECTED_EOF;
       break;
-    case TOML_CHAR_INVALID: // impossible due to toml_space_comments_skip()
-      INTERNAL_ERROR( "unexpected invalid character\n" );
     default:
       toml->error = TOML_ERR_UNEXPECTED_CHAR;
       break;
+    case TOML_CHAR_INVALID:
+      unreachable();  // caller called toml_space_comments_skip()
   } // switch
   return false;
 }
@@ -561,11 +591,12 @@ static bool toml_int_parse( toml_file *toml, int c, long *rv_i ) {
       } // switch
       break;
 
-    case TOML_CHAR_INVALID:
-      unreachable();                    // since caller got a valid char
-
     default:
       toml_ungetc( toml, c );
+      break;
+
+    case TOML_CHAR_INVALID:
+      unreachable();  // caller got a valid char
   } // switch
 
   for (;;) {
@@ -678,12 +709,12 @@ static bool toml_key_parse( toml_file *toml, toml_key *rv_key,
   int c = toml_getc( toml );
 
   switch ( c ) {
-    case TOML_CHAR_INVALID: // impossible due to toml_space_comments_skip()
-      unreachable();
     case EOF:
       // An EOF here isn't necessarily an error.  It could just mean there are
       // no more keys (and values).
       return false;
+    case TOML_CHAR_INVALID:
+      unreachable();  // caller called toml_space_comments_skip()
   } // switch
 
   unsigned const  first_col = toml->loc.col;
@@ -1169,9 +1200,6 @@ static bool toml_value_parse( toml_file *toml, toml_value *rv_value ) {
         strbuf_cleanup( &sbuf );
         return false;
 
-      case '#': // impossible since caller called toml_space_comments_skip()
-        INTERNAL_ERROR( "unexpected '#'\n" );
-
       case '+':
       case '-':
       case '0':
@@ -1217,12 +1245,13 @@ static bool toml_value_parse( toml_file *toml, toml_value *rv_value ) {
         };
         return true;
 
-      case TOML_CHAR_INVALID:
-        INTERNAL_ERROR( "unexpected invalid character\n" );
-
       default:
         toml->error = TOML_ERR_UNEXPECTED_CHAR;
         return false;
+
+      case '#':
+      case TOML_CHAR_INVALID:
+        unreachable();  // caller called toml_space_comments_skip()
     } // switch
   } // for
 }
@@ -1323,8 +1352,6 @@ bool toml_table_next( toml_file *toml, toml_table *table ) {
       if ( !toml_table_header_parse( toml, &table_key, &table_name_len ) )
         return false;
       break;
-    case TOML_CHAR_INVALID: // impossible due to toml_space_comments_skip()
-      INTERNAL_ERROR( "unexpected invalid character\n" );
     case EOF:
       // An EOF here isn't an error.  It just means there are no more tables.
       return false;
@@ -1333,6 +1360,8 @@ bool toml_table_next( toml_file *toml, toml_table *table ) {
       table_key = (toml_key){ .name = NULL };
       table_name_len = 0;
       break;
+    case TOML_CHAR_INVALID:
+      unreachable();  // we called toml_space_comments_skip()
   } // switch
 
   if ( table_key.name != NULL ) {
