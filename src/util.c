@@ -26,10 +26,7 @@
 // local
 #include "pjl_config.h"
 #include "util.h"
-#ifdef NEED_MATRIX_NEW
-#include "bit_util.h"                   /* for is_1_bit() */
-#endif /* NEED_MATRIX_NEW */
-#include "include-tidy.h"
+#include "symbol-tidy.h"
 
 /// @cond DOXYGEN_IGNORE
 
@@ -56,22 +53,6 @@
 char const WS_CHARS[] =           " \n\t\r\f\v";
 
 /// @endcond
-
-////////// local functions ////////////////////////////////////////////////////
-
-#ifdef NEED_MATRIX_NEW
-/**
- * Rounds \a n up to a multiple of \a multiple.
- *
- * @param n The number to round up.  Must be &gt; 0.
- * @param multiple The multiple to round up to.  It _must_ be a power of 2.
- * @return Returns \a n rounded up to a multiple of \a multiple.
- */
-NODISCARD
-static inline size_t round_up_pow_2( size_t n, size_t multiple ) {
-  return (n + multiple - 1) & ~(multiple - 1);
-}
-#endif /* NEED_MATRIX_NEW */
 
 ////////// extern functions ///////////////////////////////////////////////////
 
@@ -135,21 +116,6 @@ void free_pptr( void *pptr ) {
   if ( pptr != NULL )
     free( *POINTER_CAST( void**, pptr ) );
 }
-
-#ifdef NEED_MATRIX_NEW
-void** matrix2d_new( size_t esize, size_t ealign, size_t idim, size_t jdim ) {
-  assert( is_1_bit( ealign ) );
-  // ensure &elements[0] is suitably aligned
-  size_t const ptrs_size = round_up_pow_2( sizeof(void*) * idim, ealign );
-  size_t const row_size = esize * jdim;
-  // allocate the row pointers followed by the elements
-  void **const rows = MALLOC( char, ptrs_size + idim * row_size );
-  char *const elements = POINTER_CAST( char*, rows ) + ptrs_size;
-  for ( size_t i = 0; i < idim; ++i )
-    rows[i] = &elements[ i * row_size ];
-  return rows;
-}
-#endif /* NEED_MATRIX_NEW */
 
 // LCOV_EXCL_START
 void perror_exit( int status ) {

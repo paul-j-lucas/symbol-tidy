@@ -27,9 +27,9 @@
 #include "pjl_config.h"                 /* must go first */
 #include "print.h"
 #include "color.h"
-#include "include-tidy.h"
 #include "options.h"
 #include "path_util.h"
+#include "symbol-tidy.h"
 #include "util.h"
 
 /// @cond DOXYGEN_IGNORE

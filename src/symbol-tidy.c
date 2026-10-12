@@ -25,27 +25,32 @@
 
 // local
 #include "pjl_config.h"                 /* must go first */
-#include "symbol-tidy,h"
+#include "symbol-tidy.h"
+#include "cli_options.h"
 #include "color.h"
-#include "hash_table.h"
-#include "path_util,h"
+#include "options.h"
+#include "path_util.h"
 #include "source.h"
+#include "str_util.h"
+#include "symbol.h"
 #include "util.h"
 
+// libclang
 #include <clang-c/Index.h>
 
 // standard
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <sysexits.h>
 
-typedef struct VisitorData VisitorData;
+////////// enums //////////////////////////////////////////////////////////////
 
-/* Visitor context passed down the AST traversal */
-struct VisitorData {
-  tidy_symbol *current_parent;
-  hash_table_t *table;
+/**
+ * **include-tidy**-specific exit status codes.
+ */
+enum {
+  TIDY_EX_UNUSED          = 1,    ///< One or more unused symbols.
+  TIDY_EX_NO_UNUSED_ERROR = 2     ///< No unused symbols, but error anyway.
 };
 
 ////////// extern variables ///////////////////////////////////////////////////
@@ -78,7 +83,7 @@ void test_init( char const *env_var ) {
 }
 
 /**
- * Gets the status **include-tidy** should exit with.
+ * Gets the status **symbol-tidy** should exit with.
  *
  * @param unused_symbols The number of unused symbold.
  * @return Returns said exit status.
@@ -87,9 +92,9 @@ NODISCARD
 static int tidy_status( unsigned unused_symbols ) {
   if ( opt_error != TIDY_ERROR_NEVER ) {
     if ( unused_symbols > 0 )
-      return TIDY_EX_VIOLATIONS;
+      return TIDY_EX_UNUSED;
     if ( opt_error == TIDY_ERROR_ALWAYS )
-      return TIDY_EX_NO_VIOLATIONS_ERROR;
+      return TIDY_EX_NO_UNUSED_ERROR;
   }
   return EX_OK;
 }

@@ -29,6 +29,7 @@
 
 // local
 #include "pjl_config.h"
+#include "source.h"
 
 /// @cond DOXYGEN_IGNORE
 
@@ -42,26 +43,21 @@
 
 /**
  * @defgroup config-file-group Configuration File
- * Functions to read an **include-tidy** configuration file and look-up
+ * Functions to read an **symbol-tidy** configuration file and look-up
  * information specified therein.
  * @{
  */
-
-////////// extern variables ///////////////////////////////////////////////////
-
-/**
- * Ignore \ref tidy_source_path?
- */
-extern bool         tidy_config_is_source_path_ignored;
 
 ////////// extern functions ///////////////////////////////////////////////////
 
 /**
  * Reads an **include-tidy** configuration file, if any.
  *
+ * @param source The source file being tidied.
+ *
  * @note This function must be called at most once.
  */
-void config_init( void );
+void config_init( tidy_source *source );
 
 /**
  * Gets whether \a sym_name should be ignored.

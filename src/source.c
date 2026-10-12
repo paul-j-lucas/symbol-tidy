@@ -26,8 +26,8 @@
 // local
 #include "pjl_config.h"
 #include "source.h"
-#include "include-tidy.h"
 #include "print.h"
+#include "symbol-tidy.h"
 #include "util.h"
 
 // libclang

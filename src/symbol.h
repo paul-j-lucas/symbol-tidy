@@ -40,7 +40,7 @@
 
 ////////// typedefs ///////////////////////////////////////////////////////////
 
-typedef strucy tidy_ref     tidy_ref;
+typedef struct tidy_ref     tidy_ref;
 typedef struct tidy_symbol  tidy_symbol;
 
 ////////// structs ////////////////////////////////////////////////////////////
@@ -92,11 +92,22 @@ ht_hash_val_t symbol_hash( tidy_symbol const *sym );
 
 /**
  * Initializes the internal set of all symbols in the translation unit.
+ *
+ * @note This function must be called exactly once.
  */
 void symbols_init( void );
 
 /**
  * TODO.
+ *
+ * @param source TODO.
+ */
+void symbols_visit( tidy_source *source );
+
+/**
+ * TODO.
+ *
+ * @return Returns TODO.
  */
 unsigned symbols_report_unused( void );
 

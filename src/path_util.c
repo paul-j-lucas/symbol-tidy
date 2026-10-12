@@ -27,6 +27,7 @@
 #include "pjl_config.h"
 #include "path_util.h"
 #include "array.h"
+#include "str_util.h"
 #include "strbuf.h"
 #include "util.h"
 
@@ -81,24 +82,29 @@ char const* path_cwd( size_t *rv_len ) {
   return cwd_path_buf;
 }
 
-char* path_dirname( char const *path, strbuf_t *rv_dir_buf ) {
+char* path_dirname( char const *path ) {
   assert( path != NULL );
-  assert( rv_dir_buf != NULL );
 
-  strbuf_reset( rv_dir_buf );
+  size_t path_len = strlen( path );
+  if ( path_len == 0 )
+    return strdup( "." );
 
-  char const *const slash = strrchr( path, '/' );
-  if ( slash == NULL ) {
-    strbuf_putc( rv_dir_buf, '.' );
-  }
-  else {
-    size_t dir_len = STATIC_CAST( size_t, slash - path );
-    if ( dir_len == 0 )                 // "/"
-      dir_len = 1;
-    strbuf_putsn( rv_dir_buf, path, dir_len );
-  }
+  while ( path_len > 0 && path[ path_len - 1 ] == '/' )
+    --path_len;
+  if ( path_len == 0 )
+    return strdup( "/" );
 
-  return rv_dir_buf->str;
+  char const *const slash = strnrchr( path, path_len, '/' );
+  if ( slash == NULL )
+    return strdup( "." );
+
+  size_t dir_len = STATIC_CAST( size_t, slash - path );
+  while ( dir_len > 0 && path[ dir_len - 1 ] == '/' )
+    --dir_len;
+  if ( dir_len == 0 )
+    return strdup( "/" );
+
+  return strndup_or_exit( path, dir_len );
 }
 
 bool path_ends_with( char const *path, size_t path_len, char const *end_path,
@@ -111,6 +117,24 @@ bool path_ends_with( char const *path, size_t path_len, char const *end_path,
   char const *const suffix = path + (path_len - end_path_len);
   return  strcmp( end_path, suffix ) == 0 &&
           (suffix == path || suffix[-1] == '/');
+}
+
+bool path_equal( char const *i_path, char const *j_path ) {
+  assert( i_path != NULL );
+  assert( j_path != NULL );
+
+  if ( i_path == j_path )
+    return true;                        // LCOV_EXCL_LINE
+
+  size_t i_len = strlen( i_path );
+  while ( i_len > 1 && i_path[ i_len - 1 ] == '/' )
+    --i_len;
+
+  size_t j_len = strlen( j_path );
+  while ( j_len > 1 && j_path[ j_len - 1 ] == '/' )
+    --j_len;
+
+  return i_len == j_len && memcmp( i_path, j_path, i_len ) == 0;
 }
 
 char const* path_ext( char const *path ) {
@@ -137,12 +161,13 @@ char const* path_no_dot_slash( char const *path ) {
   return path;
 }
 
-char const* path_no_ext( char const *path, strbuf_t *rv_path_buf ) {
+char* path_no_ext( char const *path ) {
   assert( path != NULL );
 
   ssize_t last_dot = -1, last_slash = -1;
+  ssize_t i;
 
-  for ( ssize_t i = 0; path[i] != '\0'; ++i ) {
+  for ( i = 0; path[i] != '\0'; ++i ) {
     switch ( path[i] ) {
       case '.':
         last_dot = i;
@@ -151,57 +176,70 @@ char const* path_no_ext( char const *path, strbuf_t *rv_path_buf ) {
         last_slash = i;
         break;
     } // switch
-  }
+  } // for
 
   if ( last_dot == -1 ||                // "foo"
+       last_dot == i - 1 ||             // "foo."
        last_dot < last_slash ||         // "fo.o/bar"
        last_dot == last_slash + 1 ) {   // ".foo" or "foo/.bar"
-    return path;
+    return NULL;
   }
 
-  size_t const len = STATIC_CAST( size_t, last_dot );
-  return strbuf_putsn( rv_path_buf, path, len );
+  size_t const no_ext_len = STATIC_CAST( size_t, last_dot );
+  return strndup_or_exit( path, no_ext_len );
 }
 
 char* path_normalize( char const *path ) {
   assert( path != NULL );
 
-  strbuf_t in_path = STRBUF_INIT();
+  if ( path[0] == '.' && path[1] == '\0' )
+    return strdup_or_exit( path_cwd( /*len=*/NULL ) );
 
-  if ( path_is_relative( path ) ) {
-    path = path_no_dot_slash( path );
-    if ( strstr( path, "../" ) != NULL ) {
-      // LCOV_EXCL_START
-      // This can't be coverage tested because cwd isn't fixed.
-      size_t cwd_path_len;
-      char const *const cwd_path = path_cwd( &cwd_path_len );
-      strbuf_putsn( &in_path, cwd_path, cwd_path_len );
-      // LCOV_EXCL_STOP
+  char       *comp_save = NULL;
+  array_t     comp_stack = ARRAY_INIT( sizeof(char*) );
+  char       *cwd_copy = NULL;
+  bool        is_absolute = path_is_absolute( path );
+  char *const path_copy = strdup_or_exit( path );
+
+  for ( char const *path_comp = strtok_r( path_copy, "/", &comp_save );
+        path_comp != NULL; path_comp = strtok_r( NULL, "/", &comp_save ) ) {
+
+    if ( strcmp( path_comp, ".." ) == 0 ) {
+      if ( comp_stack.len > 0 ) {
+        array_pop_back( &comp_stack );
+      }
+      else if ( !is_absolute ) {
+        // Path escaped its relative root: anchor to CWD.
+        cwd_copy = strdup_or_exit( path_cwd( /*len=*/NULL ) );
+        is_absolute = true;
+
+        char *cwd_save = NULL;
+        for ( char const *cwd_comp = strtok_r( cwd_copy, "/", &cwd_save );
+              cwd_comp != NULL; cwd_comp = strtok_r( NULL, "/", &cwd_save ) ) {
+          *(char const**)array_push_back( &comp_stack ) = cwd_comp;
+        }
+
+        // Pop one directory level for the ".." that triggered the escape.
+        array_pop_back( &comp_stack );
+      }
     }
-  }
-  strbuf_paths( &in_path, path );
-
-  array_t comp_stack = ARRAY_INIT( sizeof(char*) );
-
-  for ( char const *comp = strtok( in_path.str, "/" ); comp != NULL;
-        comp = strtok( NULL, "/" ) ) {
-    if ( strcmp( comp, ".." ) == 0 )
-      array_pop_back( &comp_stack );
-    else if ( strcmp( comp, "." ) != 0 )
-      *(char const**)array_push_back( &comp_stack ) = comp;
+    else if ( strcmp( path_comp, "." ) != 0 ) {
+      *(char const**)array_push_back( &comp_stack ) = path_comp;
+    }
   } // for
 
   strbuf_t out_path = STRBUF_INIT();
 
-  if ( path_is_absolute( in_path.str ) )
+  if ( is_absolute )
     strbuf_putc( &out_path, '/' );
   for ( size_t i = 0; i < comp_stack.len; ++i ) {
     char const *const comp = *(char const**)array_at_nc( &comp_stack, i );
     strbuf_paths( &out_path, comp );
   } // for
 
-  strbuf_cleanup( &in_path );
   array_cleanup( &comp_stack, /*free_fn=*/NULL );
+  free( cwd_copy );
+  free( path_copy );
   return strbuf_take( &out_path );
 }
 

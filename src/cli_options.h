@@ -67,7 +67,7 @@
 ////////// extern functions ///////////////////////////////////////////////////
 
 /**
- * Initializes **include-tidy** options from the command-line.
+ * Initializes **symbol-tidy** options from the command-line.
  *
  * @param pargc A pointer to the argument count from \c main().
  * @param pargv A pointer to the argument values from \c main().

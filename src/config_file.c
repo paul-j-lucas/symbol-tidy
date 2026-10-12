@@ -20,7 +20,7 @@
 
 /**
  * @file
- * Defines functions for reading and querying an **include-tidy**
+ * Defines functions for reading and querying an **symbol-tidy**
  * configuration file.
  */
 
@@ -33,16 +33,14 @@
 #include "cli_options.h"
 #include "fnv1a.h"
 #include "hash_table.h"
-#include "include-tidy.h"
-#include "include.h"
 #include "options.h"
 #include "path_util.h"
 #include "print.h"
-#include "proxies.h"
 #include "red_black.h"
 #include "source.h"
 #include "str_util.h"
 #include "strbuf.h"
+#include "symbol-tidy.h"
 #include "toml_lite.h"
 #include "util.h"
 #include "verbose.h"
@@ -88,7 +86,7 @@ enum config_opts {
  */
 enum config_table_kind {
   TABLE_NONE          = 0,              ///< No table.
-  TABLE_INCLUDE_TIDY  = 1 << 0,         ///< The `include-tidy` table.
+  TABLE_INCLUDE_TIDY  = 1 << 0,         ///< The `symbol-tidy` table.
   TABLE_HEADER        = 1 << 1,         ///< Header table.
   TABLE_SOURCE        = 1 << 2,         ///< Source table.
   TABLE_SYMBOL        = 1 << 3          ///< Symbol table.
@@ -185,8 +183,6 @@ static void         color_parse( config_parse_fn_args const* );
 NODISCARD
 static FILE*        config_open( char const*, config_opts );
 
-static void         elide_includes_parse( config_parse_fn_args const* );
-static void         elide_include_parse_string( config_parse_fn_args const* );
 static void         error_parse( config_parse_fn_args const* );
 
 NODISCARD
@@ -196,16 +192,8 @@ static void         ignore_as_argument_parse( config_parse_fn_args const* );
 static void         ignore_parse( config_parse_fn_args const* );
 static void         ignore_symbols_parse( config_parse_fn_args const* );
 static void         ignore_symbols_parse_string( config_parse_fn_args const* );
-static void         include_handle( char const*, char const*, char const*,
-                                    toml_loc const*, tidy_handling );
-static void         includes_parse( config_parse_fn_args const* );
-static void         includes_parse_string( config_parse_fn_args const* );
-static void         keep_includes_parse( config_parse_fn_args const* );
-static void         keep_includes_parse_string( config_parse_fn_args const* );
-static void         keep_parse( config_parse_fn_args const* );
 static void         print_invalid_value( config_parse_fn_args const*,
                                          toml_value const*, toml_type );
-static void         symbol_include_add( char const*, tidy_include const* );
 static void         symbol_includes_cleanup( symbol_includes* );
 static void         symbols_parse( config_parse_fn_args const* );
 static void         symbols_parse_string( config_parse_fn_args const* );
@@ -219,14 +207,10 @@ static void         toml_value_print( toml_value const*, FILE* );
  */
 static config_key const CONFIG_KEYS[] = {
   { "color",              TABLE_INCLUDE_TIDY,   &color_parse              },
-  { "elide-includes",     TABLE_HEADER_SOURCE,  &elide_includes_parse     },
   { "error",              TABLE_INCLUDE_TIDY,   &error_parse              },
   { "ignore",             TABLE_SYMBOL,         &ignore_parse             },
   { "ignore-as-argument", TABLE_HEADER_SOURCE,  &ignore_as_argument_parse },
   { "ignore-symbols",     TABLE_HEADER_SOURCE,  &ignore_symbols_parse     },
-  { "includes",           TABLE_SYMBOL,         &includes_parse           },
-  { "keep",               TABLE_HEADER,         &keep_parse               },
-  { "keep-includes",      TABLE_HEADER_SOURCE,  &keep_includes_parse      },
   { "symbols",            TABLE_HEADER,         &symbols_parse            },
 };
 
@@ -235,7 +219,7 @@ static config_key const CONFIG_KEYS[] = {
  */
 static char const *const TABLE_KINDS[] = {
   [ TABLE_NONE ] = "none",
-  [ TABLE_INCLUDE_TIDY ] = "include-tidy",
+  [ TABLE_INCLUDE_TIDY ] = "symbol-tidy",
   [ TABLE_HEADER ] = "header",
   [ TABLE_HEADER_SOURCE ] = "source or header",
   [ TABLE_SOURCE ] = "source",
@@ -462,39 +446,6 @@ static void color_parse( config_parse_fn_args const *config ) {
 }
 
 /**
- * Parses the value of an `"elide-includes"` key.
- *
- * @param config The config_parse_fn_args to use.
- *
- * @sa elide_include_parse_string()
- */
-static void elide_includes_parse( config_parse_fn_args const *config ) {
-  assert( config != NULL );
-
-  if ( strcmp( config->table->key.name, config->source->path ) == 0 )
-    toml_string_or_string_array_parse( config, &elide_include_parse_string );
-}
-
-/**
- * Parses a single string value of an `"elide-includes"` key.
- *
- * @param config The config_parse_fn_args to use.
- *
- * @sa elide_includes_parse()
- * @sa include_handle()
- */
-static void elide_include_parse_string( config_parse_fn_args const *config ) {
-  assert( config != NULL );
-  assert( config->value->type == TOML_STRING );
-
-  include_handle(
-    config->config_path, config->key->name,
-    config->value->s, &config->value->loc,
-    TIDY_HANDLE_ELIDE
-  );
-}
-
-/**
  * Parses the value of a `"error"` key.
  *
  * @param config The config_parse_fn_args to use.
@@ -580,86 +531,6 @@ static void ignore_symbols_parse_string( config_parse_fn_args const *config ) {
 }
 
 /**
- * Parses the value of an `"includes"` key.
- *
- * @param config The config_parse_fn_args to use.
- *
- * @sa includes_parse_string()
- */
-static void includes_parse( config_parse_fn_args const *config ) {
-  toml_string_or_string_array_parse( config, &includes_parse_string );
-}
-
-/**
- * Parses a single string value of an `"includes"` key.
- *
- * @param config The config_parse_fn_args to use.
- *
- * @sa includes_parse()
- * @sa symbols_parse_string()
- */
-static void includes_parse_string( config_parse_fn_args const *config ) {
-  assert( config != NULL );
-  assert( config->value->type == TOML_STRING );
-
-  tidy_include const *const to_include =
-    include_find_by_rel_path( config->source, config->value->s );
-  if ( to_include != NULL )
-    symbol_include_add( config->table->key.name, to_include );
-}
-
-/**
- * Parses the value of an `"keep-includes"` key.
- *
- * @param config The config_parse_fn_args to use.
- *
- * @sa keep_includes_parse_string()
- */
-static void keep_includes_parse( config_parse_fn_args const *config ) {
-  assert( config != NULL );
-
-  if ( strcmp( config->table->key.name, config->source->path ) == 0 )
-    toml_string_or_string_array_parse( config, &keep_includes_parse_string );
-}
-
-/**
- * Parses a single string value of a `"keep-includes"` key.
- *
- * @param config The config_parse_fn_args to use.
- *
- * @sa include_handle()
- * @sa keep_includes_parse()
- */
-static void keep_includes_parse_string( config_parse_fn_args const *config ) {
-  assert( config != NULL );
-  assert( config->value->type == TOML_STRING );
-
-  include_handle(
-    config->config_path, config->key->name,
-    config->value->s, &config->value->loc,
-    TIDY_HANDLE_KEEP
-  );
-}
-
-/**
- * Parses the value of a `"keep"` key.
- *
- * @param config The config_parse_fn_args to use.
- *
- * @sa include_handle()
- */
-static void keep_parse( config_parse_fn_args const *config ) {
-  bool keep;
-  if ( !toml_bool_parse( config, &keep ) || !keep )
-    return;
-  include_handle(
-    config->config_path, config->key->name,
-    config->table->key.name, &config->table->key.loc,
-    TIDY_HANDLE_KEEP
-  );
-}
-
-/**
  * Parses the value of a `"symbols"` key.
  *
  * @param config The config_parse_fn_args to use.
@@ -668,24 +539,6 @@ static void keep_parse( config_parse_fn_args const *config ) {
  */
 static void symbols_parse( config_parse_fn_args const *config ) {
   toml_string_or_string_array_parse( config, &symbols_parse_string );
-}
-
-/**
- * Parses a single string value of a `"symbols"` key.
- *
- * @param config The config_parse_fn_args to use.
- *
- * @sa includes_parse_string()
- * @sa symbols_parse()
- */
-static void symbols_parse_string( config_parse_fn_args const *config ) {
-  assert( config != NULL );
-  assert( config->value->type == TOML_STRING );
-
-  tidy_include const *const to_include =
-    include_find_by_rel_path( config->source, config->table->key.name );
-  if ( to_include != NULL )
-    symbol_include_add( config->value->s, to_include );
 }
 
 ////////// local functions ////////////////////////////////////////////////////
@@ -710,13 +563,13 @@ static void config_cleanup( void ) {
  *
  *  1. The path given as the value for either the `--config` or `-c` command-
  *     line option.  (If specified, this path _must_ exist.)
- *  2. <tt>dirname(</tt> \a source_path <tt>)/include-tidy.toml</tt>.
- *  3. `$PWD/include-tidy.toml`, but only if `$PWD` is not the same as the
+ *  2. <tt>dirname(</tt> \a source_path <tt>)/symbol-tidy.toml</tt>.
+ *  3. `$PWD/symbol-tidy.toml`, but only if `$PWD` is not the same as the
  *     directory of \a source_path.
- *  4. `$XDG_CONFIG_HOME/include-tidy/config.toml`.  If `XDG_CONFIG_HOME` is
+ *  4. `$XDG_CONFIG_HOME/symbol-tidy/config.toml`.  If `XDG_CONFIG_HOME` is
  *     unset or empty, it defaults to `~/.config`.
  *  5. For each _path_ in a colon separated list of paths in `XDG_CONFIG_DIRS`,
- *     the first of <i>path</i><tt>/include-tidy/config.toml</tt> to exist and
+ *     the first of <i>path</i><tt>/symbol-tidy/config.toml</tt> to exist and
  *     be readable.  If `XDG_CONFIG_DIRS` is unset or empty, it defaults to
  *     `/etc/xdg`.
  * @endparblock
@@ -753,7 +606,7 @@ static FILE* config_file_find( char const *source_path, char const *config_path,
       FALLTHROUGH;
 
     case 2:
-      // Try dirname(source_path)/include-tidy.toml.
+      // Try dirname(source_path)/symbol-tidy.toml.
       ++case_num;
       static char *source_dirname;
       source_dirname = path_dirname( source_path );
@@ -766,7 +619,7 @@ static FILE* config_file_find( char const *source_path, char const *config_path,
       FALLTHROUGH;
 
     case 3:
-      // Try $PWD/include-tidy.toml.
+      // Try $PWD/symbol-tidy.toml.
       ++case_num;
       size_t cwd_path_len;
       char const *const cwd_path = path_cwd( &cwd_path_len );
@@ -788,8 +641,8 @@ static FILE* config_file_find( char const *source_path, char const *config_path,
       FALLTHROUGH;
 
     case 4:
-      // Try $XDG_CONFIG_HOME/include-tidy/config.toml or
-      // $HOME/.config/include-tidy/config.toml.
+      // Try $XDG_CONFIG_HOME/symbol-tidy/config.toml or
+      // $HOME/.config/symbol-tidy/config.toml.
       ++case_num;
       strbuf_reset( &path_buf );
       char const *const config_home =
@@ -814,8 +667,8 @@ static FILE* config_file_find( char const *source_path, char const *config_path,
       FALLTHROUGH;
 
     case 5:
-      // Try $XDG_CONFIG_DIRS/include-tidy/config.toml or
-      // /etc/xdg/include-tidy/config.toml.
+      // Try $XDG_CONFIG_DIRS/symbol-tidy/config.toml or
+      // /etc/xdg/symbol-tidy/config.toml.
       ++case_num;
       char const *config_dirs = null_if_empty( getenv( "XDG_CONFIG_DIRS" ) );
       if ( config_dirs == NULL ) {
@@ -952,7 +805,7 @@ static void config_parse( tidy_source *source, char const *config_path,
     }
 
     config_table_kind table_kinds =
-      strcmp( table.key.name, "include-tidy" ) == 0 ?
+      strcmp( table.key.name, "symbol-tidy" ) == 0 ?
         TABLE_INCLUDE_TIDY : TABLE_NONE;
 
     toml_iterator iter;
@@ -1054,67 +907,6 @@ static char const* home_dir( void ) {
 }
 
 /**
- * Compares two \ref tidy_include objects by their relative paths.
- *
- * @param i_include The first tidy_include.
- * @param j_include The second tidy_include.
- * @return Returns a number less than 0, 0, or greater than 0 if the relative
- * path of \a i_include is less than, equal to, or greater than the relative
- * path of \a j_include, respectively.
- */
-NODISCARD
-static int include_cmp_by_file_id( tidy_include const *i_include,
-                                   tidy_include const *j_include ) {
-  assert( i_include != NULL );
-  assert( j_include != NULL );
-  return tidy_FileUniqueID_cmp( &i_include->file_id, &j_include->file_id );
-}
-
-/**
- * Sets the \ref tidy_include::handling "handling" field of the include file(s)
- * having \a rel_path to \a handling.
- *
- * @param config_path The configuration file path.
- * @param key_name The current key name.
- * @param rel_path The relative path of the include file to use.
- * @param loc The location of \a rel_path.
- * @param handling The handling to set.
- */
-static void include_handle( char const *config_path, char const *key_name,
-                            char const *rel_path, toml_loc const *loc,
-                            tidy_handling handling ) {
-  assert( config_path != NULL );
-  assert( key_name != NULL );
-  assert( rel_path != NULL );
-  assert( loc != NULL );
-  assert( handling != TIDY_HANDLE_DEFAULT );
-
-  ht_iterator_t iter;
-  size_t const  rel_path_len = strlen( rel_path );
-
-  ht_iterator_init( &iter, &tidy_include_set );
-  for ( tidy_include *include;
-        (include = ht_iterator_next( &iter )) != NULL; ) {
-    if ( path_ends_with( include->abs_path, strlen( include->abs_path ),
-                         rel_path, rel_path_len ) ) {
-      if ( include->handling == TIDY_HANDLE_DEFAULT ) {
-        include->handling = handling;
-      }
-      else if ( include->handling != handling ) {
-        print_file_error(
-          config_path, loc->line, loc->col,
-          "%s \"%s\": previously %s\n",
-          key_name,
-          rel_path,
-          include->handling == TIDY_HANDLE_ELIDE ? "elided" : "kept"
-        );
-        ++error_count;
-      }
-    }
-  } // for
-}
-
-/**
  * Prints an error message saying that \a value is invalid.
  *
  * @param config The config_parse_fn_args to use.
@@ -1170,73 +962,6 @@ static int symbol_includes_cmp( symbol_includes const *i_si,
   assert( j_si != NULL );
   return strcmp( i_si->from_sym_name, j_si->from_sym_name );
 }
-
-/**
- * Maps \a from_sym_name to \a to_include_file so that if \a from_sym_name is
- * referenced, it'll require \a to_include_file.
- *
- * @param from_sym_name The name of the symbol.
- * @param to_include The include file that supposedly declares it.
- */
-static void symbol_include_add( char const *from_sym_name,
-                                tidy_include const *to_include ) {
-  assert( from_sym_name != NULL );
-  assert( to_include != NULL );
-
-  symbol_includes new_si = { .from_sym_name = from_sym_name };
-  rb_insert_rv_t const rbi =
-    rb_tree_insert( &symbol_includes_map, &new_si, sizeof new_si );
-  symbol_includes *const si = RB_DINT( rbi.node );
-  if ( rbi.inserted ) {
-    si->from_sym_name = strdup_or_exit( from_sym_name );
-    ht_table_init(
-      &si->to_include_set, HT_DPTR, 2.0, 10,
-      POINTER_CAST( ht_cmp_fn_t, &include_cmp_by_file_id ),
-      POINTER_CAST( ht_hash_fn_t, &include_hash )
-    );
-    array_init( &si->to_include_array, sizeof( tidy_include* ) );
-  }
-  ht_insert_rv_t const hti = ht_table_insert(
-    &si->to_include_set, CONST_CAST( tidy_include*, to_include ), 0
-  );
-  if ( hti.inserted )
-    *(tidy_include const**)array_push_back(&si->to_include_array) = to_include;
-}
-
-// LCOV_EXCL_START: even though a symbol specifies a fixed set of headers it's
-// declared it, an actual dump is the subset of those headers that are actually
-// used.
-/**
- * Dumps all symbol includes.
- */
-static void symbol_includes_dump( void ) {
-  if ( symbol_includes_map.size == 0 )
-    return;
-  verbose_section_begin( /*printed_header=*/NULL );
-  verbose_printf( "configuration symbols:\n" );
-  rb_iterator_t si_iter;
-  rb_iterator_init( &si_iter, &symbol_includes_map );
-  for ( symbol_includes const *si;
-        (si = rb_iterator_next( &si_iter )) != NULL; ) {
-    verbose_printf( "  \"%s\" -> [ ", si->from_sym_name );
-
-    bool comma = false;
-    for ( size_t i = 0; i < si->to_include_array.len; ++i ) {
-      tidy_include const *const to_include =
-        *(tidy_include const**)array_at_nc( &si->to_include_array, i );
-      char const *const delims = include_get_delims( to_include );
-      char const *const to_include_path = opt_test != TIDY_TEST_NONE ?
-        to_include->rel_path : to_include->abs_path;
-      printf(
-        "%s%c%s%c",
-        true_or_set( &comma ) ? ", " : "",
-        delims[0], to_include_path, delims[1]
-      );
-    } // for
-    puts( " ]" );
-  }
-}
-// LCOV_EXCL_STOP
 
 /**
  * Prints a TOML value.
@@ -1299,9 +1024,6 @@ void config_init( tidy_source *source ) {
     print_error( "no configuration file found\n" );
     exit( EX_CONFIG );
   }
-
-  if ( IS_VERBOSE( CONFIG_SYMBOLS ) )
-    symbol_includes_dump();             // LCOV_EXCL_LINE
 }
 
 bool config_symbol_is_ignored( char const *sym_name ) {

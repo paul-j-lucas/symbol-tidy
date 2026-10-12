@@ -28,7 +28,6 @@
 
 // local
 #include "pjl_config.h"
-#include "strbuf.h"
 
 /// @cond DOXYGEN_IGNORE
 
@@ -59,7 +58,7 @@
  *
  * @param path The path to extract the base portion of.
  * @return Returns a pointer to the last component of \a path.  If \a path
- * consists entirely of '/' characters, a pointer to the string "/" is
+ * consists entirely of `/` characters, a pointer to the string `"/"` is
  * returned.
  *
  * @sa path_dirname()
@@ -81,14 +80,16 @@ char const* path_cwd( size_t *rv_len );
  * Extracts the directory portion of \a path.
  *
  * @param path The path to extract the directory portion of.
- * @param rv_dir_buf Receives the directory portion of \a path.  It will not
- * end with <tt>'/'</tt> (unless \a path is exactly <tt>'/'</tt>).
- * @return Returns the directory portion of path.
+ * @return Returns the directory portion of path.  It will not end with `/`
+ * (unless \a path entirely consists of `"/"`).  If \a path is empty or
+ * contains no `/`, returns `"."`.
+ *
+ * @note The caller is responsible for freeing the returned string.
  *
  * @sa path_basename()
  */
-PJL_DISCARD
-char* path_dirname( char const *path, strbuf_t *rv_dir_buf );
+NODISCARD
+char* path_dirname( char const *path );
 
 /**
  * Gets whether \a path ends with \a end_path.
@@ -112,10 +113,25 @@ char* path_dirname( char const *path, strbuf_t *rv_dir_buf );
  * @param end_path_len The length of \a end_path.
  * @return Returns `true` only if \a path ends with \a end_path at a directory
  * boundary.
+ *
+ * @sa path_equal()
  */
 NODISCARD
 bool path_ends_with( char const *path, size_t path_len, char const *end_path,
                      size_t end_path_len );
+
+/**
+ * Gets whether \a i_path equals \a j_path ignoring trailing slashes.
+ *
+ * @param i_path The first path.
+ * @param j_path The second path.
+ * @return Returns `true` only if the paths are equal ignoring trailing
+ * slashes.
+ *
+ * @sa path_ends_with()
+ */
+NODISCARD
+bool path_equal( char const *i_path, char const *j_path );
 
 /**
  * Gets the filename extension of \a path, if any.
@@ -163,12 +179,12 @@ inline bool path_is_filename( char const *path ) {
  *
  * @par Example
  * @parblock
- * Assuming the current working directory is `/home/pjl/src/include-tidy/src`:
+ * Assuming the current working directory is `/home/pjl/src/cdecl/src`:
  *
- * `abs_path`                              | Local?
- * --------------------------------------- | ------
- * `/home/pjl/src/include-tidy/src/util.h` | true
- * `/usr/include/stdio.h`                  | false
+ * `abs_path`                       | Local?
+ * -------------------------------- | ------
+ * `/home/pjl/src/cdecl/src/util.h` | true
+ * `/usr/include/stdio.h`           | false
  * @endparblock
  *
  * @param abs_path The absolute path of a file.
@@ -208,25 +224,34 @@ char const* path_no_dot_slash( char const *path );
  * Gets the pathname of \a path without its filename extension, if any.
  *
  * @param path The path.
- * @param rv_path_buf Receives \a path without its extension, but only if \a
- * path has an extension.
- * @return If \a path has no extension, returns \a path as-is; otherwise
- * returns \a path without its extension in \a rv_path_buf.
+ * @return Returns a copy of \a path without its extension or NULL if \a path
+ * has no extension.
+ *
+ * @note The caller is responsible for freeing the returned string.
  *
  * @sa path_ext()
  */
 NODISCARD
-char const* path_no_ext( char const *path, strbuf_t *rv_path_buf );
+char* path_no_ext( char const *path );
 
 /**
- * Normalizes a path by:
+ * Normalizes a path.
  *
- *  + Making a relative path absolute.
- *  + Eliminating all occurrences of `./` or `../`.
+ * @remarks If \a path is relative, it's kept relative unless an occurrence of
+ * `..` causes it to "escape" in which case it's made absolute relative to the
+ * current working directory.
  *
  * @param path The path to normalize.
- * @return Returns a normalized path.  The caller is responsible for freeing
- * it.
+ * @return
+ * @parblock
+ *  + If \a path is `.`, returns the current working directory.
+ *  + Otherwise, returns \a path with all occurrences of `./`, `../`, and `/..`
+ *    eliminated.
+ * @endparblock
+ *
+ * @note The caller is responsible for freeing the returned string.
+ *
+ * @sa path_cwd()
  */
 NODISCARD
 char* path_normalize( char const *path );

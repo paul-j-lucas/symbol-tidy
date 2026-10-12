@@ -29,7 +29,7 @@
 #include "clang_util.h"
 #include "fnv1a.h"
 #include "hash_table.h"
-#include "include-tidy.h"
+#include "symbol-tidy.h"
 #include "util.h"
 #include "verbose.h"
 

@@ -23,7 +23,7 @@
 
 /**
  * @file
- * Declares types, global variables, and functions for **include-tidy**
+ * Declares types, global variables, and functions for **symbol-tidy**
  * options.
  */
 
@@ -36,7 +36,7 @@
 
 /**
  * @defgroup options-group Include-Tidy Options
- * Types, global variables, and functions for **include-tidy** options.
+ * Types, global variables, and functions for **symbol-tidy** options.
  * @{
  */
 
@@ -118,7 +118,7 @@ extern char const  *opt_config_path;      ///< Configuration file path.
 extern bool         opt_debug;            ///< Print debugging output?
 extern tidy_error   opt_error;            ///< When to exit with non-zero.
 extern unsigned     opt_line_length;      ///< Line length.
-extern tidy_test    opt_test;             ///< Is **include-tidy** under test?
+extern tidy_test    opt_test;             ///< Is **symbol-tidy** under test?
 extern tidy_verbose opt_verbose;          ///< Print verbose output?
 
 ////////// extern functions ///////////////////////////////////////////////////
@@ -182,12 +182,12 @@ bool opt_line_length_parse( char const *s );
  *
  * @param test_format
  * @parblock
- * The NULL-terminated **include-tidy** test format string (case sensitive) to
+ * The NULL-terminated **symbol-tidy** test format string (case sensitive) to
  * parse.  Valid formats are:
  *
  * Format | Meaning
  * -------|-----------------------------------------------------------------
- * `e`    | Don't read files under `/etc/xdg/include-tidy` by default.
+ * `e`    | Don't read files under `/etc/xdg/symbol-tidy` by default.
  * `h`    | Don't read files under the user's home directory by default.
  *
  * Multiple formats may be given, one immediately after the other, e.g., `eh`.
@@ -200,11 +200,11 @@ NODISCARD
 bool opt_test_parse( char const *test_format );
 
 /**
- * Parses the value of the **include-tidy** verbose option.
+ * Parses the value of the **symbol-tidy** verbose option.
  *
  * @param verbose_format
  * @parblock
- * The null-terminated **include-tidy** verbose format string to parse.
+ * The null-terminated **symbol-tidy** verbose format string to parse.
  * Valid formats are:
  *
  * Format | Be verbose about ...

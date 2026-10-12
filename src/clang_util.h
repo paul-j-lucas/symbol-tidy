@@ -1,5 +1,5 @@
 /*
-**      include-tidy -- #include tidier
+**      symbol-tidy -- Symbol tidier
 **      src/clang_util.h
 **
 **      Copyright (C) 2026  Paul J. Lucas

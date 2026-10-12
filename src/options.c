@@ -20,7 +20,7 @@
 
 /**
  * @file
- * Defines types, global variables, and functions for **include-tidy**(1)
+ * Defines types, global variables, and functions for **symbol-tidy**(1)
  * options.
  */
 
@@ -63,32 +63,6 @@ tidy_test     opt_test;
 tidy_verbose  opt_verbose;
 
 /// @endcond
-
-/////////// local functions ///////////////////////////////////////////////////
-
-/**
- * Parses a string into an `unsigned long long`.
- *
- * @remarks Unlike **strtoull**(3), insists that \a s is entirely a non-
- * negative integer.
- *
- * @param s The NULL-terminated string to parse.
- * @return Returns the parsed integer only if \a s is entirely a non-negative
- * integer or prints an error message and exits if there was an error.
- */
-NODISCARD
-static unsigned long long parse_ull( char const *s ) {
-  assert( s != NULL );
-  SKIP_WS( s );
-  if ( likely( s[0] != '\0' && s[0] != '-' ) ) {
-    char *end = NULL;
-    errno = 0;
-    unsigned long long const n = strtoull( s, &end, 0 );
-    if ( likely( errno == 0 && *end == '\0' ) )
-      return n;
-  }
-  fatal_error( EX_USAGE, "\"%s\": invalid integer\n", s );
-}
 
 ////////// extern functions ///////////////////////////////////////////////////
 
