@@ -1,5 +1,8 @@
 # symbol-tidy
 
+THIS SOFTWARE DOESN'T WORK YET.
+STAY TUNED.
+
 ## Introduction
 
 **symbol-tidy** (Tidy) is a command-line tool
