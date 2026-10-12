@@ -1,0 +1,4 @@
+2026-10-12  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * configure.ac: Changed version to 0.1.
+   * toml_lite.c: Copied from include-tidy.
