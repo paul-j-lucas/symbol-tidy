@@ -21,7 +21,7 @@
 ##
 
 AC_PREREQ([2.70])
-AC_INIT([symbol-tidy], [1.0], [https://github.com/paul-j-lucas/symbol-tidy/issues],,[https://github.com/paul-j-lucas/symbol-tidy])
+AC_INIT([symbol-tidy], [0.1], [https://github.com/paul-j-lucas/symbol-tidy/issues],,[https://github.com/paul-j-lucas/symbol-tidy])
 AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE
 AM_EXTRA_RECURSIVE_TARGETS([clean-coverage distclean-coverage])
