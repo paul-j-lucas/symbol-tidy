@@ -129,9 +129,9 @@ bool opt_error_parse( char const *s ) {
   typedef struct error_map error_map;
 
   static error_map const ERROR_MAP[] = {
-    { "always",     TIDY_ERROR_ALWAYS         },
-    { "never",      TIDY_ERROR_NEVER          },
-    { "violations", TIDY_ERROR_IF_VIOLATIONS  },
+    { "always", TIDY_ERROR_ALWAYS     },
+    { "never",  TIDY_ERROR_NEVER      },
+    { "unused", TIDY_ERROR_IF_UNUSED  },
   };
 
   assert( s != NULL );

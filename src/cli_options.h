@@ -71,10 +71,12 @@
  *
  * @param pargc A pointer to the argument count from \c main().
  * @param pargv A pointer to the argument values from \c main().
+ * @return Returns the index in \a *pargv of the first source file to tidy.
  *
  * @note This function must be called exactly once.
  */
-void cli_options_init( int *pargc, char const **pargv[] );
+NODISCARD
+int cli_options_init( int *pargc, char const **pargv[] );
 
 /**
  * Gets whether the option has been set.

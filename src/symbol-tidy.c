@@ -59,26 +59,39 @@ char const   *prog_name;
 
 ////////// local functions ////////////////////////////////////////////////////
 
-tidy_symbol* get_or_create_node( hash_table_t *table, char const *usr ) {
-  tidy_symbol ins_node = { .usr = (char*)usr };
-
-  ht_insert_rv_t hti = ht_table_insert( table, &ins_node, sizeof ins_node );
-  tidy_symbol *const node = HT_DINT( hti.entry );
-
-  if ( hti.inserted )
-    node->usr = strdup( usr );
-
-  return node;
+/**
+ * Initializes testing.
+ *
+ * @param env_var The name of the environment variable containing a test format
+ * string (case sensitive) to parse.
+ */
+void test_init( char const *env_var ) {
+  char const *const value = empty_if_null( getenv( env_var ) );
+  if ( !opt_test_parse( value ) ) {
+    // LCOV_EXCL_START
+    fatal_error( EX_USAGE,
+      "\"%s\": invalid value for %s; must be [" OPT_TEST_ALL "]|*|-\n",
+      value, env_var
+    );
+    // LCOV_EXCL_STOP
+  }
 }
 
-bool is_input_file( char const *file, int argc, char const **argv) {
-  if ( file == NULL )
-    return false;
-  for ( int i = 1; i < argc; ++i ) {
-    if ( strcmp( file, argv[i] ) == 0 )
-      return true;
-  } // for
-  return false;
+/**
+ * Gets the status **include-tidy** should exit with.
+ *
+ * @param unused_symbols The number of unused symbold.
+ * @return Returns said exit status.
+ */
+NODISCARD
+static int tidy_status( unsigned unused_symbols ) {
+  if ( opt_error != TIDY_ERROR_NEVER ) {
+    if ( unused_symbols > 0 )
+      return TIDY_EX_VIOLATIONS;
+    if ( opt_error == TIDY_ERROR_ALWAYS )
+      return TIDY_EX_NO_VIOLATIONS_ERROR;
+  }
+  return EX_OK;
 }
 
 ////////// extern functions ///////////////////////////////////////////////////
@@ -93,46 +106,26 @@ bool is_input_file( char const *file, int argc, char const **argv) {
 int main( int argc, char const *argv[] ) {
   prog_name = path_basename( argv[0] );
 
-  if ( argc < 2 ) {
-    fprintf(stderr, "Usage: %s <source_files...>\n", argv[0]);
-    return 1;
-  }
-
+  int const first_source_argi = cli_options_init( &argc, &argv );
   colors_init();
+//config_init();
   symbols_init();
 
-  /* Parse all files */
-  for ( int i = 1; i < argc; ++i ) {
+  for ( int i = first_source_argi; i < argc; ++i ) {
     tidy_source source = {
       .path = argv[i],
       .lang = CXLanguage_C
     };
     source_init( &source, argc, argv );
-
     symbols_visit( &source );
-
     source_cleanup( &source );
   } // for
 
-  symbols_mark_reachable();
+  unsigned unused = symbols_report_unused();
 
-  /* 2. Report unused/dead symbols via iterator */
-  unsigned found_dead = 0;
-  ht_iterator_init( &iter, &table );
-  for ( tidy_symbol *sym; (sym = ht_iterator_next(&iter)) != NULL; ) {
-    if ( n->is_tracked && !n->is_reachable ) {
-      /* Ensure we only report symbols belonging to the files we specifically analyzed */
-      if ( is_input_file( n->file, argc, argv ) ) {
-        printf( "%s:%d:%d: unused symbol '%s'\n",
-                n->file, n->line, n->col, n->name );
-        ++found_dead;
-      }
-    }
-  } // for
-
-  if ( found_dead == 0 ) {
+  if ( unused > 0 ) {
     printf( "No unused global symbols found.\n" );
   }
 
-  return 0;
+  return tidy_status( unused );
 }

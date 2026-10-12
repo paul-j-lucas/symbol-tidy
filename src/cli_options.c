@@ -1017,7 +1017,7 @@ static void print_version( bool verbose ) {
 
 ////////// extern functions ///////////////////////////////////////////////////
 
-tidy_source cli_options_init( int *pargc, char const **pargv[] ) {
+int cli_options_init( int *pargc, char const **pargv[] ) {
   assert(  pargc != NULL );
   assert( *pargc > 0 );
   assert(  pargv != NULL );
@@ -1229,10 +1229,7 @@ tidy_source cli_options_init( int *pargc, char const **pargv[] ) {
   // source_path, so just NULL it out.
   (*pargv)[ --*pargc ] = NULL;
 
-  return (tidy_source){
-    .path = source_path,
-    .lang = source_lang
-  };
+  return 0;
 }
 
 bool option_is_set( int short_opt ) {

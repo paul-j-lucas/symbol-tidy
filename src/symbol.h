@@ -57,14 +57,13 @@ struct tidy_ref {
  * A symbol referenced in a translation unit.
  */
 struct tidy_symbol {
-  char const *key;
-  char const *name;
+  char const *key;                      ///< Unique key.
+  char const *name;                     ///< Name.
   char const *file;
   unsigned    line;
   unsigned    col;
-  bool        is_root;        /* 1 if it is the 'main' function or referenced from global scope */
-  bool        is_tracked;     /* 1 if it is a non-static var/func or macro */
-  bool        is_reachable;        /* Used for reachability analysis */
+  bool        is_root;        /* true if 'main' or referenced from global scope */
+  bool        is_reachable;             ///< Reachable from a root symbol?
   tidy_ref   *refs;
 };
 

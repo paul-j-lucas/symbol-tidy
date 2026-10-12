@@ -215,18 +215,6 @@ static void symbols_cleanup( void ) {
 }
 
 /**
- * TODO.
- */
-static void symbols_mark_reachable( void ) {
-  ht_iterator_t iter;
-  ht_iterator_init( &iter, &symbols_set );
-  for ( tidy_symbol *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
-    if ( sym->is_root && sym->is_tracked )
-      symbol_mark_reachable( sym );
-  } // for
-}
-
-/**
  * Visits each symbol in a translation unit.
  *
  * @param cursor The cursor for the symbol in the AST being visited.
@@ -277,15 +265,16 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
   char *const usr = tidy_getCanonicalCursorUSR( cursor );
 
   if ( usr != NULL && is_def ) {
-    tidy_symbol *const n = get_or_create_node( visitor_data->table, usr );
-    n->is_tracked = true;
-
-    if ( n->name == NULL ) {
+    tidy_symol ins_sym = { .key = usr };
+    ht_insert_rv_t hti = ht_table_insert( table, &ins_sym, sizeof ins_sym );
+    tidy_symbol *const sym = HT_DINT( hti.entry );
+    if ( hti.inserted ) {
+      sym->key = strdup_or_exit( usr );
       CXString const name_cxs = clang_getCursorSpelling( cursor );
-      n->name = strdup( clang_getCString( name_cxs ) );
-      if ( strcmp( n->name, "main" ) == 0 )
-        n->is_root = true;
+      sym->name = strdup_or_exit( clang_getCString( name_cxs ) );
       clang_disposeString( name_cxs );
+      if ( strcmp( sym->name, "main" ) == 0 )
+        sym->is_root = true;
     }
 
     /* Update file/line to point to the actual definition */
@@ -295,15 +284,15 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
     CXString cx_fname = clang_getFileName( file );
     char const *const fname = clang_getCString( cx_fname );
     if ( fname ) {
-      free( n->file );
-      n->file = strdup( fname );
-      n->line = line;
-      n->col = col;
+      free( sym->file );
+      sym->file = strdup( fname );
+      sym->line = line;
+      sym->col = col;
     }
     clang_disposeString( cx_fname );
 
     if ( kind == CXCursor_FunctionDecl )
-      next_data.current_parent = n;
+      next_data.current_parent = sym;
   }
 
   /* 2. Record usages/references using canonical target cursors */
@@ -644,12 +633,28 @@ void symbols_init( void ) {
   ATEXIT( &symbols_cleanup );
 }
 
+bool is_input_file( char const *file, int argc, char const **argv) {
+  if ( file == NULL )
+    return false;
+  for ( int i = 1; i < argc; ++i ) {
+    if ( strcmp( file, argv[i] ) == 0 )
+      return true;
+  } // for
+  return false;
+}
+
 unsigned symbols_report_unused( void ) {
-  /* 2. Report unused/dead symbols via iterator */
+  ht_iterator_t iter;
+  ht_iterator_init( &iter, &symbols_set );
+  for ( tidy_symbol *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
+    if ( sym->is_root )
+      symbol_mark_reachable( sym );
+  } // for
+
   unsigned unused = 0;
   ht_iterator_init( &iter, &symbol_set );
   for ( tidy_symbol *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
-    if ( !sym->is_tracked || sym->is_reachable )
+    if ( sym->is_reachable )
       continue;
 
     if ( is_input_file( sym->file, argc, argv ) ) {
@@ -657,16 +662,13 @@ unsigned symbols_report_unused( void ) {
               sym->file, sym->line, sym->col, sym->name );
       ++unused;
     }
-
   } // for
 
   return unused;
 }
 
 void symbols_visit( tidy_source *source ) {
-  symbols_visitor_data svd = {
-    0
-  };
+  symbols_visitor_data svd = { 0 };
   CXCursor const cursor = clang_getTranslationUnitCursor( source->tu );
   clang_visitChildren( cursor, &symbols_visitor, &svd );
 }

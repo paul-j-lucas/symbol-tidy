@@ -63,7 +63,7 @@
  * When to exit with a non-zero status code.
  */
 enum tidy_error {
-  TIDY_ERROR_IF_VIOLATIONS,             ///< Non-zero if violations.
+  TIDY_ERROR_IF_UNUSED,                 ///< Non-zero if unused symbols.
   TIDY_ERROR_ALWAYS,                    ///< Always exit with non-zero.
   TIDY_ERROR_NEVER                      ///< Never exit with non-zero.
 };
