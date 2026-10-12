@@ -71,12 +71,12 @@ symbol_tidy_SOURCES =	array.c array.h \
 			pjl_config.h config.h \
 			print.c print.h \
 			red_black.c red_black.h \
+			source.c source.h \
 			str_util.c str_util.h \
 			strbuf.c strbuf.h \
 			symbol-tidy.c symbol-tidy.h \
 			symbol.c symbol.h \
 			toml_lite.c toml_lite.h \
-			trans_unit.c trans_unit.h \
 			type_traits.h \
 			typedef.c typedef.h \
 			unicode.c unicode.h \

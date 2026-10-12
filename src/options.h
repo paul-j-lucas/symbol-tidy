@@ -108,16 +108,11 @@ typedef enum tidy_verbose tidy_verbose;
 
 ////////// extern option variables ////////////////////////////////////////////
 
-extern unsigned     opt_align_column;     ///< Comment alignment column.
-extern bool         opt_all_includes;     ///< Print all includes?
 extern color_when   opt_color_when;       ///< When to colorize.
-extern char const  *opt_comment_style[2]; ///< Comment delimiters to use.
-extern tidy_comment opt_comment_symbols;  ///< How to list symbols in comments.
 extern bool         opt_config_layers;    ///< Do configuration file layering?
 extern char const  *opt_config_path;      ///< Configuration file path.
 extern bool         opt_debug;            ///< Print debugging output?
 extern tidy_error   opt_error;            ///< When to exit with non-zero.
-extern unsigned     opt_line_length;      ///< Line length.
 extern tidy_test    opt_test;             ///< Is **symbol-tidy** under test?
 extern tidy_verbose opt_verbose;          ///< Print verbose output?
 

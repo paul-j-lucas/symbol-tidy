@@ -161,32 +161,6 @@ void fl_print_warning( char const *caller_file, int caller_line,
   va_end( args );
 }
 
-void print_include( char const *sgr_color, char const delims[static 2],
-                    char const *rel_path, char const *comment ) {
-  assert( rel_path != NULL );
-
-  color_start( stdout, sgr_color );
-  int const raw_len = printf(
-    "#include %c%s%c", delims[0], rel_path, delims[1]
-  );
-  if ( unlikely( raw_len < 0 ) ) {
-    // LCOV_EXCL_START
-    color_end( stdout, sgr_color );
-    perror_exit( EX_IOERR );
-    // LCOV_EXCL_STOP
-  }
-
-  if ( comment != NULL ) {
-    unsigned const column = STATIC_CAST( unsigned, raw_len ) + 1;
-    if ( column < opt_align_column )
-      FPUTNSP( opt_align_column - column, stdout );
-    printf( "%s%s%s", opt_comment_style[0], comment, opt_comment_style[1] );
-  }
-
-  color_end( stdout, sgr_color );
-  putchar( '\n' );
-}
-
 void print_source_line( char const *path, unsigned line, unsigned col,
                         unsigned offset ) {
   assert( path != NULL );

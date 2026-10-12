@@ -212,17 +212,6 @@ void fl_print_warning( char const *caller_file, int caller_line,
                        unsigned source_col, char const *format, ... );
 
 /**
- * Prints an `#include` preprocessor directive.
- *
- * @param sgr_color The SGR color to use, if any.
- * @param delims The include delimiters.
- * @param rel_path The include's relative path.
- * @param comment The comment, if any.
- */
-void print_include( char const *sgr_color, char const delims[static 2],
-                    char const *rel_path, char const *comment );
-
-/**
  * Prints the given \a line of \a path, presumably where an error occurred,
  * followed by a line with a `^` at \a col.
  *

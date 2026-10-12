@@ -120,7 +120,6 @@ void source_check_for_errors( tidy_source const *source ) {
 
 void source_cleanup( tidy_source *source ) {
   if ( source != NULL ) {
-    FREE( source->assoc_header_rel_path );
     // source->path points to an argv so it doesn't need freeing
     if ( source->tu != NULL )
       clang_disposeTranslationUnit( source->tu );

@@ -541,6 +541,22 @@ static void symbols_parse( config_parse_fn_args const *config ) {
   toml_string_or_string_array_parse( config, &symbols_parse_string );
 }
 
+/**
+ * Parses a single string value of a `"symbols"` key.
+ *
+ * @param config The config_parse_fn_args to use.
+ *
+ * @sa includes_parse_string()
+ * @sa symbols_parse()
+ */
+static void symbols_parse_string( config_parse_fn_args const *config ) {
+  assert( config != NULL );
+  assert( config->value->type == TOML_STRING );
+
+  (void)config;
+  // TODO
+}
+
 ////////// local functions ////////////////////////////////////////////////////
 
 /**
