@@ -34,6 +34,7 @@
 #include "str_util.h"
 #include "symbol.h"
 #include "util.h"
+#include "verbose.h"
 
 // libclang
 #include <clang-c/Index.h>
@@ -111,26 +112,25 @@ static int tidy_status( unsigned unused_symbols ) {
 int main( int argc, char const *argv[] ) {
   prog_name = path_basename( argv[0] );
 
-  int const first_source_argi = cli_options_init( &argc, &argv );
+  int const arg_source1 = cli_options_init( &argc, &argv );
   colors_init();
 //config_init();
   symbols_init();
 
-  for ( int i = first_source_argi; i < argc; ++i ) {
+  for ( int i = arg_source1; i < argc; ++i ) {
+    if ( IS_VERBOSE( SRC_FILE_ALWAYS ) ) {
+      verbose_section_begin( /*printed_header=*/NULL );
+      verbose_printf( "source file = \"%s\"\n", argv[i] );
+    }
     tidy_source source = {
       .path = argv[i],
       .lang = CXLanguage_C
     };
-    source_init( &source, argc, argv );
+    source_init( &source, arg_source1, argv );
     symbols_visit( &source );
     source_cleanup( &source );
   } // for
 
-  unsigned unused = symbols_report_unused();
-
-  if ( unused > 0 ) {
-    printf( "No unused global symbols found.\n" );
-  }
-
+  unsigned const unused = symbols_report_unused();
   return tidy_status( unused );
 }

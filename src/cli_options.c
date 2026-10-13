@@ -172,11 +172,13 @@ static bool         is_Xtidy_opt( int, char const *const[], int* );
  * @param pargc A pointer to the argument count from `main()`.  The count is
  * incremented by the number of include search paths inserted.
  * @param pargv A pointer to the argument values from `main()`.  An argument of
+ * @param parg_source1 TODO.
  * the form <tt>-isystem</tt><i>path</i> is inserted for each search path.
  * @param compiler_path The path of the C or C++ compiler to use.
  * @param lang The language to use.
  */
 static void add_compiler_include_paths( int *pargc, char const **pargv[],
+                                        int *parg_source1,
                                         char const *compiler_path,
                                         enum CXLanguageKind lang ) {
   assert(  pargc != NULL );
@@ -221,16 +223,6 @@ static void add_compiler_include_paths( int *pargc, char const **pargv[],
   if ( !found_search_start )
     goto done;
 
-  // Find the index to insert the new -isystem option before the last argv that
-  // is not an option (the filename).
-  size_t isystem_argi = STATIC_CAST( size_t, *pargc );
-  for ( int i = *pargc - 1/*NULL*/; i > 0; --i ) {
-    if ( (*pargv)[i][0] != '-' ) {
-      isystem_argi = STATIC_CAST( size_t, i );
-      break;
-    }
-  } // for
-
   ssize_t line_len;
   while ( (line_len = getline( &line_buf, &line_cap, fcompiler )) != -1 ) {
     if ( strcmp( line_buf, COMPILER_SEARCH_END "\n" ) == 0 ) {
@@ -255,7 +247,7 @@ static void add_compiler_include_paths( int *pargc, char const **pargv[],
 
     char *new_arg = NULL;
     asprintf_or_exit( &new_arg, "-isystem%s", include_path );
-    insert_argv( pargc, pargv, isystem_argi++, 1,
+    insert_argv( pargc, pargv, STATIC_CAST( size_t, (*parg_source1)++ ), 1,
                  CONST_CAST( char const**, &new_arg ) );
   } // while
 
@@ -551,21 +543,50 @@ static char const* get_short_opt_value( int argc, char const *const argv[],
  *
  * @param argc The argument count from `main()`.
  * @param argv The argument values from `main()`.
- * @return Returns the source path or NULL if none.
+ * @param x_lang TODO.
+ * @return Returns the index into \a argv of the first source file.
  */
 NODISCARD
-static char const* get_source_path( int argc, char const *argv[] ) {
+static int get_source_index( int argc, char const *argv[],
+                             enum CXLanguageKind *x_lang ) {
   assert( argc > 0 );
   assert( argv != NULL );
+  assert( x_lang != NULL );
 
-  // The source path tends to be last (or near it), so iterate backwards.
+  enum CXLanguageKind lang = CXLanguage_Invalid;
+  int arg_source1 = 0;
+
+  // The source paths are last, so iterate backwards.
   for ( int i = argc - 1; i >= 1; --i ) {
     char const *const argv_i = argv[i];
-    if ( argv_i[0] != '\0' && argv_i[0] != '-' )
-      return argv_i;
+    if ( argv_i[0] == '-' )
+      break;
+    char const *const ext = path_ext( argv_i );
+    if ( ext == NULL )
+      break;
+    tidy_file_ext const *const file_ext = file_ext_find( ext );
+    if ( file_ext == NULL )
+      break;
+    if ( *x_lang == CXLanguage_Invalid ) {
+      if ( lang == CXLanguage_Invalid ) {
+        lang = file_ext->lang;
+      }
+      else if ( lang != file_ext->lang ) {
+        fatal_error( EX_USAGE,
+          "\"%s\": source files must all be the same language\n",
+          argv_i
+        );
+      }
+    }
+    arg_source1 = i;
   } // for
 
-  return NULL;
+  if ( arg_source1 == 0 )
+    fatal_error( EX_USAGE, "no source files given\n" );
+
+  if ( *x_lang == CXLanguage_Invalid )
+    *x_lang = lang;
+  return arg_source1;
 }
 
 /**
@@ -686,19 +707,14 @@ error:
  *
  * @param options An array of options to make the short option string from.
  * Its last element must be all zeros.
- * @param extra_opts Extra options to add.  May be NULL.
  * @return Returns the `optstring` for the third argument of `getopt_long()`.
  *
  * @note The caller is responsible for freeing the returned string.
  */
 NODISCARD
-static char* make_short_opts( struct option const options[static const 2],
-                              char const *extra_opts ) {
-  extra_opts = empty_if_null( extra_opts );
-  size_t const extra_opts_len = strlen( extra_opts );
-
+static char* make_short_opts( struct option const options[static const 2] ) {
   // pre-flight to calculate string length
-  size_t len = 1 /* for leading ':' */ + extra_opts_len;
+  size_t len = 1 /* for leading ':' */;
   FOREACH_CLI_OPTION( option, options ) {
     assert( option->has_arg >= 0 && option->has_arg <= 2 );
     len += 1 + STATIC_CAST( unsigned, option->has_arg );
@@ -721,9 +737,6 @@ static char* make_short_opts( struct option const options[static const 2],
         *s++ = ':';
     } // switch
   } // for
-
-  strcpy( s, extra_opts );
-  s += extra_opts_len;
   *s = '\0';
 
   return short_opts;
@@ -1030,46 +1043,38 @@ int cli_options_init( int *pargc, char const **pargv[] ) {
   // The order that we have to parse command-line arguments is necessitated to
   // be unconventional because:
   //
-  // + The source file (typically the last argument) may be needed before
-  //   parsing options because its language (based on its filename extension)
-  //   affects the list of system include files and the corresponding
-  //   `-isystem` options needed by the compiler.
+  // + The source files (typically the last arguments) may be needed before
+  //   parsing options because their language (based on their filename
+  //   extensions) affects the list of system include files and the
+  //   corresponding `-isystem` options needed by the compiler.
   //
   // + We also need to pre-scan all options looking for the compiler's
   //   -x<language> option because that has priority over whatever language is
-  //   indicated by the source file's extension.
+  //   indicated by the source files' extensions.
   //
   // + We have to call the compiler to get the list of system include paths it
   //   uses and insert `-isystem` options for them since libclang doesn't start
   //   out with any include paths.
 
-  char const *const source_path = get_source_path( *pargc, *pargv );
-  char const *const compiler_path = get_compiler_path( *pargc, *pargv );
-  char const *const source_ext =
-    source_path != NULL ? path_ext( source_path ) : NULL;
-  enum CXLanguageKind source_lang = get_x_language( *pargc, *pargv );
-  if ( source_lang == CXLanguage_Invalid && source_ext != NULL ) {
-    tidy_file_ext const *const file_ext = file_ext_find( source_ext );
-    if ( file_ext != NULL )
-      source_lang = file_ext->lang;
-  }
-  if ( compiler_path != NULL && source_lang != CXLanguage_Invalid )
-    add_compiler_include_paths( pargc, pargv, compiler_path, source_lang );
-
   strbuf_t      err_buf = STRBUF_INIT();
   char const   *opt_directory = NULL;
   bool          opt_help = false;
   unsigned      opt_version = 0;
-  int           short_opt;
-  char   *const short_opts = make_short_opts( OPTIONS, SOPT(INCLUDE) ":" );
+  char   *const short_opts = make_short_opts( OPTIONS );
   int           tidy_argc;
   char const  **tidy_argv;
 
   move_tidy_args( pargc, *pargv, &tidy_argc, &tidy_argv );
 
+  enum CXLanguageKind lang = get_x_language( *pargc, *pargv );
+  int arg_source1 = get_source_index( *pargc, *pargv, &lang );
+  char const *const compiler_path = get_compiler_path( *pargc, *pargv );
+  if ( compiler_path != NULL )
+    add_compiler_include_paths( pargc, pargv, &arg_source1, compiler_path, lang );
+
   opterr = 0;                           // suppress default error message
   for (;;) {
-    short_opt = getopt_long(
+    int const short_opt = getopt_long(
       tidy_argc, CONST_CAST( char**, tidy_argv ), short_opts, OPTIONS,
       /*longindex=*/NULL
     );
@@ -1106,8 +1111,6 @@ int cli_options_init( int *pargc, char const **pargv[] ) {
         break;
       case COPT(HELP):
         opt_help = true;
-        break;
-      case COPT(INCLUDE):
         break;
       case COPT(NO_CONFIG_LAYERS):
         opt_config_layers = false;
@@ -1161,11 +1164,6 @@ int cli_options_init( int *pargc, char const **pargv[] ) {
   free( short_opts );
   check_options();
 
-  if ( IS_VERBOSE( SRC_FILE_ALWAYS ) ) {
-    verbose_section_begin( /*printed_header=*/NULL );
-    verbose_printf( "source file = \"%s\"\n", source_path );
-  }
-
   // Keep a copy of *pargc as it is now for --help and --version below before
   // adding options for libclang via clang_parseTranslationUnit2() in
   // trans_unit.c.  Do this now so --verbose=a prints all command-line
@@ -1177,6 +1175,7 @@ int cli_options_init( int *pargc, char const **pargv[] ) {
     "-Wno-unknown-warning-option",
   };
   insert_argv( pargc, pargv, 1, ARRAY_SIZE( LIBCLANG_ARGS ), LIBCLANG_ARGS );
+  arg_source1 += ARRAY_SIZE( LIBCLANG_ARGS );
 
   if ( IS_VERBOSE( ARGS ) ) {
     // LCOV_EXCL_START: -I, -isystem, etc., options contain absolute paths.
@@ -1198,23 +1197,8 @@ int cli_options_init( int *pargc, char const **pargv[] ) {
     exit( EX_OK );
     // LCOV_EXCL_STOP
   }
-  if ( tidy_argc != 1 || source_path == NULL )
+  if ( tidy_argc != 1 )
     print_usage( EX_USAGE );
-
-  if ( source_lang == CXLanguage_Invalid ) {
-    if ( source_path != NULL )
-      strbuf_printf( &err_buf, "\"%s\": ", source_path );
-    if ( source_ext == NULL )
-      strbuf_puts( &err_buf, "missing" );
-    else
-      strbuf_printf( &err_buf, "\"%s\": unknown", source_ext );
-    strbuf_puts( &err_buf, " extension; must be one of " );
-    bool comma = false;
-    FOREACH_FILE_EXT( file_ext )
-      strbuf_sepsn_puts( &err_buf, ", ", 2, &comma, file_ext->ext );
-    strbuf_puts( &err_buf, "; or use -xc[++]" );
-    fatal_error( EX_USAGE, "%s\n", err_buf.str );
-  }
 
   if ( opt_directory != NULL ) {
     if ( IS_VERBOSE( DIRECTORY ) ) {
@@ -1225,11 +1209,7 @@ int cli_options_init( int *pargc, char const **pargv[] ) {
       fatal_error( EX_IOERR, "\"%s\": %s\n", opt_directory, STRERROR() );
   }
 
-  // argv[argc-1] is the source file, but we've already copied it into
-  // source_path, so just NULL it out.
-  (*pargv)[ --*pargc ] = NULL;
-
-  return 0;
+  return arg_source1;
 }
 
 bool option_is_set( int short_opt ) {

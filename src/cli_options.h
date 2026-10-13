@@ -42,7 +42,6 @@
 #define OPT_DEBUG                 D
 #define OPT_ERROR                 e
 #define OPT_HELP                  h
-#define OPT_INCLUDE               I
 #define OPT_COLOR                 k
 #define OPT_NO_CONFIG_LAYERS      L
 #define OPT_VERSION               v

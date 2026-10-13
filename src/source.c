@@ -145,11 +145,7 @@ void source_init( tidy_source *source, int argc, char const *const argv[] ) {
   enum CXErrorCode const error_code = clang_parseTranslationUnit2(
     tidy_index,
     source->path,
-#ifdef NOT_YET
     argv + 1, argc - 1,                 // skip argv[0] (program name)
-#else
-    NULL, 0,
-#endif
     /*unsaved_files=*/NULL,
     /*num_unsaved_files=*/0,
     CXTranslationUnit_DetailedPreprocessingRecord,
