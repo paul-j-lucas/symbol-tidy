@@ -41,31 +41,31 @@
 
 ////////// typedefs ///////////////////////////////////////////////////////////
 
-typedef struct tidy_ref     tidy_ref;
 typedef struct tidy_symbol  tidy_symbol;
+typedef struct tidy_sym_ref tidy_sym_ref;
 
 ////////// structs ////////////////////////////////////////////////////////////
 
 /**
  * A referenced symbol.
  */
-struct tidy_ref {
-  tidy_symbol *sym;                     ///< Symbol being referenced.
-  tidy_ref    *next;                    ///< Next symbol, if any.
+struct tidy_sym_ref {
+  tidy_symbol   *sym;                   ///< Symbol being referenced.
+  tidy_sym_ref  *next;                  ///< Next symbol, if any.
 };
 
 /**
  * A symbol referenced in a translation unit.
  */
 struct tidy_symbol {
-  char const *key;                      ///< Unique key.
-  char const *name;                     ///< Name.
-  char const *file;                     ///< File defined in.
-  unsigned    line;                     ///< Line defined on.
-  unsigned    col;                      ///< Column defined at.
-  bool        is_root;    // Is "main" or referenced from global scope?
-  bool        is_reachable;             ///< Reachable from a root symbol?
-  tidy_ref   *refs;
+  char const   *key;                    ///< Unique key.
+  char const   *name;                   ///< Name.
+  char const   *file;                   ///< File defined in.
+  unsigned      line;                   ///< Line defined on.
+  unsigned      col;                    ///< Column defined at.
+  bool          is_root;    // Is "main" or referenced from global scope?
+  bool          is_reachable;           ///< Reachable from a root symbol?
+  tidy_sym_ref *refs;                   ///< Symbol(s) referenced from this.
 };
 
 ////////// extern functions ///////////////////////////////////////////////////

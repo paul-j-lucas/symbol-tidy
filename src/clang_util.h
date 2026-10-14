@@ -264,6 +264,15 @@ NODISCARD
 bool tidy_Cursor_isClassDecl( CXCursor cursor );
 
 /**
+ * Gets whether \a cursor has external linkage.
+ *
+ * @param cursor The cursor to check.
+ * @return Returns `true` only if \a cursor has external linkage.
+ */
+NODISCARD
+bool tidy_Cursor_isExternal( CXCursor cursor );
+
+/**
  * Gets whether \a cursor is a function, member function, constructor,
  * destructor, or conversion operator.
  *

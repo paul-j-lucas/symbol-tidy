@@ -535,6 +535,17 @@ bool tidy_Cursor_isClassDecl( CXCursor cursor ) {
   } // switch
 }
 
+bool tidy_Cursor_isExternal( CXCursor cursor ) {
+  enum CXLinkageKind const linkage = clang_getCursorLinkage( cursor );
+  switch ( linkage ) {
+    case CXLinkage_External:
+    case CXLinkage_UniqueExternal:
+      return true;
+    default:
+      return false;
+  } // switch
+}
+
 bool tidy_Cursor_isFunctionDecl( CXCursor cursor ) {
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
   switch ( kind ) {

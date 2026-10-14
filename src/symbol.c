@@ -115,8 +115,7 @@ static hash_table_t symbol_set;         ///< Set of symbols.
  * @sa maybe_add_symbol()
  */
 static tidy_symbol* add_symbol( CXCursor sym_csr ) {
-
-  char *const key = tidy_getCanonicalCursorUSR( sym_csr );
+  char *key = tidy_getCanonicalCursorUSR( sym_csr );
   if ( key == NULL )
     return NULL;
 
@@ -126,25 +125,26 @@ static tidy_symbol* add_symbol( CXCursor sym_csr ) {
   char const *const name_cs = clang_getCString( name_cxs );
   if ( name_cs == NULL || name_cs[0] == '\0' )
     goto done;
-
   if ( strcmp( name_cs, TIDY_COMPILER_ID ) == 0 )
     goto done;
 
-  tidy_symbol ins_sym = { .key = key };
+  tidy_symbol new_sym = { .key = key };
+  key = NULL;                           // new_sym owns this now
   ht_insert_rv_t const hti =
-    ht_table_insert( &symbol_set, &ins_sym, sizeof ins_sym );
+    ht_table_insert( &symbol_set, &new_sym, sizeof new_sym );
   sym = HT_DINT( hti.entry );
 
-  if ( hti.inserted ) {
-    sym->name = strdup_or_exit( name_cs );
-    if ( strcmp( sym->name, "main" ) == 0 )
-      sym->is_root = true;
-  }
-  else {
-    free( key );
+  if ( !hti.inserted ) {
+    symbol_cleanup( &new_sym );
+    goto done;
   }
 
+  sym->name = strdup_or_exit( name_cs );
+  if ( tidy_Cursor_isExternal( sym_csr ) && strcmp( sym->name, "main" ) == 0 )
+    sym->is_root = true;
+
 done:
+  free( key );
   clang_disposeString( name_cxs );
   return sym;
 }
@@ -364,21 +364,26 @@ static void print_statistics( void ) {
   verbose_printf( "    ss-size = %u\n", symbol_set.size );
 }
 
-void symbol_add_ref( tidy_symbol *from, tidy_symbol *to ) {
-  assert( from != NULL );
-  assert( to != NULL );
+/**
+ * Adds a reference from \a from_sym to \a to_sym.
+ *
+ * @param from_sym The symbol to adda reference from.
+ * @param to_sym The symbol to adda reference to.
+ */
+static void symbol_add_ref( tidy_symbol *from_sym, tidy_symbol *to_sym ) {
+  assert( from_sym != NULL );
+  assert( to_sym != NULL );
 
-    /* Prevent duplicate refs */
-  tidy_ref *ref = from->refs;
+  tidy_sym_ref *ref = from_sym->refs;
   while ( ref != NULL ) {
-    if ( ref->sym == to )
+    if ( ref->sym == to_sym )
       return;
     ref = ref->next;
-  }
-  ref = MALLOC( tidy_ref, 1 );
-  *ref = (tidy_ref){ .sym = to, .next = from->refs };
-  from->refs = ref;
+  } // while
 
+  ref = MALLOC( tidy_sym_ref, 1 );
+  *ref = (tidy_sym_ref){ .sym = to_sym, .next = from_sym->refs };
+  from_sym->refs = ref;
 }
 
 /**
@@ -388,13 +393,13 @@ void symbol_add_ref( tidy_symbol *from, tidy_symbol *to ) {
  */
 static void symbol_cleanup( tidy_symbol *sym ) {
   if ( sym != NULL ) {
+    FREE( sym->file );
     FREE( sym->key );
     FREE( sym->name );
 
-    for ( tidy_ref *ref = sym->refs; ref != NULL; ) {
-      tidy_ref *const next = ref->next;
+    for ( tidy_sym_ref *ref = sym->refs, *next; ref != NULL; ref = next ) {
+      next = ref->next;
       free( ref );
-      ref = next;
     } // for
   }
 }
@@ -488,14 +493,14 @@ static bool symbol_is_excluded( CXCursor sym_csr,
 /**
  * TODO
  *
- * @param sym TODO.
+ * @param sym The symbol to start at.
  */
 static void symbol_mark_reachable( tidy_symbol *sym ) {
   assert( sym != NULL );
 
   if ( !sym->is_reachable ) {
     sym->is_reachable = true;
-    for ( tidy_ref *ref = sym->refs; ref != NULL; ref = ref->next )
+    for ( tidy_sym_ref *ref = sym->refs; ref != NULL; ref = ref->next )
       symbol_mark_reachable( ref->sym );
   }
 }
@@ -541,15 +546,8 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
     case CXCursor_VarDecl:
       if ( !clang_isCursorDefinition( cursor ) )
         break;
-      enum CXLinkageKind const linkage = clang_getCursorLinkage( cursor );
-      switch ( linkage ) {
-        case CXLinkage_External:
-        case CXLinkage_UniqueExternal:
-          is_definition = true;
-          break;
-        default:
-          /* suppress warning */;
-      } // switch
+      if ( tidy_Cursor_isExternal( cursor ) )
+        is_definition = true;
       break;
 
     case CXCursor_MacroDefinition:
@@ -560,8 +558,10 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       /* suppress warning */;
   } // switch
 
+  tidy_symbol *sym = NULL;
+
   if ( is_definition ) {
-    tidy_symbol *const sym = add_symbol( cursor );
+    sym = add_symbol( cursor );
     if ( sym != NULL ) {
       /* Update file/line to point to the actual definition */
       CXFile file;
@@ -579,7 +579,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
     }
   }
 
-  /* 2. Record usages/references using canonical target cursors */
+  /* Record usages/references using canonical target cursors */
   switch ( kind ) {
     case CXCursor_CallExpr:
     case CXCursor_DeclRefExpr:
@@ -587,14 +587,24 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
     case CXCursor_MemberRefExpr:;
       CXCursor const ref_csr = clang_getCursorReferenced( cursor );
       if ( !tidy_Cursor_isInvalid( ref_csr ) ) {
-        tidy_symbol *const sym = add_symbol( ref_csr );
-        if ( sym != NULL ) {
+        tidy_symbol *const ref_sym = add_symbol( ref_csr );
+        if ( ref_sym != NULL ) {
           if ( svd->parent_sym != NULL )
-            symbol_add_ref( svd->parent_sym, sym );
+            symbol_add_ref( svd->parent_sym, ref_sym );
           else
-            sym->is_root = true;
+            ref_sym->is_root = true;
         }
       }
+      break;
+    default:
+      /* suppress warning */;
+  } // switch
+
+  switch ( kind ) {
+    case CXCursor_MacroDefinition:
+      sym->is_root = true;
+      svd->parent_sym = sym;
+      visit_MacroDefinition( cursor, parent, svd );
       break;
     default:
       /* suppress warning */;
@@ -733,7 +743,7 @@ static void visit_FieldDecl( CXCursor field_csr, CXCursor parent,
  * @remarks
  * @parblock
  * We have to iterate over all tokens of the macro's definition looking for
- * identifiers to see whether the header that declares them has been included.
+ * identifiers to mark them as reachable.
  * For example, if a header contains:
  *
  *      #define POINTER_CAST(T,EXPR)    ((T)(uintptr_t)(EXPR))
