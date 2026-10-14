@@ -802,7 +802,7 @@ char* tidy_getCanonicalCursorUSR( CXCursor cursor ) {
   char const *const usr_cs = clang_getCString( usr_cxs );
   char *usr = NULL;
   if ( usr_cs != NULL && usr_cs[0] != '\0' )
-    usr = strdup( usr_cs );
+    usr = strdup_or_exit( usr_cs );
   clang_disposeString( usr_cxs );
   return usr;
 }
