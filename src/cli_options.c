@@ -917,7 +917,7 @@ static void print_usage( int status ) {
   FILE *const fout = status == EX_OK ? stdout : stderr;
 
   fprintf( fout,
-    "usage: %s [-Xtidy tidy-option]... [compiler-option]... source-file\n"
+    "usage: %s [-Xtidy tidy-option]... [compiler-option]... source-file...\n"
     "       %s other-option\n"
     "\n"
     "tidy options:\n"
@@ -1165,9 +1165,9 @@ int cli_options_init( int *pargc, char const **pargv[] ) {
   check_options();
 
   // Keep a copy of *pargc as it is now for --help and --version below before
-  // adding options for libclang via clang_parseTranslationUnit2() in
-  // trans_unit.c.  Do this now so --verbose=a prints all command-line
-  // arguments including these.
+  // adding options for libclang via clang_parseTranslationUnit2() in source.c.
+  // Do this now so --verbose=a prints all command-line arguments including
+  // these.
   int const argc = *pargc;
   static char const *const LIBCLANG_ARGS[] = {
     "-D" TIDY_COMPILER_ID,
