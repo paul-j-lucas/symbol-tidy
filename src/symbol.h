@@ -47,11 +47,11 @@ typedef struct tidy_symbol  tidy_symbol;
 ////////// structs ////////////////////////////////////////////////////////////
 
 /**
- * TODO
+ * A referenced symbol.
  */
 struct tidy_ref {
-  tidy_symbol *sym;
-  tidy_ref    *next;
+  tidy_symbol *sym;                     ///< Symbol being referenced.
+  tidy_ref    *next;                    ///< Next symbol, if any.
 };
 
 /**
@@ -60,10 +60,10 @@ struct tidy_ref {
 struct tidy_symbol {
   char const *key;                      ///< Unique key.
   char const *name;                     ///< Name.
-  char const *file;
-  unsigned    line;
-  unsigned    col;
-  bool        is_root;        /* true if 'main' or referenced from global scope */
+  char const *file;                     ///< File defined in.
+  unsigned    line;                     ///< Line defined on.
+  unsigned    col;                      ///< Column defined at.
+  bool        is_root;    // Is "main" or referenced from global scope?
   bool        is_reachable;             ///< Reachable from a root symbol?
   tidy_ref   *refs;
 };
