@@ -43,6 +43,11 @@
 #define TIDY_AUTHOR               "Paul J. Lucas"
 
 /**
+ * The macro **symbol-tidy** defines to identify itself.
+ */
+#define TIDY_COMPILER_ID          "__symbol_tidy__"
+
+/**
  * **symbol-tidy** latest copyright year.
  */
 #define TIDY_COPYRIGHT_YEAR       "2026"
