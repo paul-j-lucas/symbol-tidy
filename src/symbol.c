@@ -568,8 +568,8 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       clang_getSpellingLocation( loc, &file, &sym->line, &sym->col, NULL );
       CXString const file_cxs = clang_getFileName( file );
       char const *const file_cs = clang_getCString( file_cxs );
-      if ( file_cs != NULL ) {
-        FREE( sym->file );
+      if ( file_cs != NULL && file_cs[0] != '\0' ) {
+        FREE( sym->file );              // just in case
         sym->file = strdup_or_exit( file_cs );
       }
       clang_disposeString( file_cxs );
@@ -580,29 +580,28 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
   }
 
   /* 2. Record usages/references using canonical target cursors */
-  CXCursor ref_csr;
   switch ( kind ) {
     case CXCursor_CallExpr:
     case CXCursor_DeclRefExpr:
     case CXCursor_MacroExpansion:
-    case CXCursor_MemberRefExpr:
-      ref_csr = clang_getCursorReferenced( cursor );
+    case CXCursor_MemberRefExpr:;
+      CXCursor const ref_csr = clang_getCursorReferenced( cursor );
+      if ( !tidy_Cursor_isInvalid( ref_csr ) ) {
+        tidy_symbol *const sym = add_symbol( ref_csr );
+        if ( sym != NULL ) {
+          if ( svd->parent_sym != NULL )
+            symbol_add_ref( svd->parent_sym, sym );
+          else
+            sym->is_root = true;
+        }
+      }
       break;
     default:
-      ref_csr = clang_getNullCursor();
+      /* suppress warning */;
   } // switch
 
-  if ( !tidy_Cursor_isInvalid( ref_csr ) ) {
-    tidy_symbol *const sym = add_symbol( ref_csr );
-    if ( sym != NULL ) {
-      if ( svd->parent_sym != NULL )
-        symbol_add_ref( svd->parent_sym, sym );
-      else
-        sym->is_root = true;
-    }
-  }
-
   clang_visitChildren( cursor, symbols_visitor, svd );
+  svd->parent_sym = NULL;
 
 skip:
   return CXChildVisit_Continue;
