@@ -368,14 +368,13 @@ static void symbol_add_ref( tidy_symbol *from_sym, tidy_symbol *to_sym ) {
   assert( from_sym != NULL );
   assert( to_sym != NULL );
 
-  tidy_sym_ref *ref = from_sym->refs;
-  while ( ref != NULL ) {
+  for ( tidy_sym_ref const *ref = from_sym->refs; ref != NULL;
+        ref = ref->next ) {
     if ( ref->sym == to_sym )
       return;
-    ref = ref->next;
-  } // while
+  } // for
 
-  ref = MALLOC( tidy_sym_ref, 1 );
+  tidy_sym_ref *const ref = MALLOC( tidy_sym_ref, 1 );
   *ref = (tidy_sym_ref){ .sym = to_sym, .next = from_sym->refs };
   from_sym->refs = ref;
 }
