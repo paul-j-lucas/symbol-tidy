@@ -1,5 +1,5 @@
 /*
-**      symbol-tidy -- Symbol tidier
+**      include-tidy -- #include tidier
 **      src/path_util_test.c
 **
 **      Copyright (C) 2026  Paul J. Lucas
@@ -43,26 +43,34 @@
 static bool test_path_dirname( void ) {
   TEST_FUNC_BEGIN();
 
-  strbuf_t sbuf = STRBUF_INIT();
+  char *path;
 
   // Standard multi-level paths
-  TEST( strcmp( path_dirname( "/usr/local/bin", &sbuf ), "/usr/local" ) == 0 );
-  TEST( strcmp( path_dirname( "foo/bar/baz.txt", &sbuf ), "foo/bar" ) == 0 );
-  TEST( strcmp( path_dirname( "foo/bar", &sbuf ), "foo" ) == 0 );
+  TEST( strcmp( path = path_dirname( "/usr/local/bin" ), "/usr/local" ) == 0 );
+  free( path );
+  TEST( strcmp( path = path_dirname( "foo/bar/baz.txt" ), "foo/bar" ) == 0 );
+  free( path );
+  TEST( strcmp( path = path_dirname( "foo/bar" ), "foo" ) == 0 );
+  free( path );
 
   // Paths with no directory component
-  TEST( strcmp( path_dirname( "file.txt", &sbuf ), "." ) == 0 );
-  TEST( strcmp( path_dirname( "", &sbuf ), "." ) == 0 );
+  TEST( strcmp( path = path_dirname( "file.txt" ), "." ) == 0 );
+  free( path );
+  TEST( strcmp( path = path_dirname( "" ), "." ) == 0 );
+  free( path );
 
   // Root and single-level absolute paths
-  TEST( strcmp( path_dirname( "/", &sbuf ), "/" ) == 0 );
-  TEST( strcmp( path_dirname( "/etc", &sbuf ), "/" ) == 0 );
+  TEST( strcmp( path = path_dirname( "/" ), "/" ) == 0 );
+  free( path );
+  TEST( strcmp( path = path_dirname( "/etc" ), "/" ) == 0 );
+  free( path );
 
   // Paths ending with a slash
-  TEST( strcmp( path_dirname( "dir/", &sbuf ), "dir" ) == 0 );
-  TEST( strcmp( path_dirname( "/var/log/", &sbuf ), "/var/log" ) == 0 );
+  TEST( strcmp( path = path_dirname( "dir/" ), "." ) == 0 );
+  free( path );
+  TEST( strcmp( path = path_dirname( "/var/log/" ), "/var" ) == 0 );
+  free( path );
 
-  strbuf_cleanup( &sbuf );
   TEST_FUNC_END();
 }
 
@@ -110,23 +118,23 @@ static bool test_path_no_dot_slash( void ) {
 static bool test_path_no_ext( void ) {
   TEST_FUNC_BEGIN();
 
-  char const *path;
-  strbuf_t path_buf = STRBUF_INIT();
+  char *path;
 
-  TEST( (path = path_no_ext( "a", &path_buf )) != NULL )
-    && TEST( strcmp( path, "a" ) == 0 );
-  TEST( (path = path_no_ext( "a.", &path_buf )) != NULL )
-    && TEST( strcmp( path, "a" ) == 0 );
-  TEST( (path = path_no_ext( "a.b", &path_buf )) != NULL )
-    && TEST( strcmp( path, "a" ) == 0 );
-  TEST( (path = path_no_ext( "a.b/c", &path_buf )) != NULL )
-    && TEST( strcmp( path, "a.b/c" ) == 0 );
-  TEST( (path = path_no_ext( ".a", &path_buf )) != NULL )
-    && TEST( strcmp( path, ".a" ) == 0 );
-  TEST( (path = path_no_ext( "a/.b", &path_buf )) != NULL )
-    && TEST( strcmp( path, "a/.b" ) == 0 );
+  TEST( path_no_ext( "a" ) == NULL );
+  TEST( path_no_ext( "a." ) == NULL );
 
-  strbuf_cleanup( &path_buf );
+  TEST( (path = path_no_ext( "a.b" )) != NULL )
+    && TEST( strcmp( path, "a" ) == 0 );
+  free( path );
+
+  TEST( (path = path_no_ext( "a/b.c" )) != NULL )
+    && TEST( strcmp( path, "a/b" ) == 0 );
+  free( path );
+
+  TEST( path_no_ext( "a.b/c" ) == NULL );
+  TEST( path_no_ext( ".a" ) == NULL );
+  TEST( path_no_ext( "a/.b" ) == NULL );
+
   TEST_FUNC_END();
 }
 
@@ -135,34 +143,54 @@ static bool test_path_normalize( void ) {
 
   char *path;
 
-  if ( TEST( (path = path_normalize( "/a" )) != NULL ) ) {
+  // absolute paths
+
+  TEST( (path = path_normalize( "/a" )) != NULL ) &&
     TEST( strcmp( path, "/a" ) == 0 );
-    free( path );
-  }
-  if ( TEST( (path = path_normalize( "/a/./b" )) != NULL ) ) {
+  free( path );
+
+  TEST( (path = path_normalize( "/a/./b" )) != NULL ) &&
     TEST( strcmp( path, "/a/b" ) == 0 );
-    free( path );
-  }
-  if ( TEST( (path = path_normalize( "/a/b/." )) != NULL ) ) {
+  free( path );
+
+  TEST( (path = path_normalize( "/a/b/." )) != NULL ) &&
     TEST( strcmp( path, "/a/b" ) == 0 );
-    free( path );
-  }
-  if ( TEST( (path = path_normalize( "/a/../b" )) != NULL ) ) {
+  free( path );
+
+  TEST( (path = path_normalize( "/a/../b" )) != NULL ) &&
     TEST( strcmp( path, "/b" ) == 0 );
-    free( path );
-  }
-  if ( TEST( (path = path_normalize( "/a/.././b" )) != NULL ) ) {
+  free( path );
+
+  TEST( (path = path_normalize( "/a/.././b" )) != NULL ) &&
     TEST( strcmp( path, "/b" ) == 0 );
-    free( path );
-  }
-  if ( TEST( (path = path_normalize( "/a/b/../../c" )) != NULL ) ) {
+  free( path );
+
+  TEST( (path = path_normalize( "/a/b/../../c" )) != NULL ) &&
     TEST( strcmp( path, "/c" ) == 0 );
-    free( path );
-  }
-  if ( TEST( (path = path_normalize( "/a/b/.././../c" )) != NULL ) ) {
+  free( path );
+
+  TEST( (path = path_normalize( "/a/b/.././../c" )) != NULL ) &&
     TEST( strcmp( path, "/c" ) == 0 );
-    free( path );
+  free( path );
+
+  // relative paths
+
+  char const *const cwd = path_cwd( /*len=*/NULL );
+  char *const cwd_dir = path_dirname( cwd );
+
+  TEST( (path = path_normalize( "a/../b" )) != NULL ) &&
+    TEST( strcmp( path, "b" ) == 0 );
+  free( path );
+
+  if ( TEST( (path = path_normalize( "a/../../b" )) != NULL ) ) {
+    strbuf_t exp_dir_buf = STRBUF_INIT();
+    strbuf_puts( &exp_dir_buf, cwd_dir );
+    strbuf_paths( &exp_dir_buf, "b" );
+    TEST( strcmp( path, exp_dir_buf.str ) == 0 );
+    strbuf_cleanup( &exp_dir_buf );
   }
+  free( cwd_dir );
+  free( path );
 
   TEST_FUNC_END();
 }
