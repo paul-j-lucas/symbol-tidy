@@ -10,7 +10,7 @@ that allows you to tidy-up symbols
 in either a C or C++ source file,
 specifically:
 
-TODO
++ Prints every macro, or non-static function or variable, that is never used.
 
 ## Dependencies
 
