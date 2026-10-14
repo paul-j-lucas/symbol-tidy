@@ -32,6 +32,7 @@
 #include "fnv1a.h"
 #include "hash_table.h"
 #include "options.h"
+#include "print.h"
 #include "source.h"
 #include "str_util.h"
 #include "symbol-tidy.h"
@@ -83,18 +84,16 @@ struct symbols_visit_data {
 
 ////////// local functions ////////////////////////////////////////////////////
 
-static void     symbol_cleanup( tidy_symbol* );
+static void symbol_cleanup( tidy_symbol* );
 
 NODISCARD
-static bool     symbol_is_excluded( CXCursor, symbols_visit_data const* );
+static bool symbol_is_excluded( CXCursor, symbols_visit_data const* );
 
-static void     visit_FieldDecl( CXCursor, CXCursor, symbols_visit_data* );
-static void     visit_MacroDefinition( CXCursor, CXCursor,
-                                       symbols_visit_data* );
-static void     visit_MemberRefExpr( CXCursor, CXCursor, symbols_visit_data* );
-static void     visit_most_kinds( CXCursor, CXCursor, symbols_visit_data* );
-static void     visit_OverloadedDeclRef( CXCursor, CXCursor,
-                                         symbols_visit_data* );
+static void visit_FieldDecl( CXCursor, CXCursor, symbols_visit_data* );
+static void visit_MacroDefinition( CXCursor, CXCursor, symbols_visit_data* );
+static void visit_MemberRefExpr( CXCursor, CXCursor, symbols_visit_data* );
+static void visit_most_kinds( CXCursor, CXCursor, symbols_visit_data* );
+static void visit_OverloadedDeclRef( CXCursor, CXCursor, symbols_visit_data* );
 
 ////////// local variables ////////////////////////////////////////////////////
 
@@ -106,8 +105,6 @@ static hash_table_t symbol_set;         ///< Set of symbols.
  * Adds a symbol to the global set and marks the header that declares is as
  * necessary.
  *
- * @param name_csr The cursor to use for the name of the symbol.  It may be
- * (and often is) the same as \a sym_csr.
  * @param sym_csr The cursor for the symbol to add.
  * @param sym_file The file that contains the declaration for \a sym_csr.
  * @param svd The symbols_visit_data to use.
@@ -600,15 +597,17 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       /* suppress warning */;
   } // switch
 
-  switch ( kind ) {
-    case CXCursor_MacroDefinition:
-      sym->is_root = true;
-      svd->parent_sym = sym;
-      visit_MacroDefinition( cursor, parent, svd );
-      break;
-    default:
-      /* suppress warning */;
-  } // switch
+  if ( sym != NULL ) {
+    switch ( kind ) {
+      case CXCursor_MacroDefinition:
+        sym->is_root = true;
+        svd->parent_sym = sym;
+        visit_MacroDefinition( cursor, parent, svd );
+        break;
+      default:
+        /* suppress warning */;
+    } // switch
+  }
 
   clang_visitChildren( cursor, symbols_visitor, svd );
   svd->parent_sym = NULL;
@@ -925,16 +924,14 @@ unsigned symbols_report_unused( void ) {
   for ( tidy_symbol *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
     if ( sym->is_reachable )
       continue;
-
-
-    printf( "%s:%u:%u: unused symbol '%s'\n",
-            sym->file, sym->line, sym->col, sym->name );
+    print_file_warning( sym->file, sym->line, sym->col,
+      "\"%s\": unused symbol", sym->name
+    );
     ++unused;
   } // for
 
   if ( unused > 0 )
     EPRINTF( "%s: %u unused symbols\n", prog_name, unused );
-
   return unused;
 }
 
