@@ -1,16 +1,29 @@
 # symbol-tidy
 
-THIS SOFTWARE DOESN'T WORK YET.
+THIS SOFTWARE IS PRE-ALPHA AND DOESN'T WORK YET.
 STAY TUNED.
 
 ## Introduction
 
+Most C and C++ compilers can warn only when a parameter
+or `static` variable or function
+is unused
+within a single source file.
+
 **symbol-tidy** (Tidy) is a command-line tool
 that allows you to tidy-up symbols
-in either a C or C++ source file,
+in a set of either C or C++ source files
+comprising a program,
 specifically:
 
-+ Prints every macro, or non-static function or variable, that is never used.
++ For every symbol (macro, type, non-`static` variable or function)
+  in a set of source files, it should be used at least once.
+
+That means Tidy will print a warning for those that aren't.
+
+**symbol-tidy** has a companion
+[**include-tidy**](https://github.com/paul-j-lucas/include-tidy/)
+project.
 
 ## Dependencies
 
