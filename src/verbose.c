@@ -28,7 +28,6 @@
 #include "verbose.h"
 #include "array.h"
 #include "clang_util.h"
-#include "cli_options.h"
 #include "options.h"
 #include "str_util.h"
 #include "util.h"

@@ -29,7 +29,6 @@
 #include "config_file.h"
 #include "array.h"
 #include "bit_util.h"
-#include "clang_util.h"
 #include "cli_options.h"
 #include "fnv1a.h"
 #include "hash_table.h"
@@ -47,13 +46,9 @@
 
 /// @cond DOXYGEN_IGNORE
 
-// libclang
-#include <clang-c/Index.h>
-
 // standard
 #include <assert.h>
 #include <errno.h>
-#include <fnmatch.h>
 #if HAVE_PWD_H
 # include <pwd.h>                       /* for getpwuid() */
 #endif /* HAVE_PWD_H */

@@ -40,7 +40,6 @@
 #include <clang-c/Index.h>
 
 // standard
-#include <stdio.h>
 #include <stdlib.h>
 #include <sysexits.h>
 

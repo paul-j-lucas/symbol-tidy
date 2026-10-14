@@ -33,9 +33,6 @@
 
 /// @cond DOXYGEN_IGNORE
 
-// libclang
-#include <clang-c/Index.h>
-
 // standard
 #include <stdbool.h>
 

@@ -35,12 +35,10 @@
 
 // standard
 #include <assert.h>
-#include <errno.h>
 #include <stdbool.h>
 #include <stdlib.h>                     /* for exit() */
 #include <string.h>                     /* for str...() */
 #include <strings.h>                    /* for strcasecmp() */
-#include <sysexits.h>
 
 /// @endcond
 

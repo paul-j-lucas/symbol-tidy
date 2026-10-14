@@ -26,12 +26,10 @@
 // local
 #include "pjl_config.h"                 /* must go first */
 #include "cli_options.h"
-#include "array.h"
 #include "file_ext.h"
 #include "options.h"
 #include "path_util.h"
 #include "print.h"
-#include "source.h"
 #include "str_util.h"
 #include "strbuf.h"
 #include "symbol-tidy.h"

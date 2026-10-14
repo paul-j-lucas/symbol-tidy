@@ -27,8 +27,6 @@
 #include "pjl_config.h"
 #include "symbol.h"
 #include "clang_util.h"
-#include "cli_options.h"
-#include "config_file.h"
 #include "fnv1a.h"
 #include "hash_table.h"
 #include "options.h"
@@ -36,7 +34,6 @@
 #include "source.h"
 #include "str_util.h"
 #include "symbol-tidy.h"
-#include "typedef.h"
 #include "util.h"
 #include "verbose.h"
 

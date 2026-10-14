@@ -39,7 +39,6 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>                     /* for free */
-#include <sysexits.h>
 
 /// @endcond
 

@@ -32,6 +32,9 @@
 #include "hash_table.h"
 #include "source.h"
 
+// standard
+#include <stdbool.h>
+
 /**
  * @defgroup tidy-symbols-group Symbols
  * Structures and functions for keeping track of symbols declared and
