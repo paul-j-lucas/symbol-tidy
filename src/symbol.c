@@ -61,15 +61,15 @@
 ////////// typedefs ///////////////////////////////////////////////////////////
 
 /// @cond DOXYGEN_IGNORE
-typedef struct symbols_visitor_data symbols_visitor_data;
+typedef struct symbols_visit_data symbols_visit_data;
 /// @endcond
 
 ////////// structs ////////////////////////////////////////////////////////////
 
 /**
- * Additional data passed to symbols_init_visitor().
+ * Additional data passed to symbols_visitor().
  */
-struct symbols_visitor_data {
+struct symbols_visit_data {
   /**
    * The source file being tidied.
    */
@@ -86,16 +86,15 @@ struct symbols_visitor_data {
 static void     symbol_cleanup( tidy_symbol* );
 
 NODISCARD
-static bool     symbol_is_excluded( CXCursor, symbols_visitor_data const* );
+static bool     symbol_is_excluded( CXCursor, symbols_visit_data const* );
 
-static void     visit_FieldDecl( CXCursor, CXCursor, symbols_visitor_data* );
+static void     visit_FieldDecl( CXCursor, CXCursor, symbols_visit_data* );
 static void     visit_MacroDefinition( CXCursor, CXCursor,
-                                       symbols_visitor_data* );
-static void     visit_MemberRefExpr( CXCursor, CXCursor,
-                                     symbols_visitor_data* );
-static void     visit_most_kinds( CXCursor, CXCursor, symbols_visitor_data* );
+                                       symbols_visit_data* );
+static void     visit_MemberRefExpr( CXCursor, CXCursor, symbols_visit_data* );
+static void     visit_most_kinds( CXCursor, CXCursor, symbols_visit_data* );
 static void     visit_OverloadedDeclRef( CXCursor, CXCursor,
-                                         symbols_visitor_data* );
+                                         symbols_visit_data* );
 
 ////////// local variables ////////////////////////////////////////////////////
 
@@ -111,7 +110,7 @@ static hash_table_t symbol_set;         ///< Set of symbols.
  * (and often is) the same as \a sym_csr.
  * @param sym_csr The cursor for the symbol to add.
  * @param sym_file The file that contains the declaration for \a sym_csr.
- * @param svd The symbols_visitor_data to use.
+ * @param svd The symbols_visit_data to use.
  *
  * @sa maybe_add_symbol()
  */
@@ -155,12 +154,12 @@ done:
  * which case we don't want to add that symbol to the global set.
  *
  * @param sym_csr The cursor for the symbol.
- * @param svd The symbols_visitor_data to use.
+ * @param svd The symbols_visit_data to use.
  * @return Returns the file containing \a sym_csr or NULL.
  */
 NODISCARD
 static CXFile get_symbol_file( CXCursor sym_csr,
-                               symbols_visitor_data const *svd ) {
+                               symbols_visit_data const *svd ) {
   assert( svd != NULL );
 
   CXFile const sym_file = tidy_getCursorLocation_File( sym_csr );
@@ -342,9 +341,9 @@ CXCursor macro_Token_getScopedNameCursor( CXTranslationUnit tu,
  * @param name_csr The cursor to use for the name of the symbol.  It may be
  * (and often is) the same as \a sym_csr.
  * @param sym_csr The cursor for the symbol to add.
- * @param svd The symbols_visitor_data to use.
+ * @param svd The symbols_visit_data to use.
  */
-static void maybe_add_symbol( CXCursor sym_csr, symbols_visitor_data *svd ) {
+static void maybe_add_symbol( CXCursor sym_csr, symbols_visit_data *svd ) {
   if ( symbol_is_excluded( sym_csr, svd ) )
     return;
   add_symbol( sym_csr );
@@ -404,12 +403,12 @@ static void symbol_cleanup( tidy_symbol *sym ) {
  * Gets whether \a sym_csr should be excluded from the global set.
  *
  * @param sym_csr The symbol's cursor to check.
- * @param svd The symbols_visitor_data to use.
+ * @param svd The symbols_visit_data to use.
  * @return Returns `true` only if \a sym_csr is excluded.
  */
 NODISCARD
 static bool symbol_is_excluded( CXCursor sym_csr,
-                                symbols_visitor_data const *svd ) {
+                                symbols_visit_data const *svd ) {
   if ( tidy_Cursor_isInvalid( sym_csr ) )
     return true;
 
@@ -516,7 +515,7 @@ static void symbols_cleanup( void ) {
  *
  * @param cursor The cursor for the symbol in the AST being visited.
  * @param parent The parent cursor of \a cursor.
- * @param data A pointer to a symbols_visitor_data.
+ * @param data A pointer to a symbols_visit_data.
  * @return Always returns `CXChildVisit_Continue`.
  */
 static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
@@ -532,7 +531,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
     verbose_print_cursor( cursor );     // LCOV_EXCL_LINE
 
   assert( data != NULL );
-  symbols_visitor_data *const svd = data;
+  symbols_visit_data *const svd = data;
 
   bool is_definition = false;
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
@@ -686,10 +685,10 @@ static CXCursor tidy_Token_getScopedNameCursor( CXTranslationUnit tu,
  *
  * @param field_csr The field declaration's cursor to visit.
  * @param parent The parent cursor of \a field_csr.
- * @param svd The symbols_visitor_data to use.
+ * @param svd The symbols_visit_data to use.
  */
 static void visit_FieldDecl( CXCursor field_csr, CXCursor parent,
-                             symbols_visitor_data *svd ) {
+                             symbols_visit_data *svd ) {
   (void)parent;
   assert( svd != NULL );
 
@@ -747,10 +746,10 @@ static void visit_FieldDecl( CXCursor field_csr, CXCursor parent,
  *
  * @param macro_csr The macro definition's cursor to visit.
  * @param parent The parent cursor of \a macro_csr.
- * @param svd The symbols_visitor_data to use.
+ * @param svd The symbols_visit_data to use.
  */
 static void visit_MacroDefinition( CXCursor macro_csr, CXCursor parent,
-                                   symbols_visitor_data *svd ) {
+                                   symbols_visit_data *svd ) {
   (void)parent;
   assert( svd != NULL );
 
@@ -796,10 +795,10 @@ static void visit_MacroDefinition( CXCursor macro_csr, CXCursor parent,
  *
  * @param cursor The cursor to visit.
  * @param parent The parent cursor of \a cursor.
- * @param svd The symbols_visitor_data to use.
+ * @param svd The symbols_visit_data to use.
  */
 static void visit_most_kinds( CXCursor cursor, CXCursor parent,
-                              symbols_visitor_data *svd ) {
+                              symbols_visit_data *svd ) {
   (void)parent;
   assert( svd != NULL );
 
@@ -826,10 +825,10 @@ static void visit_most_kinds( CXCursor cursor, CXCursor parent,
  *
  * @param mbr_ref_csr The member reference's cursor to visit.
  * @param parent Not used.
- * @param svd The symbols_visitor_data to use.
+ * @param svd The symbols_visit_data to use.
  */
 static void visit_MemberRefExpr( CXCursor mbr_ref_csr, CXCursor parent,
-                                 symbols_visitor_data *svd ) {
+                                 symbols_visit_data *svd ) {
   (void)parent;
   assert( svd != NULL );
 
@@ -850,10 +849,10 @@ static void visit_MemberRefExpr( CXCursor mbr_ref_csr, CXCursor parent,
  *
  * @param overloaded_csr The overloaded definition's cursor to visit.
  * @param parent Not used.
- * @param svd The symbols_visitor_data to use.
+ * @param svd The symbols_visit_data to use.
  */
 static void visit_OverloadedDeclRef( CXCursor overloaded_csr, CXCursor parent,
-                                     symbols_visitor_data *svd ) {
+                                     symbols_visit_data *svd ) {
   (void)parent;
   assert( svd != NULL );
 
@@ -931,7 +930,7 @@ unsigned symbols_report_unused( void ) {
 }
 
 void symbols_visit( tidy_source *source ) {
-  symbols_visitor_data svd = { .source = source };
+  symbols_visit_data svd = { .source = source };
   CXCursor const cursor = clang_getTranslationUnitCursor( source->tu );
   clang_visitChildren( cursor, &symbols_visitor, &svd );
 }
