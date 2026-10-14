@@ -75,6 +75,9 @@ struct symbols_visitor_data {
    */
   tidy_source const *source;
 
+  /**
+   * TODO.
+   */
   tidy_symbol *parent_sym;
 };
 
@@ -84,9 +87,6 @@ static void     symbol_cleanup( tidy_symbol* );
 
 NODISCARD
 static bool     symbol_is_excluded( CXCursor, symbols_visitor_data const* );
-
-NODISCARD
-static bool     visit_CallExpr( CXCursor, CXCursor, symbols_visitor_data* );
 
 static void     visit_FieldDecl( CXCursor, CXCursor, symbols_visitor_data* );
 static void     visit_MacroDefinition( CXCursor, CXCursor,
@@ -115,13 +115,39 @@ static hash_table_t symbol_set;         ///< Set of symbols.
  *
  * @sa maybe_add_symbol()
  */
-static void add_symbol( CXCursor sym_csr, symbols_visitor_data *svd ) {
-  assert( svd != NULL );
+static tidy_symbol* add_symbol( CXCursor sym_csr ) {
 
-  (void)sym_csr;
-  (void)svd;
+  char *const key = tidy_getCanonicalCursorUSR( sym_csr );
+  if ( key == NULL )
+    return NULL;
 
-  // TODO
+  tidy_symbol *sym = NULL;
+
+  CXString const name_cxs = clang_getCursorSpelling( sym_csr );
+  char const *const name_cs = clang_getCString( name_cxs );
+  if ( name_cs == NULL || name_cs[0] == '\0' )
+    goto done;
+
+  if ( strcmp( name_cs, TIDY_COMPILER_ID ) == 0 )
+    goto done;
+
+  tidy_symbol ins_sym = { .key = key };
+  ht_insert_rv_t const hti =
+    ht_table_insert( &symbol_set, &ins_sym, sizeof ins_sym );
+  sym = HT_DINT( hti.entry );
+
+  if ( hti.inserted ) {
+    sym->name = strdup_or_exit( name_cs );
+    if ( strcmp( sym->name, "main" ) == 0 )
+      sym->is_root = true;
+  }
+  else {
+    free( key );
+  }
+
+done:
+  clang_disposeString( name_cxs );
+  return sym;
 }
 
 /**
@@ -321,7 +347,7 @@ CXCursor macro_Token_getScopedNameCursor( CXTranslationUnit tu,
 static void maybe_add_symbol( CXCursor sym_csr, symbols_visitor_data *svd ) {
   if ( symbol_is_excluded( sym_csr, svd ) )
     return;
-  add_symbol( sym_csr, svd );
+  add_symbol( sym_csr );
 }
 
 /**
@@ -508,63 +534,50 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
   assert( data != NULL );
   symbols_visitor_data *const svd = data;
 
-  bool is_def = false;
+  bool is_definition = false;
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
 
   switch ( kind ) {
     case CXCursor_FunctionDecl:
-    case CXCursor_VarDecl:;
+    case CXCursor_VarDecl:
       if ( !clang_isCursorDefinition( cursor ) )
         break;
       enum CXLinkageKind const linkage = clang_getCursorLinkage( cursor );
       switch ( linkage ) {
         case CXLinkage_External:
         case CXLinkage_UniqueExternal:
-          is_def = true;
+          is_definition = true;
           break;
         default:
           /* suppress warning */;
       } // switch
       break;
+
     case CXCursor_MacroDefinition:
-      is_def = true;
+      is_definition = true;
       break;
+
     default:
       /* suppress warning */;
   } // switch
 
-  char *const usr = tidy_getCanonicalCursorUSR( cursor );
+  if ( is_definition ) {
+    tidy_symbol *const sym = add_symbol( cursor );
+    if ( sym != NULL ) {
+      /* Update file/line to point to the actual definition */
+      CXFile file;
+      clang_getSpellingLocation( loc, &file, &sym->line, &sym->col, NULL );
+      CXString const file_cxs = clang_getFileName( file );
+      char const *const file_cs = clang_getCString( file_cxs );
+      if ( file_cs != NULL ) {
+        FREE( sym->file );
+        sym->file = strdup_or_exit( file_cs );
+      }
+      clang_disposeString( file_cxs );
 
-  if ( usr != NULL && is_def ) {
-    tidy_symbol ins_sym = { .key = usr };
-    ht_insert_rv_t const hti =
-      ht_table_insert( &symbol_set, &ins_sym, sizeof ins_sym );
-    tidy_symbol *const sym = HT_DINT( hti.entry );
-    if ( hti.inserted ) {
-      sym->key = strdup_or_exit( usr );
-      CXString const name_cxs = clang_getCursorSpelling( cursor );
-      sym->name = strdup_or_exit( clang_getCString( name_cxs ) );
-      clang_disposeString( name_cxs );
-      if ( strcmp( sym->name, "main" ) == 0 )
-        sym->is_root = true;
+      if ( kind == CXCursor_FunctionDecl )
+        svd->parent_sym = sym;
     }
-
-    /* Update file/line to point to the actual definition */
-    CXFile file;
-    unsigned line, col;
-    clang_getSpellingLocation( loc, &file, &line, &col, NULL );
-    CXString cx_fname = clang_getFileName( file );
-    char const *const fname = clang_getCString( cx_fname );
-    if ( fname ) {
-      FREE( sym->file );
-      sym->file = strdup_or_exit( fname );
-      sym->line = line;
-      sym->col = col;
-    }
-    clang_disposeString( cx_fname );
-
-    if ( kind == CXCursor_FunctionDecl )
-      svd->parent_sym = sym;
   }
 
   /* 2. Record usages/references using canonical target cursors */
@@ -580,24 +593,15 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       ref_csr = clang_getNullCursor();
   } // switch
 
-  if ( !clang_Cursor_isNull( ref_csr ) &&
-       !clang_isInvalid( clang_getCursorKind( ref_csr ) ) ) {
-    char *const ref_usr = tidy_getCanonicalCursorUSR( ref_csr );
-    if ( ref_usr != NULL ) {
-      tidy_symbol ins_sym = { .key = ref_usr };
-      ht_insert_rv_t const hti =
-        ht_table_insert( &symbol_set, &ins_sym, sizeof ins_sym );
-      tidy_symbol *const sym = HT_DINT( hti.entry );
+  if ( !tidy_Cursor_isInvalid( ref_csr ) ) {
+    tidy_symbol *const sym = add_symbol( ref_csr );
+    if ( sym != NULL ) {
       if ( svd->parent_sym != NULL )
         symbol_add_ref( svd->parent_sym, sym );
       else
         sym->is_root = true;
-
-      free( ref_usr );
     }
   }
-
-  free( usr );
 
   clang_visitChildren( cursor, symbols_visitor, svd );
 
@@ -812,7 +816,7 @@ static void visit_most_kinds( CXCursor cursor, CXCursor parent,
   if ( !symbol_is_excluded( dec_csr, svd ) ) {
     CXFile const dec_file = get_symbol_file( dec_csr, svd );
     if ( dec_file != NULL ) {
-      add_symbol( dec_csr, svd );
+      add_symbol( dec_csr );
     }
   }
 }
