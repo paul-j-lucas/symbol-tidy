@@ -112,6 +112,8 @@ static int tidy_status( unsigned unused_symbols ) {
 int main( int argc, char const *argv[] ) {
   prog_name = path_basename( argv[0] );
 
+  // Initialization MUST happen in this order.
+  test_init( "SYMBOL_TIDY_TEST" );
   int const arg_source1 = cli_options_init( &argc, &argv );
   colors_init();
 //config_init();
