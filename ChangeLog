@@ -1,4 +1,27 @@
+2026-10-14  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * clang_util.c, clang_util.h, symbol.c: Now handling tentative definitions
+     in C.
+   * verbose.c: Now printing abs_path, line, and col only if abs_path != NULL.
+   * cli_options.c, config_file.c, config_file.h, options.c, print.c,
+     symbol-tidy.c, symbol.c, symbol.h, verbose.c: #include fixes.
+   * path_util_test.c: Updated from include-tidy.
+
+2026-10-13  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * configure.ac, cli_options.c: Added -Wno-string-concatenation.
+   * symbol.c: More stuff works.
+   * source.c, source.h: Immediately calling source_check_for_errors().
+   * cli_options.c, symbol-tidy.h: Added TIDY_COMPILER_ID.
+   * clang_util.c: /strdup/strdup_or_exit/
+   * symbol-tidy.c: Added call to test_init().
+   * cli_options.c, cli_options.h, source.c, symbol-tidy.c: CLI rework.
+
 2026-10-12  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * src/Makefile.am, config_file.c, options.h, print.c, print.h, source.c,
+     symbol.c, symbol.h: It compiles and links.
+   * Makefile.am: Removed "etc".
+   * Doxygen.sed: Initial commit.
    * configure.ac: Changed version to 0.1.
    * toml_lite.c: Copied from include-tidy.
