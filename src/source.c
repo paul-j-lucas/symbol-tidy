@@ -62,7 +62,14 @@ static void libclang_cleanup( void ) {
 
 ////////// extern functions ///////////////////////////////////////////////////
 
-void source_check_for_errors( tidy_source const *source ) {
+/**
+ * Checks the source's translation unit for errors and prints them, if any.
+ *
+ * @note If there are errors, this function does not return.
+ *
+ * @param source The source file being tidied.
+ */
+static void source_check_for_errors( tidy_source const *source ) {
   assert( source != NULL );
   assert( source->tu != NULL );
 
@@ -194,6 +201,7 @@ void source_init( tidy_source *source, int argc, char const *const argv[] ) {
   } // switch
 
   source->file = clang_getFile( source->tu, source->path );
+  source_check_for_errors( source );
 }
 
 ///////////////////////////////////////////////////////////////////////////////
