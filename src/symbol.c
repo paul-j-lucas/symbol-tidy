@@ -134,7 +134,7 @@ static tidy_symbol* add_symbol( CXCursor sym_csr ) {
   }
 
   sym->name = strdup_or_exit( name_cs );
-  if ( tidy_Cursor_isExternal( sym_csr ) && strcmp( sym->name, "main" ) == 0 )
+  if ( tidy_Cursor_isExternalLinkage( sym_csr ) && strcmp( sym->name, "main" ) == 0 )
     sym->is_root = true;
 
 done:
@@ -537,10 +537,9 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
   switch ( kind ) {
     case CXCursor_FunctionDecl:
     case CXCursor_VarDecl:
-      if ( !clang_isCursorDefinition( cursor ) )
-        break;
-      if ( tidy_Cursor_isExternal( cursor ) )
-        is_definition = true;
+      is_definition =
+        tidy_isCursorDefinition( cursor ) &&
+        tidy_Cursor_isExternalLinkage( cursor );
       break;
 
     case CXCursor_MacroDefinition:
@@ -921,13 +920,18 @@ unsigned symbols_report_unused( void ) {
     if ( sym->is_reachable )
       continue;
     print_file_warning( sym->file, sym->line, sym->col,
-      "\"%s\": unused symbol", sym->name
+      "\"%s\": unused symbol\n", sym->name
     );
     ++unused;
   } // for
 
-  if ( unused > 0 )
-    EPRINTF( "%s: %u unused symbols\n", prog_name, unused );
+  if ( unused > 0 ) {
+    EPRINTF(
+      "%s: %u unused symbol%s\n",
+      prog_name, unused, plural_s( unused )
+    );
+  }
+
   return unused;
 }
 

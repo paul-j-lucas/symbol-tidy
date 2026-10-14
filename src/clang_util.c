@@ -535,7 +535,7 @@ bool tidy_Cursor_isClassDecl( CXCursor cursor ) {
   } // switch
 }
 
-bool tidy_Cursor_isExternal( CXCursor cursor ) {
+bool tidy_Cursor_isExternalLinkage( CXCursor cursor ) {
   enum CXLinkageKind const linkage = clang_getCursorLinkage( cursor );
   switch ( linkage ) {
     case CXLinkage_External:
@@ -924,6 +924,21 @@ CXFileUniqueID tidy_getFileUniqueID( CXFile file ) {
     // LCOV_EXCL_STOP
   }
   return id;
+}
+
+bool tidy_isCursorDefinition( CXCursor cursor ) {
+  if ( clang_isCursorDefinition( cursor ) )
+    return true;
+  enum CXLanguageKind const lang = clang_getCursorLanguage( cursor );
+  if ( lang == CXLanguage_CPlusPlus )
+    return false;
+  enum CXCursorKind const kind = clang_getCursorKind( cursor );
+  if ( kind != CXCursor_VarDecl )
+    return false;
+  enum CX_StorageClass const storage = clang_Cursor_getStorageClass( cursor );
+  if ( storage == CX_SC_Extern )
+    return false;
+  return true;
 }
 
 CXToken const* tidy_Token_getNext( CXToken const tokens[], unsigned token_count,

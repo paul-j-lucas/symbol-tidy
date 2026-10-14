@@ -270,7 +270,7 @@ bool tidy_Cursor_isClassDecl( CXCursor cursor );
  * @return Returns `true` only if \a cursor has external linkage.
  */
 NODISCARD
-bool tidy_Cursor_isExternal( CXCursor cursor );
+bool tidy_Cursor_isExternalLinkage( CXCursor cursor );
 
 /**
  * Gets whether \a cursor is a function, member function, constructor,
@@ -640,6 +640,28 @@ inline unsigned tidy_getSpellingLocation_offset( CXSourceLocation loc ) {
   );
   return offset;
 }
+
+/**
+ * Calls `clang_isCursorDefinition()` but, in C, also considers tentative
+ * definitions as definitions.
+ *
+ * @remarks
+ * @parblock
+ * In C, a defintion that does not have an explicit initializer is a "tentative
+ * definition":
+ *
+ *      int a = 0;  // definition
+ *      int b;      // tentative definition
+ *
+ * But we want to consider tentative definitions as real definitions.
+ * @endparblock
+ *
+ * @param cursor The cursor to check.
+ * @return Returns `true` if \a cursor is either a definition or, in C, a
+ * tentative definition.
+ */
+NODISCARD
+bool tidy_isCursorDefinition( CXCursor cursor );
 
 /**
  * Gets a pointer to the next non-comment token in \a tokens, if any.
