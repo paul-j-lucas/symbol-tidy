@@ -908,9 +908,7 @@ unsigned symbols_report_unused( void ) {
   unsigned unused = 0;
   ht_iterator_init( &iter, &symbol_set );
   for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
-    if ( sym->path == NULL )
-      continue;
-    if ( !sym->is_used )
+    if ( !(sym->path == NULL || sym->line == 0 || sym->is_used) )
       ++unused;
   } // for
 
@@ -922,9 +920,8 @@ unsigned symbols_report_unused( void ) {
 
   ht_iterator_init( &iter, &symbol_set );
   for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
-    if ( sym->path == NULL || sym->is_used )
-      continue;
-    *(tidy_symbol*)array_push_back( &symbol_array ) = *sym;
+    if ( !(sym->path == NULL || sym->line == 0 || sym->is_used) )
+      *(tidy_symbol*)array_push_back( &symbol_array ) = *sym;
   } // for
 
   array_qsort(
