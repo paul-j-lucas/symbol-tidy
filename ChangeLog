@@ -1,5 +1,8 @@
 2026-10-14  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * symbol.c: Added call to array_cleanup.
+   * symbol.c, symbol.h: Now sorting output by path by line.
+   * man/man1/symbol-tidy.1, src/Makefile.am: s/tidy/itidy/
    * clang_util.c, clang_util.h, symbol.c: Now handling tentative definitions
      in C.
    * verbose.c: Now printing abs_path, line, and col only if abs_path != NULL.
