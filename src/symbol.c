@@ -424,46 +424,6 @@ static bool symbol_is_excluded( CXCursor sym_csr,
 
   enum CXCursorKind const sym_kind = clang_getCursorKind( sym_csr );
   switch ( sym_kind ) {
-    case CXCursor_CXXMethod:
-    case CXCursor_Constructor:
-    case CXCursor_ConversionFunction:
-    case CXCursor_Destructor:
-      //
-      // Even though the switch in symbols_init_visitor() doesn't include cases
-      // for all of these, the referenced cursor obtained in visit_most_kinds()
-      // may turn out to be one of these.
-      //
-      // However, adding the symbol for one of these would trigger a false-
-      // positive include dependency for merely _calling_ the symbol when
-      // inherited, e.g.:
-      //
-      //      // Base.hpp
-      //      struct Base {
-      //        void f();
-      //      };
-      //
-      //      // Derived.hpp
-      //      #include "Base.hpp"
-      //      struct Derived : Base {
-      //        void g();
-      //      };
-      //
-      //      // Derived.cpp
-      //      #include "Derived.hpp"
-      //      void Derived::g() {
-      //        f();
-      //      }
-      //
-      // If these cases weren't skipped, then the call of f() in Derived.cpp
-      // would trigger a dependency on Base.hpp because that's where f() is
-      // declared.
-      //
-      // However, since Derived is derived from Base, that means the definition
-      // of Base was available via Derived.hpp including Base.hpp and that's
-      // sufficient --- an exception to IWYU.
-      //
-      return true;
-
     case CXCursor_NonTypeTemplateParameter:
     case CXCursor_TemplateTemplateParameter:
     case CXCursor_TemplateTypeParameter:
@@ -486,9 +446,9 @@ static bool symbol_is_excluded( CXCursor sym_csr,
 }
 
 /**
- * TODO
+ * Marks a symbol as used.
  *
- * @param sym The symbol to start at.
+ * @param sym The symbol to mark as used.
  */
 static void symbol_mark_used( tidy_symbol *sym ) {
   assert( sym != NULL );
