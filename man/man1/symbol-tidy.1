@@ -35,7 +35,7 @@
 .if !'\\$1'0' .sp
 ..
 .\" ---------------------------------------------------------------------------
-.TH \f3symbol-tidy\fP 1 "September 18, 2026" "PJL TOOLS"
+.TH \f3symbol-tidy\fP 1 "October 14, 2026" "PJL TOOLS"
 .SH NAME
 symbol-tidy \(em Symbol tidier
 .SH SYNOPSIS
@@ -86,8 +86,8 @@ have:
 TIDY_FLAGS  = -Xtidy --verbose=f -Xtidy --error=never
 TIDY_CFLAGS = $(CFLAGS) $(AM_CFLAGS) $(CPPFLAGS) $(AM_CPPFLAGS)
 
-tidy:
-        symbol-tidy $(TIDY_FLAGS) $(TIDY_CFLAGS) *.[hc]
+stidy:
+        symbol-tidy $(TIDY_FLAGS) $(TIDY_CFLAGS) $(SOURCES)
 .cE
 then simply
 .B make tidy
