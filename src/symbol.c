@@ -939,13 +939,12 @@ unsigned symbols_report_unused( void ) {
     );
   } // for
 
-  if ( unused > 0 ) {
-    EPRINTF(
-      "%s: %u unused symbol%s\n",
-      prog_name, unused, plural_s( unused )
-    );
-  }
+  array_cleanup( &symbol_array, /*free_fn=*/NULL );
 
+  EPRINTF(
+    "%s: %u unused symbol%s\n",
+    prog_name, unused, plural_s( unused )
+  );
   return unused;
 }
 
