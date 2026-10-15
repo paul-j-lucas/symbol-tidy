@@ -26,6 +26,7 @@
 // local
 #include "pjl_config.h"
 #include "symbol.h"
+#include "array.h"
 #include "clang_util.h"
 #include "fnv1a.h"
 #include "hash_table.h"
@@ -388,7 +389,7 @@ static void symbol_add_ref( tidy_symbol *from_sym, tidy_symbol *to_sym ) {
  */
 static void symbol_cleanup( tidy_symbol *sym ) {
   if ( sym != NULL ) {
-    FREE( sym->file );
+    FREE( sym->path );
     FREE( sym->key );
     FREE( sym->name );
 
@@ -397,6 +398,31 @@ static void symbol_cleanup( tidy_symbol *sym ) {
       free( ref );
     } // for
   }
+}
+
+/**
+ * Compares two \ref tidy_symbol objects by their source path, then by line
+ * number.
+ *
+ * @param i_sym The first symbol.
+ * @param j_sym The second symbol.
+ * @return Returns a number less than 0, 0, or greater than 0 if the first
+ * symbol's path is less than, equal to, or greater than the second symbol's
+ * path, respectively.
+ */
+NODISCARD
+static int symbol_cmp_by_path( tidy_symbol const *i_sym,
+                               tidy_symbol const *j_sym ) {
+  assert( i_sym != NULL );
+  assert( i_sym->path != NULL );
+  assert( j_sym != NULL );
+  assert( j_sym->path != NULL );
+
+  int const cmp = strcmp( i_sym->path, j_sym->path );
+  if ( cmp != 0 )
+    return cmp;
+
+  return STATIC_CAST( int, i_sym->line ) - STATIC_CAST( int, j_sym->line );
 }
 
 /**
@@ -540,13 +566,13 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       /* Update file/line to point to the actual definition */
       CXFile file;
       clang_getSpellingLocation( loc, &file, &sym->line, &sym->col, NULL );
-      CXString const file_cxs = clang_getFileName( file );
-      char const *const file_cs = clang_getCString( file_cxs );
-      if ( file_cs != NULL && file_cs[0] != '\0' ) {
-        FREE( sym->file );              // just in case
-        sym->file = strdup_or_exit( file_cs );
+      CXString const path_cxs = clang_getFileName( file );
+      char const *const path_cs = clang_getCString( path_cxs );
+      if ( path_cs != NULL && path_cs[0] != '\0' ) {
+        FREE( sym->path );              // just in case
+        sym->path = strdup_or_exit( path_cs );
       }
-      clang_disposeString( file_cxs );
+      clang_disposeString( path_cxs );
 
       if ( kind == CXCursor_FunctionDecl )
         svd->parent_sym = sym;
@@ -881,13 +907,36 @@ unsigned symbols_report_unused( void ) {
 
   unsigned unused = 0;
   ht_iterator_init( &iter, &symbol_set );
-  for ( tidy_symbol *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
-    if ( sym->is_used )
+  for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
+    if ( sym->path == NULL )
       continue;
-    print_file_warning( sym->file, sym->line, sym->col,
+    if ( !sym->is_used )
+      ++unused;
+  } // for
+
+  if ( unused == 0 )
+    return 0;
+
+  array_t symbol_array = ARRAY_INIT( sizeof(tidy_symbol) );
+  array_reserve( &symbol_array, unused );
+
+  ht_iterator_init( &iter, &symbol_set );
+  for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
+    if ( sym->path == NULL || sym->is_used )
+      continue;
+    *(tidy_symbol*)array_push_back( &symbol_array ) = *sym;
+  } // for
+
+  array_qsort(
+    &symbol_array,
+    POINTER_CAST( array_cmp_fn_t, &symbol_cmp_by_path )
+  );
+
+  for ( size_t i = 0; i < symbol_array.len; ++i ) {
+    tidy_symbol const *const sym = array_at_nc( &symbol_array, i );
+    print_file_warning( sym->path, sym->line, sym->col,
       "\"%s\": unused symbol\n", sym->name
     );
-    ++unused;
   } // for
 
   if ( unused > 0 ) {

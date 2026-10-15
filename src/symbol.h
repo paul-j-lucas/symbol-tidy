@@ -63,7 +63,7 @@ struct tidy_sym_ref {
 struct tidy_symbol {
   char const   *key;                    ///< Unique key.
   char const   *name;                   ///< Name.
-  char const   *file;                   ///< File defined in.
+  char const   *path;                   ///< File defined in.
   unsigned      line;                   ///< Line defined on.
   unsigned      col;                    ///< Column defined at.
   bool          is_root;    // Is "main" or referenced from global scope?
