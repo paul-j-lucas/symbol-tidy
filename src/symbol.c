@@ -134,8 +134,10 @@ static tidy_symbol* add_symbol( CXCursor sym_csr ) {
   }
 
   sym->name = strdup_or_exit( name_cs );
-  if ( tidy_Cursor_isExternalLinkage( sym_csr ) && strcmp( sym->name, "main" ) == 0 )
+  if ( strcmp( sym->name, "main" ) == 0 &&
+       tidy_Cursor_isExternalLinkage( sym_csr ) ) {
     sym->is_root = true;
+  }
 
 done:
   free( key );
