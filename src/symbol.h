@@ -67,7 +67,7 @@ struct tidy_symbol {
   unsigned      line;                   ///< Line defined on.
   unsigned      col;                    ///< Column defined at.
   bool          is_root;    // Is "main" or referenced from global scope?
-  bool          is_reachable;           ///< Reachable from a root symbol?
+  bool          is_used;                ///< Is the symbol used?
   tidy_sym_ref *refs;                   ///< Symbol(s) referenced from this.
 };
 

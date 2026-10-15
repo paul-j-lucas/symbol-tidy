@@ -488,13 +488,13 @@ static bool symbol_is_excluded( CXCursor sym_csr,
  *
  * @param sym The symbol to start at.
  */
-static void symbol_mark_reachable( tidy_symbol *sym ) {
+static void symbol_mark_used( tidy_symbol *sym ) {
   assert( sym != NULL );
 
-  if ( !sym->is_reachable ) {
-    sym->is_reachable = true;
+  if ( !sym->is_used ) {
+    sym->is_used = true;
     for ( tidy_sym_ref *ref = sym->refs; ref != NULL; ref = ref->next )
-      symbol_mark_reachable( ref->sym );
+      symbol_mark_used( ref->sym );
   }
 }
 
@@ -741,8 +741,7 @@ static void visit_FieldDecl( CXCursor field_csr, CXCursor parent,
  * @remarks
  * @parblock
  * We have to iterate over all tokens of the macro's definition looking for
- * identifiers to mark them as reachable.
- * For example, if a header contains:
+ * identifiers to mark them as used.  For example, if a header contains:
  *
  *      #define POINTER_CAST(T,EXPR)    ((T)(uintptr_t)(EXPR))
  *
@@ -915,13 +914,13 @@ unsigned symbols_report_unused( void ) {
   ht_iterator_init( &iter, &symbol_set );
   for ( tidy_symbol *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
     if ( sym->is_root )
-      symbol_mark_reachable( sym );
+      symbol_mark_used( sym );
   } // for
 
   unsigned unused = 0;
   ht_iterator_init( &iter, &symbol_set );
   for ( tidy_symbol *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
-    if ( sym->is_reachable )
+    if ( sym->is_used )
       continue;
     print_file_warning( sym->file, sym->line, sym->col,
       "\"%s\": unused symbol\n", sym->name
