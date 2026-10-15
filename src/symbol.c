@@ -535,6 +535,24 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
 
   switch ( kind ) {
+    case CXCursor_CallExpr:
+    case CXCursor_DeclRefExpr:
+    case CXCursor_MacroExpansion:
+    case CXCursor_MemberRefExpr:
+    case CXCursor_TemplateRef:
+    case CXCursor_TypeRef:;
+      CXCursor const ref_csr = clang_getCursorReferenced( cursor );
+      if ( !tidy_Cursor_isInvalid( ref_csr ) ) {
+        tidy_symbol *const ref_sym = add_symbol( ref_csr );
+        if ( ref_sym != NULL ) {
+          if ( svd->parent_sym != NULL )
+            symbol_add_ref( svd->parent_sym, ref_sym );
+          else
+            ref_sym->is_root = true;
+        }
+      }
+      break;
+
     case CXCursor_FunctionDecl:
     case CXCursor_VarDecl:
       is_definition =
@@ -543,6 +561,8 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       break;
 
     case CXCursor_MacroDefinition:
+    case CXCursor_TypeAliasDecl:
+    case CXCursor_TypedefDecl:
       is_definition = true;
       break;
 
@@ -571,29 +591,13 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
     }
   }
 
-  /* Record usages/references using canonical target cursors */
-  switch ( kind ) {
-    case CXCursor_CallExpr:
-    case CXCursor_DeclRefExpr:
-    case CXCursor_MacroExpansion:
-    case CXCursor_MemberRefExpr:;
-      CXCursor const ref_csr = clang_getCursorReferenced( cursor );
-      if ( !tidy_Cursor_isInvalid( ref_csr ) ) {
-        tidy_symbol *const ref_sym = add_symbol( ref_csr );
-        if ( ref_sym != NULL ) {
-          if ( svd->parent_sym != NULL )
-            symbol_add_ref( svd->parent_sym, ref_sym );
-          else
-            ref_sym->is_root = true;
-        }
-      }
-      break;
-    default:
-      /* suppress warning */;
-  } // switch
-
   if ( sym != NULL ) {
     switch ( kind ) {
+      case CXCursor_FieldDecl:
+        svd->parent_sym = sym;
+        visit_FieldDecl( cursor, parent, svd );
+        break;
+
       case CXCursor_MacroDefinition:
         sym->is_root = true;
         svd->parent_sym = sym;
@@ -672,18 +676,18 @@ static CXCursor tidy_Token_getScopedNameCursor( CXTranslationUnit tu,
  * Ideally, we'd call visit_most_kinds() for a FieldDecl.  The problem is that,
  * given a field declaration like:
  *
+ *      #define MAX_ALIGN         8
+ *
  *      struct rb_node {
  *        // ...
- *        alignas( max_align_t ) char data[];
+ *        alignas( MAX_ALIGN ) char data[];
  *      };
  *
- * libclang's AST does _not_ include the `alignas` part, so we can't check that
- * the header that declares either `alignas` (for C &lt; C23) or `max_align_t`
- * has been included.
+ * libclang's AST does _not_ include the `alignas` part, so we can't mark that
+ * `MAX_ALIGN` is used.
  *
  * Therefore, we have to fall back to iterating over all tokens of the field's
- * declaration looking for identifiers to see whether the header that declares
- * them has been included.
+ * declaration looking for identifiers to mark them as used.
  * @endparblock
  *
  * @param field_csr The field declaration's cursor to visit.
