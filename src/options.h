@@ -101,7 +101,6 @@ enum tidy_verbose {
 
 ////////// typedefs ///////////////////////////////////////////////////////////
 
-typedef enum tidy_comment tidy_comment;
 typedef enum tidy_error   tidy_error;
 typedef enum tidy_test    tidy_test;
 typedef enum tidy_verbose tidy_verbose;

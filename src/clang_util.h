@@ -36,7 +36,6 @@
 
 // standard
 #include <stdbool.h>
-#include <string.h>                     /* for memcmp(3) */
 
 /// @endcond
 
@@ -77,90 +76,14 @@ inline CXCursor tidy_Cursor_getCanonicalTypeDeclaration( CXCursor cursor ) {
 }
 
 /**
- * Gets the cursor for the C++ class type as written in the source file.
- *
- * @par Example
- * @parblock
- * Given something like:
- *
- *      struct Base {
- *        struct iterator {
- *          // ...
- *        };
- *        // ...
- *      };
- *
- *      struct Derived : Base {
- *        // ...
- *      };
- *
- *      void f() {
- *        Derived::iterator i;
- *        // ...
- *      }
- *
- * the cursor for `i` would be of type `Base::iterator` because `Derived`
- * doesn't contain `iterator` and instead inherits it from `Base`.  But in some
- * cases, we really want to know that it was `Derived` as written in the source
- * file.
- * @endparblock
- *
- * @param cursor The cursor for an expression.
- * @return Returns the cursor for its type as written in the source file.
- */
-NODISCARD
-CXCursor tidy_Cursor_getClassAsWritten( CXCursor cursor );
-
-/**
  * Gets the first child cursor of \a cursor, if any.
  *
  * @param cursor The cursor to get the first child cursor of, if any.
  * @return Returns the first child cursor of \a cursor, or the null cursor if
  * none.
- *
- * @sa tidy_Cursor_getFirstExposedChild()
  */
 NODISCARD
 CXCursor tidy_Cursor_getFirstChild( CXCursor cursor );
-
-/**
- * Gets the first exposed (i.e., not UnexposedExpr) child cursor of \a cursor,
- * if any.
- *
- * @param cursor The cursor.
- * @return Returns the first exposed child cursor of \a cursor, or the null
- * cursor if none.
- *
- * @sa tidy_Cursor_getFirstChild()
- * @sa tidy_Cursor_skipUnexposedDown()
- */
-NODISCARD
-CXCursor tidy_Cursor_getFirstExposedChild( CXCursor cursor );
-
-/**
- * Gets the outermost C++ class for a cursor.
- *
- * @par Example
- * @parblock
- * Given:
- *
- *      namespace N {
- *        class A {
- *          class B {
- *            void f();
- *            // ...
- *          };
- *        };
- *      }
- *
- * then the outermost class for `f()` would be `A`.
- * @endparblock
- *
- * @param cursor The cursor to get the outermost class of.
- * @return Returns said class cursor.
- */
-NODISCARD
-CXCursor tidy_Cursor_getOutermostClass( CXCursor cursor );
 
 /**
  * Given a cursor at a local name of an enumeration, class, class data member,
@@ -193,18 +116,6 @@ NODISCARD
 char* tidy_Cursor_getScopedSpelling( CXCursor cursor );
 
 /**
- * If \a cursor represents either a pointer or reference, gets the cursor for
- * the type to which it either points to or refers, respectively.
- *
- * @param cursor The cursor.
- * @return Returns the cursor for the type to which \a cursor either points to
- * or refers, respectively; or \a cursor if it's neither a pointer nor
- * reference.
- */
-NODISCARD
-CXCursor tidy_Cursor_getUnderlyingType( CXCursor cursor );
-
-/**
  * Gets the root initializer for a variable.
  *
  * @par Example
@@ -220,35 +131,9 @@ CXCursor tidy_Cursor_getUnderlyingType( CXCursor cursor );
  * @param expr_csr The cursor for the initializing expression.
  * @return Returns the root initializer expression or \a expr_csr (without
  * UnexposedExpr) if no other initializer expressions exist.
- *
- * @sa tidy_Cursor_getVarInitNoUnaryOps()
  */
 NODISCARD
 CXCursor tidy_Cursor_getVarInit( CXCursor expr_csr );
-
-/**
- * Calls tidy_Cursor_getVarInit(), but strips all unary operators (cast, `&`,
- * `*`) as well as `()`.
- *
- * @param expr_csr The cursor for the initializing expression.
- * @return Returns the root initializer expression or \a expr_csr (without
- * UnexposedExpr) if no other initializer expressions exist.
- *
- * @sa tidy_Cursor_getVarInit()
- */
-NODISCARD
-CXCursor tidy_Cursor_getVarInitNoUnaryOps( CXCursor expr_csr );
-
-/**
- * Gets whether \a i_csr is before \a j_csr in the translation unit.
- *
- * @param i_csr The first cursor.
- * @param j_csr The second cursor.
- * @return Returns `true` only if \a i_csr is before \a j_csr in the
- * translation unit.
- */
-NODISCARD
-bool tidy_Cursor_isBeforeInTranslationUnit( CXCursor i_csr, CXCursor j_csr );
 
 /**
  * Gets whether \a cursor is a class, class template, structure, or union
@@ -271,16 +156,6 @@ bool tidy_Cursor_isClassDecl( CXCursor cursor );
  */
 NODISCARD
 bool tidy_Cursor_isExternalLinkage( CXCursor cursor );
-
-/**
- * Gets whether \a cursor is a function, member function, constructor,
- * destructor, or conversion operator.
- *
- * @param cursor The cursor to check.
- * @return Returns `true` only if \a cursor is a function.
- */
-NODISCARD
-bool tidy_Cursor_isFunctionDecl( CXCursor cursor );
 
 /**
  * Gets whether \a cursor is referenced from \a file.
@@ -358,20 +233,6 @@ inline bool tidy_Cursor_isInvalid( CXCursor cursor ) {
 }
 
 /**
- * Gets whether \a cursor is an out-of-line definition for a C++ constructor,
- * destructor, member function, conversion operator, or variable.
- *
- * @param cursor The cursor to check.
- * @param parent The lexical parent cursor of \a cursor.
- * @param rv_cls_csr If not NULL and \a cursor is an out-of-line definition,
- * the class of \a cursor is put here.
- * @return Returns `true` only if \a cursor is an out-of-line definition.
- */
-NODISCARD
-bool tidy_Cursor_isOutOfLineDefinition( CXCursor cursor, CXCursor parent,
-                                        CXCursor *rv_cls_csr );
-
-/**
  * Gets whether \a cursor has a name that is reserved in \a lang.
  *
  * @remarks A name is reserved if it matches any of these patterns:
@@ -402,16 +263,6 @@ NODISCARD
 bool tidy_Cursor_isScopeDecl( CXCursor cursor );
 
 /**
- * Gets whether the spelling of \a cursor equals \a value.
- *
- * @param cursor The cursor to compare.
- * @param value The value to compare against.
- * @return Returns `true` only if the spelling of \a cursor equals \a value.
- */
-NODISCARD
-bool tidy_Cursor_isSpellingEqualTo( CXCursor cursor, char const *value );
-
-/**
  * Gets whether \a cursor is a template specialization of \a template_csr.
  *
  * @param cursor The candicate template class specialization cursor.
@@ -424,42 +275,6 @@ bool tidy_Cursor_isTemplateSpecializationOf( CXCursor cursor,
                                              CXCursor template_csr );
 
 /**
- * Gets whether \a cursor is a complete type.
- *
- * @par Example
- * @parblock
- * Given:
- *
- *      struct point {
- *        int x, y;
- *      };
- *
- *      typedef struct point point_t;
- *      typedef struct foo foo_t;
- *
- * The alias `point_t` is "complete" because the definition of `point` is known
- * whereas the alias `foo_t` is incomplete because the definition of `foo` is
- * unknown.
- * @endparblock
- *
- * @param cursor The cursor check.
- * @return Returns `true` only if \a cursor is a complete type.
- */
-NODISCARD
-bool tidy_Cursor_isTypeComplete( CXCursor cursor );
-
-/**
- * Gets whether \a alias_csr is an alias type for \a underlying_csr.
- *
- * @param alias_csr The cursor for a type alias.
- * @param underlying_csr The cursor for an underlying type.
- * @return Returns `true` only if \a alias_csr is an alias type for \a
- * underlying_csr.
- */
-NODISCARD
-bool tidy_Cursor_isTypeAliasOf( CXCursor alias_csr, CXCursor underlying_csr );
-
-/**
  * If \a cursor is an UnexposedExpr, gets its first child cursor.
  *
  * @param cursor The cursor.
@@ -470,20 +285,6 @@ bool tidy_Cursor_isTypeAliasOf( CXCursor alias_csr, CXCursor underlying_csr );
  */
 NODISCARD
 CXCursor tidy_Cursor_skipUnexposedDown( CXCursor cursor );
-
-/**
- * Compares two CXFileUniqueID objects.
- *
- * @param i_id The first CXFileUniqueID.
- * @param j_id The second CXFileUniqueID.
- * @return Returns a number less than 0, 0, or greater than 0 if \a i_id is
- * less than, equal to, or greater than \a j_id, respectively.
- */
-NODISCARD
-inline int tidy_FileUniqueID_compare( CXFileUniqueID const *i_id,
-                                      CXFileUniqueID const *j_id ) {
-  return memcmp( i_id, j_id, sizeof *i_id );
-}
 
 /**
  * Gets the real path of \a file.
@@ -595,24 +396,12 @@ inline CXFile tidy_getFileLocation_File( CXSourceLocation loc ) {
 }
 
 /**
- * Gets a unique ID for \a file.
- *
- * @note Unlike `clang_getFileUniqueID()`, this function never fails.
- *
- * @param file The file to get the unique ID for.
- * @return Returns said unique ID.
- */
-NODISCARD
-CXFileUniqueID tidy_getFileUniqueID( CXFile file );
-
-/**
  * Calls `clang_getSpellingLocation()` and returns only the file.
  *
  * @param loc The location to use.
  * @return Returns the file of \a loc.
  *
  * @sa tidy_getFileLocation_File()
- * @sa tidy_getSpellingLocation_offset()
  */
 NODISCARD
 inline CXFile tidy_getSpellingLocation_File( CXSourceLocation loc ) {
@@ -621,24 +410,6 @@ inline CXFile tidy_getSpellingLocation_File( CXSourceLocation loc ) {
     loc, &file, /*line=*/NULL, /*column=*/NULL, /*offset=*/NULL
   );
   return file;
-}
-
-/**
- * Calls `clang_getSpellingLocation()` and returns only the offset.
- *
- * @param loc The location to use.
- * @return Returns the file of \a loc.
- *
- * @sa tidy_getFileLocation_File()
- * @sa tidy_getSpellingLocation_File()
- */
-NODISCARD
-inline unsigned tidy_getSpellingLocation_offset( CXSourceLocation loc ) {
-  unsigned offset;
-  clang_getSpellingLocation(
-    loc, /*file=*/NULL, /*line=*/NULL, /*column=*/NULL, &offset
-  );
-  return offset;
 }
 
 /**
@@ -671,25 +442,10 @@ bool tidy_isCursorDefinition( CXCursor cursor );
  * @param ptoken_idx A pointer to the current token index.  It is updated to be
  * either the index of the next non-comment token or \a token_count if none.
  * @return Returns a pointer to the next non-comment token or NULL for none.
- *
- * @sa tidy_Token_getPrev()
  */
 NODISCARD
 CXToken const* tidy_Token_getNext( CXToken const tokens[], unsigned token_count,
                                    unsigned *ptoken_idx );
-
-/**
- * Gets a pointer to the previous non-comment token in \a tokens, if any.
- *
- * @param tokens The array of tokens.
- * @param ptoken_idx A pointer to the current token index.  It is updated to be
- * either the index of the previous non-comment token or -1 if none.
- * @return Returns a pointer to the next non-comment token or NULL for none.
- *
- * @sa tidy_Token_getNext()
- */
-NODISCARD
-CXToken const* tidy_Token_getPrev( CXToken const tokens[], int *ptoken_idx );
 
 /**
  * Gets whether the spelling of \a token equals \a value.
@@ -707,23 +463,6 @@ bool tidy_Token_isEqualTo( CXTranslationUnit tu, CXToken token,
                            char const *value );
 
 /**
- * Gets whether the spelling of \a token equals any one of \a values.
- *
- * @note This function isn't normally called directly; use the
- * #tidy_Token_isEqualToAny() macro instead.
- *
- * @param tu The translation unit to use.
- * @param token The token to compare.
- * @param values The NULL terminated array of values to compare against.
- * @return Returns the index of the matched value or -1 for none.
- *
- * @sa tidy_Token_isEqualTo()
- */
-NODISCARD
-int tidy_Token_isEqualToAny_impl( CXTranslationUnit tu, CXToken token,
-                                  char const *values[] );
-
-/**
  * Gets whether the spelling of \a token is the scope qualifier `"::"`.
  *
  * @param tu The translation unit to use.
@@ -733,21 +472,6 @@ int tidy_Token_isEqualToAny_impl( CXTranslationUnit tu, CXToken token,
  */
 NODISCARD
 bool tidy_Token_isScopeQualifier( CXTranslationUnit tu, CXToken token );
-
-/**
- * Gets whether the spelling of \a token equals any one of \a values.
- *
- * @param TU The translation unit to use.
- * @param TOKEN The token to compare.
- * @param ... A comma separated list of values to compare against.  It is
- * implicitly NULL terminated.
- * @return Returns the index of the matched value or -1 for none.
- *
- * @sa tidy_Token_isEqualTo()
- */
-#define tidy_Token_isEqualToAny(TU,TOKEN,...)   \
-  tidy_Token_isEqualToAny_impl( (TU), (TOKEN),  \
-                                (char const*[]){ __VA_ARGS__, NULL } )
 
 ///////////////////////////////////////////////////////////////////////////////
 

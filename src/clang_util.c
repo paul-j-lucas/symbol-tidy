@@ -26,7 +26,6 @@
 // local
 #include "pjl_config.h"
 #include "clang_util.h"
-#include "fnv1a.h"
 #include "str_util.h"
 #include "strbuf.h"
 #include "util.h"
@@ -255,39 +254,6 @@ static char* getScopedName_thunk( CXCursor cursor, getCursorName_fn name_fn ) {
 }
 
 /**
- * Helper function for tidy_Cursor_getTypeRef() that visits the children of \a
- * cursor looking for a TypeRef to a class.
- *
- * @param cursor The cursor being visited.
- * @param parent Not used.
- * @param data A pointer to receive the type cursor.
- * @return Returns either `CXChildVisit_Break` or `CXChildVisit_Recurse`.
- */
-static enum CXChildVisitResult getTypeRef_visitor( CXCursor cursor,
-                                                   CXCursor parent,
-                                                   CXClientData data ) {
-  (void)parent;
-
-  enum CXCursorKind const kind = clang_getCursorKind( cursor );
-  switch ( kind ) {
-    case CXCursor_TemplateRef:
-    case CXCursor_TypeRef:;
-      CXCursor const ref_csr = clang_getCursorReferenced( cursor );
-      if ( tidy_Cursor_isClassDecl( ref_csr ) ) {
-        assert( data != NULL );
-        CXCursor *const type_ref_csr = data;
-        *type_ref_csr = ref_csr;
-        return CXChildVisit_Break;
-      }
-      break;
-    default:
-      /* suppress warning */;
-  } // switch
-
-  return CXChildVisit_Continue;
-}
-
-/**
  * A helper function for tidy_Cursor_isInheritedFrom() that visits the children
  * of a class looking for a base class.
  *
@@ -341,20 +307,6 @@ static CXCursor tidy_Cursor_getFirstExprChild( CXCursor cursor ) {
   CXCursor child_csr = clang_getNullCursor();
   clang_visitChildren( cursor, &getFirstExprChild_visitor, &child_csr );
   return child_csr;
-}
-
-/**
- * Gets the TypeRef child cursor of \a cursor, if any.
- *
- * @param cursor The cursor to get the TypeRef child cursor of.
- * @return Returns the TypeRef child cursor of \a cursor or the null cursor if
- * none.
- */
-NODISCARD
-static CXCursor tidy_Cursor_getTypeRef( CXCursor cursor ) {
-  CXCursor type_csr = clang_getNullCursor();
-  clang_visitChildren( cursor, &getTypeRef_visitor, &type_csr );
-  return type_csr;
 }
 
 /**
@@ -413,39 +365,10 @@ int tidy_Cursor_compare( CXCursor i_csr, CXCursor j_csr ) {
   return 0;
 }
 
-CXCursor tidy_Cursor_getClassAsWritten( CXCursor cursor ) {
-  cursor = tidy_Cursor_skipUnexposedDown( cursor );
-  CXCursor const ref_csr = clang_getCursorReferenced( cursor );
-  if ( !clang_Cursor_isNull( ref_csr ) ) {
-    CXCursor const type_csr = tidy_Cursor_getTypeRef( ref_csr );
-    if ( !clang_Cursor_isNull( type_csr ) )
-      return type_csr;
-  }
-  return tidy_Cursor_getUnderlyingType( cursor );
-}
-
 CXCursor tidy_Cursor_getFirstChild( CXCursor cursor ) {
   CXCursor child_csr = clang_getNullCursor();
   clang_visitChildren( cursor, &getFirstChild_visitor, &child_csr );
   return child_csr;
-}
-
-CXCursor tidy_Cursor_getFirstExposedChild( CXCursor cursor ) {
-  return tidy_Cursor_skipUnexposedDown( tidy_Cursor_getFirstChild( cursor ) );
-}
-
-CXCursor tidy_Cursor_getOutermostClass( CXCursor cursor ) {
-  CXCursor enclosing_csr = clang_getNullCursor();
-
-  while ( !clang_Cursor_isNull( cursor ) ) {
-    if ( tidy_Cursor_isClassDecl( cursor ) )
-      enclosing_csr = cursor;
-    else if ( !clang_Cursor_isNull( enclosing_csr ) )
-      break;
-    cursor = clang_getCursorSemanticParent( cursor );
-  } // wnile
-
-  return enclosing_csr;
 }
 
 char* tidy_Cursor_getScopedDisplayName( CXCursor cursor ) {
@@ -454,26 +377,6 @@ char* tidy_Cursor_getScopedDisplayName( CXCursor cursor ) {
 
 char* tidy_Cursor_getScopedSpelling( CXCursor cursor ) {
   return getScopedName_thunk( cursor, &clang_getCursorSpelling );
-}
-
-CXCursor tidy_Cursor_getUnderlyingType( CXCursor cursor ) {
-  CXType type = clang_getCursorType( cursor );
-  for ( bool done = false; !done; ) {
-    switch ( type.kind ) {
-      case CXType_Pointer:
-        type = clang_getPointeeType( type );
-        break;
-      case CXType_LValueReference:
-      case CXType_RValueReference:
-        type = clang_getNonReferenceType( type );
-        break;
-      default:
-        done = true;
-        break;
-    } // switch
-  } // for
-
-  return clang_getTypeDeclaration( type );
 }
 
 CXCursor tidy_Cursor_getVarInit( CXCursor expr_csr ) {
@@ -489,36 +392,6 @@ CXCursor tidy_Cursor_getVarInit( CXCursor expr_csr ) {
     }
   }
   return expr_csr;
-}
-
-CXCursor tidy_Cursor_getVarInitNoUnaryOps( CXCursor expr_csr ) {
-  while ( !tidy_Cursor_isInvalid( expr_csr ) ) {
-    CXCursor const init_csr = tidy_Cursor_getVarInit( expr_csr );
-    enum CXCursorKind const kind = clang_getCursorKind( init_csr );
-    switch ( kind ) {
-      case CXCursor_ParenExpr:
-      case CXCursor_UnaryOperator:
-        expr_csr = tidy_Cursor_getFirstExposedChild( init_csr );
-        if ( !tidy_Cursor_isInvalid( expr_csr ) &&
-             !clang_equalCursors( expr_csr, init_csr ) ) {
-          continue;
-        }
-        FALLTHROUGH;
-      default:
-        return init_csr;
-    } // switch
-  } // while
-
-  return expr_csr;                      // LCOV_EXCL_LINE
-}
-
-
-bool tidy_Cursor_isBeforeInTranslationUnit( CXCursor i_csr, CXCursor j_csr ) {
-  if ( tidy_Cursor_isInvalid( i_csr ) || tidy_Cursor_isInvalid( j_csr ) )
-    return false;
-  CXSourceLocation const i_loc = clang_getCursorLocation( i_csr );
-  CXSourceLocation const j_loc = clang_getCursorLocation( j_csr );
-  return clang_isBeforeInTranslationUnit( i_loc, j_loc );
 }
 
 bool tidy_Cursor_isClassDecl( CXCursor cursor ) {
@@ -540,21 +413,6 @@ bool tidy_Cursor_isExternalLinkage( CXCursor cursor ) {
   switch ( linkage ) {
     case CXLinkage_External:
     case CXLinkage_UniqueExternal:
-      return true;
-    default:
-      return false;
-  } // switch
-}
-
-bool tidy_Cursor_isFunctionDecl( CXCursor cursor ) {
-  enum CXCursorKind const kind = clang_getCursorKind( cursor );
-  switch ( kind ) {
-    case CXCursor_Constructor:
-    case CXCursor_ConversionFunction:
-    case CXCursor_CXXMethod:
-    case CXCursor_Destructor:
-    case CXCursor_FunctionDecl:
-    case CXCursor_FunctionTemplate:
       return true;
     default:
       return false;
@@ -602,72 +460,6 @@ bool tidy_Cursor_isInheritedFrom( CXCursor cursor, CXCursor base_csr ) {
     cursor = sem_parent;
   } // while
 
-  return false;
-}
-
-#ifdef NEED_tidy_Cursor_isInheritedMemberFunctionCall
-// See comment above tidy_Cursor_isInheritedMemberFunctionCall() declaration.
-
-bool tidy_Cursor_isInheritedMemberFunctionCall( CXCursor expr_csr,
-                                                CXCursor *rv_cls_csr ) {
-  expr_csr = tidy_Cursor_getVarInit( expr_csr );
-  expr_csr = tidy_Cursor_skipUnexposedDown( expr_csr );
-
-  enum CXCursorKind const kind = clang_getCursorKind( expr_csr );
-  if ( kind != CXCursor_CallExpr )
-    return false;                       // LCOV_EXCL_LINE
-
-  // Get the class of the member function.
-  CXCursor const callee_csr = tidy_Cursor_getFirstExposedChild( expr_csr );
-  if ( clang_getCursorKind( callee_csr ) != CXCursor_MemberRefExpr )
-    return false;                       // LCOV_EXCL_LINE
-  CXCursor const mbr_fn_csr = clang_getCursorReferenced( callee_csr );
-  if ( clang_Cursor_isNull( mbr_fn_csr ) )
-    return false;                       // LCOV_EXCL_LINE
-  CXCursor mbr_fn_cls_csr = clang_getCursorSemanticParent( mbr_fn_csr );
-  mbr_fn_cls_csr = clang_getCanonicalCursor( mbr_fn_cls_csr );
-  if ( clang_Cursor_isNull( mbr_fn_cls_csr ) )
-    return false;                       // LCOV_EXCL_LINE
-
-  // Get the object the member function is being called on.
-  CXCursor const obj_csr = tidy_Cursor_getFirstExposedChild( callee_csr );
-  if ( clang_Cursor_isNull( obj_csr ) )
-    return false;                       // LCOV_EXCL_LINE
-  CXCursor obj_cls_csr = tidy_Cursor_getUnderlyingType( obj_csr );
-  obj_cls_csr = clang_getCanonicalCursor( obj_cls_csr );
-  if ( clang_Cursor_isNull( obj_cls_csr ) )
-    return false;                       // LCOV_EXCL_LINE
-
-  // Is the object's class inherited from the member function's class?
-  if ( !tidy_Cursor_isInheritedFrom( obj_cls_csr, mbr_fn_cls_csr ) )
-    return false;
-
-  if ( rv_cls_csr != NULL )
-    *rv_cls_csr = mbr_fn_cls_csr;
-  return true;
-}
-#endif /* NEED_tidy_Cursor_isInheritedMemberFunctionCall */
-
-bool tidy_Cursor_isOutOfLineDefinition( CXCursor cursor, CXCursor parent,
-                                        CXCursor *rv_cls_csr ) {
-  enum CXCursorKind const kind = clang_getCursorKind( cursor );
-  switch ( kind ) {
-    case CXCursor_Constructor:
-    case CXCursor_ConversionFunction:
-    case CXCursor_CXXMethod:
-    case CXCursor_Destructor:
-    case CXCursor_VarDecl:
-      if ( clang_isCursorDefinition( cursor ) ) {
-        CXCursor const cls_csr = clang_getCursorSemanticParent( cursor );
-        bool const is_out_of_line = !clang_equalCursors( parent, cls_csr );
-        if ( is_out_of_line && rv_cls_csr != NULL )
-          *rv_cls_csr = cls_csr;
-        return is_out_of_line;
-      }
-      break;
-    default:
-      /* suppress warning */;
-  } // switch
   return false;
 }
 
@@ -728,17 +520,6 @@ bool tidy_Cursor_isScopeDecl( CXCursor cursor ) {
   } // switch
 }
 
-bool tidy_Cursor_isSpellingEqualTo( CXCursor cursor, char const *value ) {
-  assert( value != NULL );
-
-  CXString const    cxs = clang_getCursorSpelling( cursor );
-  char const *const s = clang_getCString( cxs );
-  bool const        is_equal = s != NULL && strcmp( s, value ) == 0;
-
-  clang_disposeString( cxs );
-  return is_equal;
-}
-
 bool tidy_Cursor_isTemplateSpecializationOf( CXCursor cursor,
                                              CXCursor template_csr ) {
   template_csr = clang_getSpecializedCursorTemplate( template_csr );
@@ -748,41 +529,6 @@ bool tidy_Cursor_isTemplateSpecializationOf( CXCursor cursor,
       return true;
   }
   return false;
-}
-
-bool tidy_Cursor_isTypeComplete( CXCursor cursor ) {
-  CXType type = clang_getCursorType( cursor );
-  type = clang_getCanonicalType( type );
-  return clang_Type_getSizeOf( type ) > 0;
-}
-
-bool tidy_Cursor_isTypeAliasOf( CXCursor alias_csr, CXCursor underlying_csr ) {
-  enum CXCursorKind const kind = clang_getCursorKind( alias_csr );
-  if ( kind != CXCursor_TypedefDecl && kind != CXCursor_TypeAliasDecl )
-    return false;
-
-  CXType alias_type = clang_getTypedefDeclUnderlyingType( alias_csr );
-  alias_type = clang_getCanonicalType( alias_type );
-
-  CXType underlying_type = clang_getCursorType( underlying_csr );
-  underlying_type = clang_getCanonicalType( underlying_type );
-
-  if ( clang_equalTypes( alias_type, underlying_type ) )
-    return true;
-
-  alias_csr = clang_getTypeDeclaration( alias_type );
-  if ( tidy_Cursor_isInvalid( alias_csr ) )
-    return false;                       // LCOV_EXCL_LINE
-
-  CXCursor spec_csr = clang_getSpecializedCursorTemplate( alias_csr );
-  if ( !tidy_Cursor_isInvalid( spec_csr ) )
-    alias_csr = spec_csr;
-
-  spec_csr = clang_getSpecializedCursorTemplate( underlying_csr );
-  if ( !tidy_Cursor_isInvalid( spec_csr ) )
-    underlying_csr = spec_csr;          // LCOV_EXCL_LINE
-
-  return clang_equalCursors( alias_csr, underlying_csr );
 }
 
 CXCursor tidy_Cursor_skipUnexposedDown( CXCursor cursor ) {
@@ -898,34 +644,6 @@ CXFile tidy_getCursorLocation_File( CXCursor cursor ) {
   return file;
 }
 
-CXFileUniqueID tidy_getFileUniqueID( CXFile file ) {
-  assert( file != NULL );
-
-  CXFileUniqueID id;
-  if ( unlikely( clang_getFileUniqueID( file, &id ) != 0 ) ) {
-    // LCOV_EXCL_START
-    // clang_getFileUniqueID() failed, but we still want an ID: get a hash of
-    // its full path.
-    CXString const    abs_path_cxs = tidy_File_getRealPathName( file );
-    char const *const abs_path = clang_getCString( abs_path_cxs );
-    fnv1a_t const     hash = fnv1a_s( abs_path );
-
-    clang_disposeString( abs_path_cxs );
-
-#ifdef HAVE_TYPEOF
-    typedef typeof( ((CXFileUniqueID*)0)->data[0] ) CXFileUniqueID_data_t;
-#else
-    typedef unsigned long long CXFileUniqueID_data_t;
-#endif /* HAVE_TYPEOF */
-
-    id = (CXFileUniqueID){
-      .data = { STATIC_CAST( CXFileUniqueID_data_t, hash ) }
-    };
-    // LCOV_EXCL_STOP
-  }
-  return id;
-}
-
 bool tidy_isCursorDefinition( CXCursor cursor ) {
   if ( clang_isCursorDefinition( cursor ) )
     return true;
@@ -960,24 +678,6 @@ CXToken const* tidy_Token_getNext( CXToken const tokens[], unsigned token_count,
   return pnext_token;
 }
 
-CXToken const* tidy_Token_getPrev( CXToken const tokens[], int *ptoken_idx ) {
-  assert( ptoken_idx != NULL );
-
-  CXToken const *pprev_token = NULL;
-  int i;
-
-  for ( i = *ptoken_idx - 1; i >= 0; --i ) {
-    CXTokenKind const kind = clang_getTokenKind( tokens[i] );
-    if ( kind != CXToken_Comment ) {
-      pprev_token = &tokens[i];
-      break;
-    }
-  } // for
-
-  *ptoken_idx = i;
-  return pprev_token;
-}
-
 bool tidy_Token_isEqualTo( CXTranslationUnit tu, CXToken token,
                            char const *value ) {
   assert( value != NULL );
@@ -988,26 +688,6 @@ bool tidy_Token_isEqualTo( CXTranslationUnit tu, CXToken token,
 
   clang_disposeString( token_cxs );
   return cmp == 0;
-}
-
-int tidy_Token_isEqualToAny_impl( CXTranslationUnit tu, CXToken token,
-                                  char const *values[] ) {
-  assert( values != NULL );
-
-  CXString const    token_cxs = clang_getTokenSpelling( tu, token );
-  char const *const token_cs = clang_getCString( token_cxs );
-
-  int equal_idx = -1;
-
-  for ( int i = 0; values[i] != NULL; ++i ) {
-    if ( strcmp( token_cs, values[i] ) == 0 ) {
-      equal_idx = i;
-      break;
-    }
-  } // for
-
-  clang_disposeString( token_cxs );
-  return equal_idx;
 }
 
 bool tidy_Token_isScopeQualifier( CXTranslationUnit tu, CXToken token ) {
@@ -1024,11 +704,8 @@ bool tidy_Token_isScopeQualifier( CXTranslationUnit tu, CXToken token ) {
 
 extern inline CXCursor tidy_Cursor_getCanonicalTypeDeclaration( CXCursor );
 extern inline bool tidy_Cursor_isInvalid( CXCursor );
-extern inline int tidy_FileUniqueID_compare( CXFileUniqueID const*,
-                                             CXFileUniqueID const* );
 extern inline CXFile tidy_getFileLocation_File( CXSourceLocation );
 extern inline CXFile tidy_getSpellingLocation_File( CXSourceLocation );
-extern inline unsigned tidy_getSpellingLocation_offset( CXSourceLocation );
 
 /// @endcond
 
