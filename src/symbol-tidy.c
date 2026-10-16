@@ -28,6 +28,8 @@
 #include "symbol-tidy.h"
 #include "cli_options.h"
 #include "color.h"
+#include "fnv1a.h"
+#include "hash_table.h"
 #include "options.h"
 #include "path_util.h"
 #include "source.h"
@@ -59,6 +61,7 @@ enum {
 /// Otherwise Doxygen generates two entries.
 
 char const   *prog_name;
+hash_table_t  tidy_source_path_set;
 
 /// @endcond
 
@@ -80,6 +83,13 @@ void test_init( char const *env_var ) {
     );
     // LCOV_EXCL_STOP
   }
+}
+
+/**
+ * Cleans-up **symbol-tidy**.
+ */
+static void tidy_cleanup( void ) {
+  ht_table_cleanup( &tidy_source_path_set, /*free_fn=*/NULL );
 }
 
 /**
@@ -109,6 +119,7 @@ static int tidy_status( unsigned unused_symbols ) {
  * @return Returns 0 on success, non-zero on failure.
  */
 int main( int argc, char const *argv[] ) {
+  ATEXIT( &tidy_cleanup );
   prog_name = path_basename( argv[0] );
 
   // Initialization MUST happen in this order.
@@ -118,7 +129,18 @@ int main( int argc, char const *argv[] ) {
 //config_init();
   symbols_init();
 
+  ht_table_init(
+    &tidy_source_path_set, HT_DPTR, 2.0, 256,
+    POINTER_CAST( ht_cmp_fn_t, strcmp ),
+    POINTER_CAST( ht_hash_fn_t, fnv1a_s )
+  );
+
   for ( int i = arg_source1; i < argc; ++i ) {
+    ht_insert_rv_t const hti = ht_table_insert(
+      &tidy_source_path_set, CONST_CAST( char*, argv[i] ), strlen( argv[i] ) + 1
+    );
+    if ( !hti.inserted )
+      continue;
     if ( IS_VERBOSE( SRC_FILE_ALWAYS ) ) {
       verbose_section_begin( /*printed_header=*/NULL );
       verbose_printf( "source file = \"%s\"\n", argv[i] );

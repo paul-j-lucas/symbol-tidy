@@ -103,21 +103,22 @@ static hash_table_t symbol_set;         ///< Set of symbols.
  * @param sym_csr The cursor for the symbol to add.
  * @param sym_file The file that contains the declaration for \a sym_csr.
  * @param svd The symbols_visit_data to use.
+ * @return Returns TODO.
  *
  * @sa maybe_add_symbol()
  */
 static tidy_symbol* add_symbol( CXCursor sym_csr ) {
   char *key = tidy_getCanonicalCursorUSR( sym_csr );
-  if ( key == NULL )
+  if ( unlikely( key == NULL ) )
     return NULL;
 
   tidy_symbol *sym = NULL;
 
-  CXString const name_cxs = clang_getCursorSpelling( sym_csr );
-  char const *const name_cs = clang_getCString( name_cxs );
-  if ( name_cs == NULL || name_cs[0] == '\0' )
+  CXString const sym_name_cxs = clang_getCursorSpelling( sym_csr );
+  char const *const sym_name_cs = clang_getCString( sym_name_cxs );
+  if ( sym_name_cs == NULL || sym_name_cs[0] == '\0' )
     goto done;
-  if ( strcmp( name_cs, TIDY_COMPILER_ID ) == 0 )
+  if ( strcmp( sym_name_cs, TIDY_COMPILER_ID ) == 0 )
     goto done;
 
   tidy_symbol new_sym = { .key = key };
@@ -131,15 +132,33 @@ static tidy_symbol* add_symbol( CXCursor sym_csr ) {
     goto done;
   }
 
-  sym->name = strdup_or_exit( name_cs );
-  if ( strcmp( sym->name, "main" ) == 0 &&
-       tidy_Cursor_isExternalLinkage( sym_csr ) ) {
+  sym->name = strdup_or_exit( sym_name_cs );
+
+  //
+  // If the symbol's name is "main", we have to mark it as a root since nothing
+  // calls main().  But first ensure that it's the program's main() function:
+  // in C, anything named "main" must be main(); however, in C++, other things,
+  // e.g., member functions, can also be named "main".
+  //
+  if ( strcmp( sym->name, "main" ) == 0 ) {
+    enum CXCursorKind const sym_kind = clang_getCursorKind( sym_csr );
+    if ( sym_kind != CXCursor_FunctionDecl )
+      goto done;
+
+    CXCursor const sem_parent = clang_getCursorSemanticParent( sym_csr );
+    enum CXCursorKind const sem_kind = clang_getCursorKind( sem_parent );
+    if ( sem_kind != CXCursor_TranslationUnit )
+      goto done;
+
+    if ( !tidy_Cursor_isExternalLinkage( sym_csr ) )
+      goto done;
+
     sym->is_root = true;
   }
 
 done:
   free( key );
-  clang_disposeString( name_cxs );
+  clang_disposeString( sym_name_cxs );
   return sym;
 }
 
@@ -362,9 +381,9 @@ static void symbol_add_ref( tidy_symbol *from_sym, tidy_symbol *to_sym ) {
  */
 static void symbol_cleanup( tidy_symbol *sym ) {
   if ( sym != NULL ) {
-    FREE( sym->path );
     FREE( sym->key );
     FREE( sym->name );
+    FREE( sym->path );
 
     for ( tidy_sym_ref *ref = sym->refs, *next; ref != NULL; ref = next ) {
       next = ref->next;
@@ -564,8 +583,12 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       CXString const path_cxs = clang_getFileName( file );
       char const *const path_cs = clang_getCString( path_cxs );
       if ( path_cs != NULL && path_cs[0] != '\0' ) {
-        FREE( sym->path );              // just in case
-        sym->path = strdup_or_exit( path_cs );
+        ht_entry_t const *const found_ht =
+          ht_table_find( &tidy_source_path_set, path_cs );
+        if ( found_ht != NULL ) {
+          FREE( sym->path );              // just in case
+          sym->path = strdup_or_exit( path_cs );
+        };
       }
       clang_disposeString( path_cxs );
 
@@ -799,16 +822,6 @@ void symbols_init( void ) {
     POINTER_CAST( ht_hash_fn_t, &symbol_hash )
   );
   ATEXIT( &symbols_cleanup );
-}
-
-bool is_input_file( char const *file, int argc, char const **argv) {
-  if ( file == NULL )
-    return false;
-  for ( int i = 1; i < argc; ++i ) {
-    if ( strcmp( file, argv[i] ) == 0 )
-      return true;
-  } // for
-  return false;
 }
 
 unsigned symbols_report_unused( void ) {

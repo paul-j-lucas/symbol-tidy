@@ -28,6 +28,7 @@
 
 // local
 #include "pjl_config.h"
+#include "hash_table.h"
 
 /**
  * @defgroup misc-globals Miscellaneous Globals
@@ -73,7 +74,8 @@
 
 ////////// extern variables ///////////////////////////////////////////////////
 
-extern char const  *prog_name;          ///< Program name.
+extern char const  *prog_name;            ///< Program name.
+extern hash_table_t tidy_source_path_set; ///< Source files being tidied.
 
 ///////////////////////////////////////////////////////////////////////////////
 
