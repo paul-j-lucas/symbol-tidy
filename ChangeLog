@@ -1,5 +1,8 @@
 2026-10-15  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * clang_util.c, clang_util.h, path_util.c, path_util.h: Removed unused
+     include-tidy code.
+   * src/Makefile.am: Added @; added test sources to stidy target.
    * symbol-tidy.c, symbol-tidy.h, symbol.c: Added tidy_source_path_set; better
      checking that "main" is main().
    * src/Makefile.am: Added stidy target.
