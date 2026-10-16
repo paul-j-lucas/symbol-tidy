@@ -128,6 +128,9 @@ itidy:
 	    include-tidy $(TIDY_FLAGS) $(TIDY_CFLAGS) "$$file" || exit $$?; \
 	done
 
+stidy: symbol-tidy
+	symbol-tidy $(TIDY_FLAGS) $(TIDY_CFLAGS) $(symbol_tidy_SOURCES)
+
 clean-coverage-local:
 	rm -f *.gcda
 
