@@ -163,7 +163,7 @@ static config_key const CONFIG_KEYS[] = {
   { "error",              TABLE_SYMBOL_TIDY,    &error_parse              },
   { "ignore",             TABLE_SYMBOL,         &ignore_parse             },
   { "ignore-as-argument", TABLE_HEADER_SOURCE,  &ignore_as_argument_parse },
-  { "ignore-symbols",     TABLE_HEADER_SOURCE,  &ignore_symbols_parse     },
+  { "ignore-symbols",     TABLE_SYMBOL_TIDY,    &ignore_symbols_parse     },
   { "symbols",            TABLE_HEADER,         &symbols_parse            },
 };
 
