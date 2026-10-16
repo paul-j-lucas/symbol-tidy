@@ -186,28 +186,6 @@ static unsigned     warning_count;        ///< Configuration file warning count.
 ////////// local TOML type parsing functions //////////////////////////////////
 
 /**
- * Parses a TOML bool value.
- *
- * @param config The config_parse_fn_args to use.
- * @param *rv_bool Receives the bool value.
- * @return Returns `true` only if a bool was parsed successfully.
- */
-NODISCARD
-static bool toml_bool_parse( config_parse_fn_args const *config,
-                             bool *rv_bool ) {
-  assert( config != NULL );
-  assert( rv_bool != NULL );
-
-  if ( config->value->type != TOML_BOOL ) {
-    print_invalid_value( config, /*value=*/NULL, TOML_BOOL );
-    return false;
-  }
-
-  *rv_bool = config->value->b;
-  return true;
-}
-
-/**
  * Parses either a TOML string value or an array of string values.
  *
  * @param config The config_parse_fn_args to use.
