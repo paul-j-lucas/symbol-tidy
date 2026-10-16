@@ -1,3 +1,14 @@
+2026-10-15  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * symbol-tidy.c, symbol-tidy.h, symbol.c: Added tidy_source_path_set; better
+     checking that "main" is main().
+   * src/Makefile.am: Added stidy target.
+   * symbol.c: Removed unused include-tidy code.
+   * clang_util.h: #include fix.
+   * clang_util.c, clang_util.h, options.h: Removed currently unused
+     include-tidy code.
+   * symbol.c: Now exluding symbols where line == 0.
+
 2026-10-14  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
    * symbol.c: Added call to array_cleanup.
