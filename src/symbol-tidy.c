@@ -28,6 +28,7 @@
 #include "symbol-tidy.h"
 #include "cli_options.h"
 #include "color.h"
+#include "config_file.h"
 #include "fnv1a.h"
 #include "hash_table.h"
 #include "options.h"
@@ -127,7 +128,7 @@ int main( int argc, char const *argv[] ) {
   test_init( "SYMBOL_TIDY_TEST" );
   int const arg_source1 = cli_options_init( &argc, &argv );
   colors_init();
-//config_init();
+  config_init();
   symbols_init();
 
   ht_table_init(
