@@ -140,7 +140,8 @@ static void         error_parse( config_parse_fn_args const* );
 NODISCARD
 static char const*  home_dir( void );
 
-static void         ignore_as_argument_parse( config_parse_fn_args const* );
+static void         ignore_paths_parse( config_parse_fn_args const* );
+static void         ignore_paths_parse_string( config_parse_fn_args const* );
 static void         ignore_symbols_parse( config_parse_fn_args const* );
 static void         ignore_symbols_parse_string( config_parse_fn_args const* );
 static void         print_invalid_value( config_parse_fn_args const*,
@@ -156,11 +157,11 @@ static void         toml_value_print( toml_value const*, FILE* );
  * Configuration keys.
  */
 static config_key const CONFIG_KEYS[] = {
-  { "color",              TABLE_SYMBOL_TIDY,    &color_parse              },
-  { "error",              TABLE_SYMBOL_TIDY,    &error_parse              },
-  { "ignore-as-argument", TABLE_HEADER_SOURCE,  &ignore_as_argument_parse },
-  { "ignore-symbols",     TABLE_SYMBOL_TIDY,    &ignore_symbols_parse     },
-  { "symbols",            TABLE_HEADER,         &symbols_parse            },
+  { "color",          TABLE_SYMBOL_TIDY,  &color_parse          },
+  { "error",          TABLE_SYMBOL_TIDY,  &error_parse          },
+  { "ignore-paths",   TABLE_SYMBOL_TIDY,  &ignore_paths_parse   },
+  { "ignore-symbols", TABLE_SYMBOL_TIDY,  &ignore_symbols_parse },
+  { "symbols",        TABLE_HEADER,       &symbols_parse        },
 };
 
 /**
@@ -178,6 +179,7 @@ static char const *const TABLE_KINDS[] = {
 ////////// local variables ////////////////////////////////////////////////////
 
 static unsigned     error_count;          ///< Configuration file error count.
+static hash_table_t ignore_path_set;      ///< Set of paths to ignore.
 static hash_table_t ignore_symbol_set;    ///< Set of symbols to ignore.
 static unsigned     warning_count;        ///< Configuration file warning count.
 
@@ -324,17 +326,38 @@ static void error_parse( config_parse_fn_args const *config ) {
 }
 
 /**
- * Parses the value of an `"ignore-as-argument"` key.
+ * Parses the value of an `"ignore-files"` key.
  *
  * @param config The config_parse_fn_args to use.
  */
-static void ignore_as_argument_parse( config_parse_fn_args const *config ) {
-  bool ignore;
-  if ( !toml_bool_parse( config, &ignore ) || !ignore )
-    return;
-  if ( strcmp( config->table->key.name, config->source->path ) == 0 )
-    config->source->is_ignored = true;
+static void ignore_paths_parse( config_parse_fn_args const *config ) {
+  toml_string_or_string_array_parse( config, &ignore_paths_parse_string );
 };
+
+/**
+ * Parses a single string value of an `"ignore-symbols"` key.
+ *
+ * @param config The config_parse_fn_args to use.
+ *
+ * @sa ignore_symbols_parse()
+ */
+static void ignore_paths_parse_string( config_parse_fn_args const *config ) {
+  assert( config != NULL );
+  assert( config->value->type == TOML_STRING );
+
+  ht_insert_rv_t const hti = ht_table_insert(
+    &ignore_symbol_set, CONST_CAST( char*, config->value->s ),
+    strlen( config->value->s ) + 1/*\0*/
+  );
+  if ( !hti.inserted ) {
+    print_file_warning(
+      config->config_path, config->value->loc.line, config->value->loc.col,
+      "\"%s\" already ignored\n",
+      config->value->s
+    );
+    ++warning_count;
+  }
+}
 
 /**
  * Parses the value of an `"ignore-symbols"` key.
@@ -344,10 +367,7 @@ static void ignore_as_argument_parse( config_parse_fn_args const *config ) {
  * @sa ignore_symbols_parse_string()
  */
 static void ignore_symbols_parse( config_parse_fn_args const *config ) {
-  assert( config != NULL );
-
-  if ( strcmp( config->table->key.name, config->source->path ) == 0 )
-    toml_string_or_string_array_parse( config, &ignore_symbols_parse_string );
+  toml_string_or_string_array_parse( config, &ignore_symbols_parse_string );
 }
 
 /**
@@ -408,6 +428,7 @@ static void symbols_parse_string( config_parse_fn_args const *config ) {
  * Cleans-up all configuration data.
  */
 static void config_cleanup( void ) {
+  ht_table_cleanup( &ignore_path_set, /*free_fn=*/NULL );
   ht_table_cleanup( &ignore_symbol_set, /*free_fn=*/NULL );
 }
 
@@ -847,6 +868,10 @@ void config_init( tidy_source *source ) {
     print_error( "no configuration file found\n" );
     exit( EX_CONFIG );
   }
+}
+
+bool config_path_is_ignored( char const *path ) {
+  return ht_table_find( &ignore_path_set, path ) != NULL;
 }
 
 bool config_symbol_is_ignored( char const *sym_name ) {

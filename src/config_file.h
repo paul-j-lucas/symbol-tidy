@@ -57,6 +57,15 @@
 void config_init( tidy_source *source );
 
 /**
+ * Gets whether \a path should be ignored.
+ *
+ * @param path The path to check.
+ * @return Returns `true` only if \a path should be ignored.
+ */
+NODISCARD
+bool config_path_is_ignored( char const *path );
+
+/**
  * Gets whether \a sym_name should be ignored.
  *
  * @param sym_name The symbol name to check.
