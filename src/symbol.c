@@ -97,13 +97,12 @@ static hash_table_t symbol_set;         ///< Set of symbols.
 ////////// local functions ////////////////////////////////////////////////////
 
 /**
- * Adds a symbol to the global set and marks the header that declares is as
- * necessary.
+ * Adds a symbol to the global set.
  *
  * @param sym_csr The cursor for the symbol to add.
  * @param sym_file The file that contains the declaration for \a sym_csr.
  * @param svd The symbols_visit_data to use.
- * @return Returns TODO.
+ * @return Returns the new tidy_symbol or NULL if it could not be added.
  *
  * @sa maybe_add_symbol()
  */
