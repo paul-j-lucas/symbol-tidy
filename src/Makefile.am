@@ -129,7 +129,8 @@ itidy:
 	done
 
 stidy: symbol-tidy
-	symbol-tidy $(TIDY_FLAGS) $(TIDY_CFLAGS) $(symbol_tidy_SOURCES)
+	@symbol-tidy $(TIDY_FLAGS) $(TIDY_CFLAGS) \
+	  $(symbol_tidy_SOURCES) *_test.[hc]
 
 clean-coverage-local:
 	rm -f *.gcda
