@@ -614,7 +614,6 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
         break;
 
       case CXCursor_MacroDefinition:
-        sym->is_root = true;
         svd->parent_sym = sym;
         visit_MacroDefinition( cursor, parent, svd );
         break;
