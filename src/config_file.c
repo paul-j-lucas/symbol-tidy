@@ -27,7 +27,6 @@
 // local
 #include "pjl_config.h"
 #include "config_file.h"
-#include "array.h"
 #include "bit_util.h"
 #include "cli_options.h"
 #include "fnv1a.h"
@@ -35,7 +34,6 @@
 #include "options.h"
 #include "path_util.h"
 #include "print.h"
-#include "red_black.h"
 #include "source.h"
 #include "str_util.h"
 #include "strbuf.h"
@@ -143,7 +141,6 @@ NODISCARD
 static char const*  home_dir( void );
 
 static void         ignore_as_argument_parse( config_parse_fn_args const* );
-static void         ignore_parse( config_parse_fn_args const* );
 static void         ignore_symbols_parse( config_parse_fn_args const* );
 static void         ignore_symbols_parse_string( config_parse_fn_args const* );
 static void         print_invalid_value( config_parse_fn_args const*,
@@ -161,7 +158,6 @@ static void         toml_value_print( toml_value const*, FILE* );
 static config_key const CONFIG_KEYS[] = {
   { "color",              TABLE_SYMBOL_TIDY,    &color_parse              },
   { "error",              TABLE_SYMBOL_TIDY,    &error_parse              },
-  { "ignore",             TABLE_SYMBOL,         &ignore_parse             },
   { "ignore-as-argument", TABLE_HEADER_SOURCE,  &ignore_as_argument_parse },
   { "ignore-symbols",     TABLE_SYMBOL_TIDY,    &ignore_symbols_parse     },
   { "symbols",            TABLE_HEADER,         &symbols_parse            },
@@ -210,89 +206,11 @@ static bool toml_bool_parse( config_parse_fn_args const *config,
 }
 
 /**
- * Parses a TOML integer value.
- *
- * @param config The config_parse_fn_args to use.
- * @param value_min The minimum allowed value.
- * @param value_max The maximum allowed value.
- * @param rv_int Receives the integer value.
- * @return Returns `true` only if an integer was parsed successfully and in
- * range.
- */
-NODISCARD
-static bool toml_int_parse( config_parse_fn_args const *config, long value_min,
-                            long value_max, long *rv_int ) {
-  assert( config != NULL );
-  assert( rv_int != NULL );
-
-  if ( config->value->type != TOML_INT ) {
-    print_invalid_value( config, /*value=*/NULL, TOML_INT );
-    return false;
-  }
-  if ( config->value->i < value_min || config->value->i > value_max ) {
-    print_invalid_value( config, /*value=*/NULL, TOML_INT );
-    EPRINTF( "; must be %ld-%ld\n", value_min, value_max );
-    return false;
-  }
-
-  *rv_int = config->value->i;
-  return true;
-}
-
-/**
- * Parses a TOML array of strings values.
- *
- * @param config The config_parse_fn_args to use.
- * @param rv_array Receives the parsed array.
- * @return Returns `true` only if an array of strings was parsed successfully.
- *
- * @sa toml_string_or_string_array_parse()
- * @sa toml_string_parse()
- */
-NODISCARD
-static bool toml_string_array_parse( config_parse_fn_args const *config,
-                                     array_t *rv_array ) {
-  assert( config != NULL );
-  assert( rv_array != NULL );
-
-  if ( config->value->type != TOML_ARRAY ) {
-    print_invalid_value( config, /*value=*/NULL, TOML_ARRAY );
-    return false;
-  }
-
-  array_t array = ARRAY_INIT( sizeof(char*) );
-  bool    ok = true;
-
-  if ( config->value->a.size > 0 ) {
-    array_reserve( &array, config->value->a.size );
-
-    for ( unsigned i = 0; i < config->value->a.size; ++i ) {
-      toml_value *const a_value = &config->value->a.values[i];
-      if ( a_value->type != TOML_STRING ) {
-        print_invalid_value( config, a_value, TOML_STRING );
-        ok = false;
-        continue;
-      }
-      *(char**)array_push_back( &array ) = a_value->s;
-      a_value->s = NULL;                // steal value's string
-    } // for
-  }
-
-  if ( ok )
-    *rv_array = array;
-  else
-    array_cleanup( &array, &free_pptr );
-
-  return ok;
-}
-
-/**
  * Parses either a TOML string value or an array of string values.
  *
  * @param config The config_parse_fn_args to use.
  * @param parse_fn The parse function to use.
  *
- * @sa toml_string_array_parse()
  * @sa toml_string_parse()
  */
 static
@@ -345,7 +263,6 @@ void toml_string_or_string_array_parse( config_parse_fn_args const *config,
  * @param rv_string Receives a pointer to the string.
  * @return Returns `true` only if a string was parsed successfully.
  *
- * @sa toml_string_array_parse()
  * @sa toml_string_or_string_array_parse()
  */
 NODISCARD
@@ -418,21 +335,6 @@ static void ignore_as_argument_parse( config_parse_fn_args const *config ) {
   if ( strcmp( config->table->key.name, config->source->path ) == 0 )
     config->source->is_ignored = true;
 };
-
-/**
- * Parses the value of an `"ignore"` key.
- *
- * @param config The config_parse_fn_args to use.
- */
-static void ignore_parse( config_parse_fn_args const *config ) {
-  bool ignore;
-  if ( !toml_bool_parse( config, &ignore ) || !ignore )
-    return;
-  ht_table_insert(
-    &ignore_symbol_set, CONST_CAST( char*, config->table->key.name ),
-    strlen( config->table->key.name ) + 1/*\0*/
-  );
-}
 
 /**
  * Parses the value of an `"ignore-symbols"` key.
