@@ -159,16 +159,6 @@ NODISCARD
 bool tidy_Cursor_isExternalLinkage( CXCursor cursor );
 
 /**
- * Gets whether \a cursor is referenced from \a file.
- *
- * @param cursor The cursor to use.
- * @param file The file of interest.
- * @return Returns `true` only if the \a cursor is referenced from \a file.
- */
-NODISCARD
-bool tidy_Cursor_isInFile( CXCursor cursor, CXFile file );
-
-/**
  * Gets whether a class, data member, or member function given by \a cursor is
  * derived, inherited, or specialized from the class given by \a base_csr.
  *
@@ -369,49 +359,6 @@ CXCursor tidy_getCursorByNameToken( CXTranslationUnit tu, CXToken token,
  */
 NODISCARD
 CXSourceRange tidy_getCursorExtent( CXCursor cursor );
-
-/**
- * Calls `clang_getCursorLocation()` and returns only the file.
- *
- * @param cursor The cursor to use.
- * @return Returns the file \a cursor is in, if any.
- */
-NODISCARD
-CXFile tidy_getCursorLocation_File( CXCursor cursor );
-
-/**
- * Calls `clang_getFileLocation()` and returns the `CXFile`.
- *
- * @param loc The `CXSourceLocation` to use.
- * @return Returns its `CXFile`.
- *
- * @sa tidy_getSpellingLocation_File()
- */
-NODISCARD
-inline CXFile tidy_getFileLocation_File( CXSourceLocation loc ) {
-  CXFile file;
-  clang_getFileLocation(
-    loc, &file, /*line=*/NULL, /*column=*/NULL, /*offset=*/NULL
-  );
-  return file;
-}
-
-/**
- * Calls `clang_getSpellingLocation()` and returns only the file.
- *
- * @param loc The location to use.
- * @return Returns the file of \a loc.
- *
- * @sa tidy_getFileLocation_File()
- */
-NODISCARD
-inline CXFile tidy_getSpellingLocation_File( CXSourceLocation loc ) {
-  CXFile file;
-  clang_getSpellingLocation(
-    loc, &file, /*line=*/NULL, /*column=*/NULL, /*offset=*/NULL
-  );
-  return file;
-}
 
 /**
  * Calls `clang_isCursorDefinition()` but, in C, also considers tentative

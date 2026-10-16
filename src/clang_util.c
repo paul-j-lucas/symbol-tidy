@@ -419,13 +419,6 @@ bool tidy_Cursor_isExternalLinkage( CXCursor cursor ) {
   } // switch
 }
 
-bool tidy_Cursor_isInFile( CXCursor cursor, CXFile file ) {
-  assert( file != NULL );
-
-  CXFile const cursor_file = tidy_getCursorLocation_File( cursor );
-  return cursor_file != NULL && clang_File_isEqual( cursor_file, file );
-}
-
 bool tidy_Cursor_isInheritedFrom( CXCursor cursor, CXCursor base_csr ) {
   if ( tidy_Cursor_isInvalid( cursor ) || tidy_Cursor_isInvalid( base_csr ) )
     return false;
@@ -628,22 +621,6 @@ CXSourceRange tidy_getCursorExtent( CXCursor cursor ) {
   return clang_getRange( start_loc, end_loc );
 }
 
-CXFile tidy_getCursorLocation_File( CXCursor cursor ) {
-  CXSourceLocation const  loc = clang_getCursorLocation( cursor );
-  CXFile                  file = tidy_getSpellingLocation_File( loc );
-
-  if ( file == NULL ) {
-    //
-    // If tidy_getSpellingLocation_File() returns a NULL file, it can mean that
-    // the symbol was formed via preprocessor token pasting, e.g., foo_ ## bar.
-    // Fall back to tidy_getFileLocation_File().
-    //
-    file = tidy_getFileLocation_File( loc );
-  }
-
-  return file;
-}
-
 bool tidy_isCursorDefinition( CXCursor cursor ) {
   if ( clang_isCursorDefinition( cursor ) )
     return true;
@@ -704,8 +681,6 @@ bool tidy_Token_isScopeQualifier( CXTranslationUnit tu, CXToken token ) {
 
 extern inline CXCursor tidy_Cursor_getCanonicalTypeDeclaration( CXCursor );
 extern inline bool tidy_Cursor_isInvalid( CXCursor );
-extern inline CXFile tidy_getFileLocation_File( CXSourceLocation );
-extern inline CXFile tidy_getSpellingLocation_File( CXSourceLocation );
 
 /// @endcond
 
