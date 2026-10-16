@@ -89,9 +89,6 @@ static bool symbol_is_excluded( CXCursor, symbols_visit_data const* );
 
 static void visit_FieldDecl( CXCursor, CXCursor, symbols_visit_data* );
 static void visit_MacroDefinition( CXCursor, CXCursor, symbols_visit_data* );
-static void visit_MemberRefExpr( CXCursor, CXCursor, symbols_visit_data* );
-static void visit_most_kinds( CXCursor, CXCursor, symbols_visit_data* );
-static void visit_OverloadedDeclRef( CXCursor, CXCursor, symbols_visit_data* );
 
 ////////// local variables ////////////////////////////////////////////////////
 
@@ -144,30 +141,6 @@ done:
   free( key );
   clang_disposeString( name_cxs );
   return sym;
-}
-
-/**
- * Gets the file containing \a sym_csr unless it's the file being tidied in
- * which case we don't want to add that symbol to the global set.
- *
- * @param sym_csr The cursor for the symbol.
- * @param svd The symbols_visit_data to use.
- * @return Returns the file containing \a sym_csr or NULL.
- */
-NODISCARD
-static CXFile get_symbol_file( CXCursor sym_csr,
-                               symbols_visit_data const *svd ) {
-  assert( svd != NULL );
-
-  CXFile const sym_file = tidy_getCursorLocation_File( sym_csr );
-  if ( unlikely( sym_file == NULL ) )
-    return NULL;                        // LCOV_EXCL_LINE
-
-  // If the symbol was first declared in the file being tidied, we don't care.
-  if ( clang_File_isEqual( sym_file, svd->source->file ) )
-    return NULL;
-
-  return sym_file;
 }
 
 /**
@@ -541,6 +514,28 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       }
       break;
 
+    case CXCursor_OverloadedDeclRef:;
+      //
+      // We have to iterate over all overloaded functions since calling
+      // clang_getCursorReferenced() on a CXCursor_OverloadedDeclRef returns an
+      // invalid or null cursor.
+      //
+      unsigned const num_decls = clang_getNumOverloadedDecls( cursor );
+      for ( unsigned i = 0; i < num_decls; ++i ) {
+        CXCursor dec_csr = clang_getOverloadedDecl( cursor, i );
+        if ( tidy_Cursor_isInvalid( dec_csr ) )
+          continue;                         // LCOV_EXCL_LINE
+        dec_csr = clang_getCanonicalCursor( dec_csr );
+        tidy_symbol *const dec_sym = add_symbol( dec_csr );
+        if ( dec_sym != NULL ) {
+          if ( svd->parent_sym != NULL )
+            symbol_add_ref( svd->parent_sym, dec_sym );
+          else
+            dec_sym->is_root = true;
+        }
+      } // for
+      break;
+
     case CXCursor_FunctionDecl:
     case CXCursor_VarDecl:
       is_definition =
@@ -782,87 +777,6 @@ static void visit_MacroDefinition( CXCursor macro_csr, CXCursor parent,
 
   ht_table_cleanup( &param_set, /*free_fn=*/NULL );
   clang_disposeTokens( tu, tokens, token_count );
-}
-
-/**
- * Visit most kinds of cursor.
- *
- * @param cursor The cursor to visit.
- * @param parent The parent cursor of \a cursor.
- * @param svd The symbols_visit_data to use.
- */
-static void visit_most_kinds( CXCursor cursor, CXCursor parent,
-                              symbols_visit_data *svd ) {
-  (void)parent;
-  assert( svd != NULL );
-
-  // Gets the cursor for the declaration of the symbol.
-  CXCursor const dec_csr = clang_getCursorReferenced( cursor );
-  if ( tidy_Cursor_isInvalid( dec_csr ) )
-    return;                             // LCOV_EXCL_LINE
-
-  //
-  // Call symbol_is_excluded() and get_symbol_file() ourselves to avoid calling
-  // is_cxx_proxy_qual_ref_iwyu_exc() and is_cxx_mbr_or_base_iwyu_exc() unless
-  // necessary since they're both expensive.
-  //
-  if ( !symbol_is_excluded( dec_csr, svd ) ) {
-    CXFile const dec_file = get_symbol_file( dec_csr, svd );
-    if ( dec_file != NULL ) {
-      add_symbol( dec_csr );
-    }
-  }
-}
-
-/**
- * Visits a `CXCursor_MemberRefExpr` kind of cursor.
- *
- * @param mbr_ref_csr The member reference's cursor to visit.
- * @param parent Not used.
- * @param svd The symbols_visit_data to use.
- */
-static void visit_MemberRefExpr( CXCursor mbr_ref_csr, CXCursor parent,
-                                 symbols_visit_data *svd ) {
-  (void)parent;
-  assert( svd != NULL );
-
-  CXCursor const mbr_csr = clang_getCursorReferenced( mbr_ref_csr );
-  if ( tidy_Cursor_isInvalid( mbr_csr ) )
-    return;                             // LCOV_EXCL_LINE
-
-  CXCursor const mbr_cls_csr = clang_getCursorSemanticParent( mbr_csr );
-  visit_most_kinds( mbr_ref_csr, mbr_cls_csr, svd );
-}
-
-/**
- * Visits a `CXCursor_OverloadedDeclRef` kind of cursor.
- *
- * @remarks We have to iterate over all overloaded functions since calling
- * clang_getCursorReferenced() on a CXCursor_OverloadedDeclRef returns an
- * invalid or null cursor.
- *
- * @param overloaded_csr The overloaded definition's cursor to visit.
- * @param parent Not used.
- * @param svd The symbols_visit_data to use.
- */
-static void visit_OverloadedDeclRef( CXCursor overloaded_csr, CXCursor parent,
-                                     symbols_visit_data *svd ) {
-  (void)parent;
-  assert( svd != NULL );
-
-  unsigned const num_decls = clang_getNumOverloadedDecls( overloaded_csr );
-  for ( unsigned i = 0; i < num_decls; ++i ) {
-    CXCursor dec_csr = clang_getOverloadedDecl( overloaded_csr, i );
-    if ( tidy_Cursor_isInvalid( dec_csr ) )
-      continue;                         // LCOV_EXCL_LINE
-    dec_csr = clang_getCanonicalCursor( dec_csr );
-    maybe_add_symbol( dec_csr, svd );
-    //
-    // It's possible that different overloads will be declared in different
-    // headers.  But for now, we stop after the first overload.
-    //
-    break;
-  } // for
 }
 
 ////////// extern functions ///////////////////////////////////////////////////
