@@ -97,7 +97,6 @@ typedef enum    config_opts           config_opts;
 typedef struct  config_key            config_key;
 typedef struct  config_parse_fn_args  config_parse_fn_args;
 typedef enum    config_table_kind     config_table_kind;
-typedef struct  symbol_includes       symbol_includes;
 
 /**
  * Signature for a function that parses the value of a configuration key.
@@ -131,46 +130,6 @@ struct config_parse_fn_args {
   toml_value const *value;              ///< Value to parse.
 };
 
-/**
- * Mapping from a symbol name to a set of include CXFiles that declare it.
- *
- * @remarks
- * @parblock
- * A set of include files is needed since some symbols are declared in multiple
- * include files, e.g., `NULL` and `size_t`.
- *
- * An array of include files is needed to preserve the order in which the
- * include files were listed.
- * @endparblock
- *
- * @par Example
- *  ```
- *  [NULL]
- *  includes = [
- *      "stddef.h",
- *      "stdlib.h",
- *      "stdio.h",
- *      "string.h",
- *      "locale.h",
- *      "time.h",
- *      "wchar.h",
- *  ]
- *  ```
- */
-struct symbol_includes {
-  char const *from_sym_name;            ///< Symbol name.
-
-  /**
-   * A set of include file(s) that declare \ref from_sym_name.
-   */
-  hash_table_t  to_include_set;
-
-  /**
-   * An array of include file(s) that declare \ref from_sym_name.
-   */
-  array_t       to_include_array;
-};
-
 ////////// local functions ////////////////////////////////////////////////////
 
 static void         color_parse( config_parse_fn_args const* );
@@ -189,7 +148,6 @@ static void         ignore_symbols_parse( config_parse_fn_args const* );
 static void         ignore_symbols_parse_string( config_parse_fn_args const* );
 static void         print_invalid_value( config_parse_fn_args const*,
                                          toml_value const*, toml_type );
-static void         symbol_includes_cleanup( symbol_includes* );
 static void         symbols_parse( config_parse_fn_args const* );
 static void         symbols_parse_string( config_parse_fn_args const* );
 
@@ -226,16 +184,6 @@ static char const *const TABLE_KINDS[] = {
 static unsigned     error_count;          ///< Configuration file error count.
 static hash_table_t ignore_symbol_set;    ///< Set of symbols to ignore.
 static unsigned     warning_count;        ///< Configuration file warning count.
-
-/**
- * Mapping from symbols to the include file(s) they're declared in.
- *
- * @remarks This is a red-black tree and not a hash table because, when we
- * iterate over it, we want it to be in sorted order.
- *
- * @sa symbol_includes
- */
-static rb_tree_t symbol_includes_map;
 
 ////////// local TOML type parsing functions //////////////////////////////////
 
@@ -559,10 +507,6 @@ static void symbols_parse_string( config_parse_fn_args const *config ) {
  */
 static void config_cleanup( void ) {
   ht_table_cleanup( &ignore_symbol_set, /*free_fn=*/NULL );
-  rb_tree_cleanup(
-    &symbol_includes_map,
-    POINTER_CAST( rb_free_fn_t, &symbol_includes_cleanup )
-  );
 }
 
 /**
@@ -945,36 +889,6 @@ static void print_invalid_value( config_parse_fn_args const *config,
 }
 
 /**
- * Cleans-up a symbol_includes.
- *
- * @param si The symbol_includes to clean up.  If NULL, does nothing.
- */
-static void symbol_includes_cleanup( symbol_includes *si ) {
-  if ( si != NULL ) {
-    FREE( si->from_sym_name );
-    ht_table_cleanup( &si->to_include_set, /*free_fn=*/NULL );
-    array_cleanup( &si->to_include_array, /*free_fn=*/NULL );
-  }
-}
-
-/**
- * Compares two \ref symbol_includes objects.
- *
- * @param i_si The first symbol_includes.
- * @param j_si The second symbol_includes.
- * @return Returns a number less than 0, 0, or greater than 0 if the name of \a
- * i_si is less than, equal to, or greater than the name of \a j_si,
- * respectively.
- */
-NODISCARD
-static int symbol_includes_cmp( symbol_includes const *i_si,
-                                symbol_includes const *j_si ) {
-  assert( i_si != NULL );
-  assert( j_si != NULL );
-  return strcmp( i_si->from_sym_name, j_si->from_sym_name );
-}
-
-/**
  * Prints a TOML value.
  *
  * @param value The toml_value to print.
@@ -1009,10 +923,6 @@ void config_init( tidy_source *source ) {
     &ignore_symbol_set, HT_DINT, 2.0, 10,
     POINTER_CAST( ht_cmp_fn_t, &strcmp ),
     POINTER_CAST( ht_hash_fn_t, &fnv1a_s )
-  );
-  rb_tree_init(
-    &symbol_includes_map, RB_DINT,
-    POINTER_CAST( rb_cmp_fn_t, &symbol_includes_cmp )
   );
   ATEXIT( &config_cleanup );
 
