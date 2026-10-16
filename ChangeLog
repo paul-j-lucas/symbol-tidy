@@ -1,3 +1,17 @@
+2026-10-16  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * cli_options.c, options.c, options.h, symbol-tidy.c: Added opt_lang.
+   * symbol-tidy.c: Now calling config_init().
+   * config_file.c, config_file.h: No longer need tidy_source. No config file
+     is not an error.
+   * config_file.c: Added print_statistics().
+   * config_file.c: Removed unused include-tidy code.
+   * config_file.c, config_file.h: Added ignore-paths.
+   * clang_util.h, symbol-tidy.c: #include fix.
+   * config_file.c: Removed unused include-tidy code.
+   * config_file.c: ignore-symbols is now a symbol-tidy table kwy.
+   * config_file.c: Removed unused include-tidy code.
+
 2026-10-15  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
    * clang_util.c, clang_util.h, path_util.c, path_util.h: Removed unused
