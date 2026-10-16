@@ -173,18 +173,15 @@ static bool         is_Xtidy_opt( int, char const *const[], int* );
  * @param parg_source1 TODO.
  * the form <tt>-isystem</tt><i>path</i> is inserted for each search path.
  * @param compiler_path The path of the C or C++ compiler to use.
- * @param lang The language to use.
  */
 static void add_compiler_include_paths( int *pargc, char const **pargv[],
                                         int *parg_source1,
-                                        char const *compiler_path,
-                                        enum CXLanguageKind lang ) {
+                                        char const *compiler_path ) {
   assert(  pargc != NULL );
   assert( *pargc > 0 );
   assert(  pargv != NULL );
   assert( *pargv != NULL );
   assert(  compiler_path != NULL );
-  assert(  lang != CXLanguage_Invalid );
   ASSERT_RUN_ONCE();
 
   static char const COMMAND[] =
@@ -199,7 +196,7 @@ static void add_compiler_include_paths( int *pargc, char const **pargv[],
   char *command = NULL;
   asprintf_or_exit(
     &command, COMMAND, compiler_path,
-    lang == CXLanguage_CPlusPlus ? "c++" : "c"
+    opt_lang == CXLanguage_CPlusPlus ? "c++" : "c"
   );
 
   FILE *const fcompiler = popen( command, "r" );
@@ -1064,11 +1061,11 @@ int cli_options_init( int *pargc, char const **pargv[] ) {
 
   move_tidy_args( pargc, *pargv, &tidy_argc, &tidy_argv );
 
-  enum CXLanguageKind lang = get_x_language( *pargc, *pargv );
-  int arg_source1 = get_source_index( *pargc, *pargv, &lang );
+  opt_lang = get_x_language( *pargc, *pargv );
+  int arg_source1 = get_source_index( *pargc, *pargv, &opt_lang );
   char const *const compiler_path = get_compiler_path( *pargc, *pargv );
   if ( compiler_path != NULL )
-    add_compiler_include_paths( pargc, pargv, &arg_source1, compiler_path, lang );
+    add_compiler_include_paths( pargc, pargv, &arg_source1, compiler_path );
 
   opterr = 0;                           // suppress default error message
   for (;;) {

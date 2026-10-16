@@ -39,9 +39,6 @@
 #include "util.h"
 #include "verbose.h"
 
-// libclang
-#include <clang-c/Index.h>
-
 // standard
 #include <stdlib.h>
 #include <string.h>
@@ -138,6 +135,8 @@ int main( int argc, char const *argv[] ) {
   );
 
   for ( int i = arg_source1; i < argc; ++i ) {
+    if ( config_path_is_ignored( argv[i] ) )
+      continue;
     ht_insert_rv_t const hti = ht_table_insert(
       &tidy_source_path_set, CONST_CAST( char*, argv[i] ), strlen( argv[i] ) + 1
     );
@@ -149,7 +148,7 @@ int main( int argc, char const *argv[] ) {
     }
     tidy_source source = {
       .path = argv[i],
-      .lang = CXLanguage_C
+      .lang = opt_lang
     };
     source_init( &source, arg_source1, argv );
     symbols_visit( &source );

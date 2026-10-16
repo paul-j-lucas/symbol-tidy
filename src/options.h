@@ -31,6 +31,9 @@
 #include "pjl_config.h"                 /* must go first */
 #include "color.h"
 
+// libclang
+#include <clang-c/Index.h>
+
 // standard
 #include <stdbool.h>
 
@@ -107,13 +110,17 @@ typedef enum tidy_verbose tidy_verbose;
 
 ////////// extern option variables ////////////////////////////////////////////
 
-extern color_when   opt_color_when;       ///< When to colorize.
-extern bool         opt_config_layers;    ///< Do configuration file layering?
-extern char const  *opt_config_path;      ///< Configuration file path.
-extern bool         opt_debug;            ///< Print debugging output?
-extern tidy_error   opt_error;            ///< When to exit with non-zero.
-extern tidy_test    opt_test;             ///< Is **symbol-tidy** under test?
-extern tidy_verbose opt_verbose;          ///< Print verbose output?
+extern color_when     opt_color_when;     ///< When to colorize.
+extern bool           opt_config_layers;  ///< Do configuration file layering?
+extern char const    *opt_config_path;    ///< Configuration file path.
+extern bool           opt_debug;          ///< Print debugging output?
+extern tidy_error     opt_error;          ///< When to exit with non-zero.
+
+extern
+enum CXLanguageKind   opt_lang;           ///< Explicitly specified language.
+
+extern tidy_test      opt_test;           ///< Is **symbol-tidy** under test?
+extern tidy_verbose   opt_verbose;        ///< Print verbose output?
 
 ////////// extern functions ///////////////////////////////////////////////////
 
