@@ -80,11 +80,11 @@ enum config_opts {
  * Table kind.
  */
 enum config_table_kind {
-  TABLE_NONE          = 0,              ///< No table.
-  TABLE_INCLUDE_TIDY  = 1 << 0,         ///< The `symbol-tidy` table.
-  TABLE_HEADER        = 1 << 1,         ///< Header table.
-  TABLE_SOURCE        = 1 << 2,         ///< Source table.
-  TABLE_SYMBOL        = 1 << 3          ///< Symbol table.
+  TABLE_NONE        = 0,                ///< No table.
+  TABLE_SYMBOL_TIDY = 1 << 0,           ///< The `symbol-tidy` table.
+  TABLE_HEADER      = 1 << 1,           ///< Header table.
+  TABLE_SOURCE      = 1 << 2,           ///< Source table.
+  TABLE_SYMBOL      = 1 << 3            ///< Symbol table.
 };
 
 /// @cond DOXYGEN_IGNORE
@@ -159,8 +159,8 @@ static void         toml_value_print( toml_value const*, FILE* );
  * Configuration keys.
  */
 static config_key const CONFIG_KEYS[] = {
-  { "color",              TABLE_INCLUDE_TIDY,   &color_parse              },
-  { "error",              TABLE_INCLUDE_TIDY,   &error_parse              },
+  { "color",              TABLE_SYMBOL_TIDY,    &color_parse              },
+  { "error",              TABLE_SYMBOL_TIDY,    &error_parse              },
   { "ignore",             TABLE_SYMBOL,         &ignore_parse             },
   { "ignore-as-argument", TABLE_HEADER_SOURCE,  &ignore_as_argument_parse },
   { "ignore-symbols",     TABLE_HEADER_SOURCE,  &ignore_symbols_parse     },
@@ -172,7 +172,7 @@ static config_key const CONFIG_KEYS[] = {
  */
 static char const *const TABLE_KINDS[] = {
   [ TABLE_NONE ] = "none",
-  [ TABLE_INCLUDE_TIDY ] = "symbol-tidy",
+  [ TABLE_SYMBOL_TIDY ] = "symbol-tidy",
   [ TABLE_HEADER ] = "header",
   [ TABLE_HEADER_SOURCE ] = "source or header",
   [ TABLE_SOURCE ] = "source",
@@ -761,7 +761,7 @@ static void config_parse( tidy_source *source, char const *config_path,
 
     config_table_kind table_kinds =
       strcmp( table.key.name, "symbol-tidy" ) == 0 ?
-        TABLE_INCLUDE_TIDY : TABLE_NONE;
+        TABLE_SYMBOL_TIDY : TABLE_NONE;
 
     toml_iterator iter;
     toml_iterator_init( &iter, &table );
