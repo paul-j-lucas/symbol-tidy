@@ -144,6 +144,7 @@ static void         ignore_paths_parse( config_parse_fn_args const* );
 static void         ignore_paths_parse_string( config_parse_fn_args const* );
 static void         ignore_symbols_parse( config_parse_fn_args const* );
 static void         ignore_symbols_parse_string( config_parse_fn_args const* );
+static void         print_statistics( void );
 static void         print_invalid_value( config_parse_fn_args const*,
                                          toml_value const*, toml_type );
 static void         symbols_parse( config_parse_fn_args const* );
@@ -406,6 +407,7 @@ static void symbols_parse_string( config_parse_fn_args const *config ) {
  * Cleans-up all configuration data.
  */
 static void config_cleanup( void ) {
+  print_statistics();
   ht_table_cleanup( &ignore_path_set, /*free_fn=*/NULL );
   ht_table_cleanup( &ignore_symbol_set, /*free_fn=*/NULL );
 }
@@ -787,6 +789,36 @@ static void print_invalid_value( config_parse_fn_args const *config,
     EPRINTF( "; expected %s\n", toml_type_name( expected ) );
 
   ++error_count;
+}
+
+/**
+ * Prints statistics if requested.
+ */
+static void print_statistics( void ) {
+  if ( !verbose_print_statistics() )
+    return;
+
+  verbose_printf(
+    "  ignore-path set:\n"
+  );
+  verbose_printf(
+    "    ips-load-factor = " TIDY_STAT_LF_FMT "\n",
+                           ht_table_load_factor( &ignore_path_set )
+  );
+  verbose_printf(
+    "    ips-size = %u\n", ignore_path_set.size
+  );
+
+  verbose_printf(
+    "  ignore-symbol set:\n"
+  );
+  verbose_printf(
+    "    iss-load-factor = " TIDY_STAT_LF_FMT "\n",
+                           ht_table_load_factor( &ignore_symbol_set )
+  );
+  verbose_printf(
+    "    iss-size = %u\n", ignore_symbol_set.size
+  );
 }
 
 /**
