@@ -102,18 +102,18 @@ ht_hash_val_t symbol_hash( tidy_symbol const *sym );
 void symbols_init( void );
 
 /**
- * TODO.
+ * Determines the number of unused symbols and prints them.
  *
- * @param source TODO.
+ * @return Returns the number of unused symbols.
  */
-void symbols_visit( tidy_source *source );
+unsigned symbols_print_unused( void );
 
 /**
- * TODO.
+ * Visits all symbols in \a source.
  *
- * @return Returns TODO.
+ * @param source The source file to visit.
  */
-unsigned symbols_report_unused( void );
+void symbols_visit( tidy_source *source );
 
 ///////////////////////////////////////////////////////////////////////////////
 

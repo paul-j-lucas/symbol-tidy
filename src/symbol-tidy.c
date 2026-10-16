@@ -155,6 +155,6 @@ int main( int argc, char const *argv[] ) {
     source_cleanup( &source );
   } // for
 
-  unsigned const unused = symbols_report_unused();
+  unsigned const unused = symbols_print_unused();
   return tidy_status( unused );
 }

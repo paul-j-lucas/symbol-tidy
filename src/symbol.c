@@ -27,11 +27,12 @@
 #include "pjl_config.h"
 #include "symbol.h"
 #include "array.h"
+#include "color.h"
 #include "clang_util.h"
 #include "fnv1a.h"
 #include "hash_table.h"
 #include "options.h"
-#include "print.h"
+#include "path_util.h"
 #include "source.h"
 #include "str_util.h"
 #include "symbol-tidy.h"
@@ -47,6 +48,7 @@
 #include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>                     /* for unreachable(3) */
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -396,8 +398,8 @@ static void symbol_cleanup( tidy_symbol *sym ) {
 }
 
 /**
- * Compares two \ref tidy_symbol objects by their source path, then by line
- * number.
+ * Compares two \ref tidy_symbol objects by their source path, then by line,
+ * then by column.
  *
  * @param i_sym The first symbol.
  * @param j_sym The second symbol.
@@ -413,11 +415,15 @@ static int symbol_cmp_by_path( tidy_symbol const *i_sym,
   assert( j_sym != NULL );
   assert( j_sym->path != NULL );
 
-  int const cmp = strcmp( i_sym->path, j_sym->path );
+  int cmp;
+
+  cmp = strcmp( i_sym->path, j_sym->path );
   if ( cmp != 0 )
     return cmp;
-
-  return STATIC_CAST( int, i_sym->line ) - STATIC_CAST( int, j_sym->line );
+  cmp = STATIC_CAST( int, i_sym->line ) - STATIC_CAST( int, j_sym->line );
+  if ( cmp != 0 )
+    return cmp;
+  return STATIC_CAST( int, i_sym->col ) - STATIC_CAST( int, j_sym->col );
 }
 
 /**
@@ -827,7 +833,7 @@ void symbols_init( void ) {
   ATEXIT( &symbols_cleanup );
 }
 
-unsigned symbols_report_unused( void ) {
+unsigned symbols_print_unused( void ) {
   ht_iterator_t iter;
   ht_iterator_init( &iter, &symbol_set );
   for ( tidy_symbol *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
@@ -859,11 +865,30 @@ unsigned symbols_report_unused( void ) {
     POINTER_CAST( array_cmp_fn_t, &symbol_cmp_by_path )
   );
 
+  char const *prev_path = "";
   for ( size_t i = 0; i < symbol_array.len; ++i ) {
     tidy_symbol const *const sym = array_at_nc( &symbol_array, i );
-    print_file_warning( sym->path, sym->line, sym->col,
-      "\"%s\": unused symbol\n", sym->name
-    );
+    if ( strcmp( sym->path, prev_path ) != 0 ) {
+      color_start( stderr, sgr_locus );
+      EPRINTF( "\"%s\"", path_no_dot_slash( sym->path ) );
+      color_end( stderr, sgr_locus );
+      EPUTS( ": " );
+      prev_path = sym->path;
+
+      color_start( stderr, sgr_warning );
+      EPUTS( "warning" );
+      color_end( stderr, sgr_warning );
+      EPUTS( ": unused symbols:\n" );
+    }
+
+    color_start( stderr, sgr_locus );
+    EPRINTF( "%5u", sym->line );
+    color_end( stderr, sgr_locus );
+    EPUTC( ',' );
+    color_start( stderr, sgr_locus );
+    EPRINTF( "%2u", sym->col );
+    color_end( stderr, sgr_locus );
+    EPRINTF( " | \"%s\"\n", sym->name );
   } // for
 
   array_cleanup( &symbol_array, /*free_fn=*/NULL );
