@@ -1,5 +1,7 @@
 2026-10-16  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * symbol-tidy.c, symbol.c, symbol.h: Reworked printing of unused symbols;
+     now also comparing by column.
    * cli_options.c, options.c, options.h, symbol-tidy.c: Added opt_lang.
    * symbol-tidy.c: Now calling config_init().
    * config_file.c, config_file.h: No longer need tidy_source. No config file
