@@ -79,13 +79,12 @@ enum config_opts {
 enum config_table_kind {
   TABLE_NONE        = 0,                ///< No table.
   TABLE_SYMBOL_TIDY = 1 << 0,           ///< The `symbol-tidy` table.
-  TABLE_HEADER      = 1 << 1,           ///< Header table.
-  TABLE_SOURCE      = 1 << 2,           ///< Source table.
-  TABLE_SYMBOL      = 1 << 3            ///< Symbol table.
+  TABLE_SOURCE      = 1 << 1,           ///< Source table.
+  TABLE_SYMBOL      = 1 << 2            ///< Symbol table.
 };
 
 /// @cond DOXYGEN_IGNORE
-#define TABLE_HEADER_SOURCE       (TABLE_HEADER | TABLE_SOURCE)
+#define TABLE_TIDY_SOURCE         (TABLE_SYMBOL_TIDY | TABLE_SOURCE)
 /// @endcond
 
 ////////// typedefs ///////////////////////////////////////////////////////////
@@ -160,7 +159,7 @@ static config_key const CONFIG_KEYS[] = {
   { "error",          TABLE_SYMBOL_TIDY,  &error_parse          },
   { "ignore-paths",   TABLE_SYMBOL_TIDY,  &ignore_paths_parse   },
   { "ignore-symbols", TABLE_SYMBOL_TIDY,  &ignore_symbols_parse },
-  { "symbols",        TABLE_HEADER,       &symbols_parse        },
+  { "symbols",        TABLE_TIDY_SOURCE,  &symbols_parse        },
 };
 
 /**
@@ -169,8 +168,7 @@ static config_key const CONFIG_KEYS[] = {
 static char const *const TABLE_KINDS[] = {
   [ TABLE_NONE ] = "none",
   [ TABLE_SYMBOL_TIDY ] = "symbol-tidy",
-  [ TABLE_HEADER ] = "header",
-  [ TABLE_HEADER_SOURCE ] = "source or header",
+  [ TABLE_TIDY_SOURCE ] = "symbol-tidy or source",
   [ TABLE_SOURCE ] = "source",
   [ TABLE_SYMBOL ] = "symbol"
 };
