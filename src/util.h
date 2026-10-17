@@ -795,7 +795,6 @@ unsigned asprintf_or_exit( char **rv_s, char const *format, ... );
  * sets it to `true`.
  * @return Returns `true` only if \a flag was `false` initially.
  *
- * @sa true_clear()
  * @sa true_or_set()
  */
 NODISCARD
@@ -873,7 +872,6 @@ void* realloc_or_exit( void *p, size_t size );
  * @return Returns `true` only if \a flag was `true` initially.
  *
  * @sa false_set()
- * @sa true_clear()
  */
 NODISCARD
 inline bool true_or_set( bool *flag ) {
@@ -881,24 +879,6 @@ inline bool true_or_set( bool *flag ) {
     return true;
   *flag = true;
   return false;
-}
-
-/**
- * Checks the flag: if `true`, resets the flag to `false`.
- *
- * @param flag A pointer to the Boolean flag to be tested and, if `true`, set
- * to \c false.
- * @return Returns `true` only if \a *flag is `true`.
- *
- * @sa false_set()
- * @sa true_or_set()
- */
-NODISCARD
-inline bool true_clear( bool *flag ) {
-  if ( !*flag )
-    return false;
-  *flag = false;
-  return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

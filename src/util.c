@@ -135,7 +135,6 @@ void* realloc_or_exit( void *p, size_t size ) {
 extern inline bool false_set( bool* );
 extern inline char const* plural_s( unsigned long long );
 extern inline bool true_or_set( bool* );
-extern inline bool true_clear( bool* );
 
 /// @endcond
 
