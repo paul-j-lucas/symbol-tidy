@@ -1,5 +1,17 @@
+2026-10-17  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * symbol.c: Eliminated maybe_add_symbol().
+   * util.c, util.h: Eliminated true_clear() -- not used.
+   * config_file.c: s/ignore_symbol_set/ignore_path_set/
+   * symbol-tidy.toml: Initial version.
+   * clang_util.c, clang_util.h, config_file.c, config_file.h, symbol.c: Config
+     file works a bit.
+   * util.c, util.h: Removed free_pptr().
+   * config_file.c: Eliminated header tables.
+
 2026-10-16  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * symbol.c: No longer marking a macro as used.
    * symbol-tidy.c, symbol.c, symbol.h: Reworked printing of unused symbols;
      now also comparing by column.
    * cli_options.c, options.c, options.h, symbol-tidy.c: Added opt_lang.
