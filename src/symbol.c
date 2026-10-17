@@ -27,8 +27,9 @@
 #include "pjl_config.h"
 #include "symbol.h"
 #include "array.h"
-#include "color.h"
 #include "clang_util.h"
+#include "color.h"
+#include "config_file.h"
 #include "fnv1a.h"
 #include "hash_table.h"
 #include "options.h"
@@ -91,6 +92,8 @@ static bool symbol_is_excluded( CXCursor, symbols_visit_data const* );
 
 static void visit_FieldDecl( CXCursor, CXCursor, symbols_visit_data* );
 static void visit_MacroDefinition( CXCursor, CXCursor, symbols_visit_data* );
+static void visit_PreprocessingDirective( CXCursor, CXCursor,
+                                          symbols_visit_data* );
 
 ////////// local variables ////////////////////////////////////////////////////
 
@@ -108,7 +111,10 @@ static hash_table_t symbol_set;         ///< Set of symbols.
  *
  * @sa maybe_add_symbol()
  */
-static tidy_symbol* add_symbol( CXCursor sym_csr ) {
+static tidy_symbol* add_symbol( CXCursor sym_csr,
+                                symbols_visit_data const *svd ) {
+  (void)svd;
+
   char *key = tidy_getCanonicalCursorUSR( sym_csr );
   if ( unlikely( key == NULL ) )
     return NULL;
@@ -120,6 +126,17 @@ static tidy_symbol* add_symbol( CXCursor sym_csr ) {
   if ( sym_name_cs == NULL || sym_name_cs[0] == '\0' )
     goto done;
   if ( strcmp( sym_name_cs, TIDY_COMPILER_ID ) == 0 )
+    goto done;
+
+  bool is_ignored = false;
+  CXFile sym_path_file = tidy_getCursorLocation_File( sym_csr );
+  if ( sym_path_file != NULL ) {
+    CXString const sym_path_cxs = clang_getFileName( sym_path_file );
+    char const *const sym_path_cs = clang_getCString( sym_path_cxs );
+    is_ignored = config_symbol_is_ignored( sym_name_cs, sym_path_cs );
+    clang_disposeString( sym_path_cxs );
+  }
+  if ( is_ignored )
     goto done;
 
   tidy_symbol new_sym = { .key = key };
@@ -336,7 +353,7 @@ CXCursor macro_Token_getScopedNameCursor( CXTranslationUnit tu,
 static void maybe_add_symbol( CXCursor sym_csr, symbols_visit_data *svd ) {
   if ( symbol_is_excluded( sym_csr, svd ) )
     return;
-  add_symbol( sym_csr );
+  add_symbol( sym_csr, svd );
 }
 
 /**
@@ -532,7 +549,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
     case CXCursor_TypeRef:;
       CXCursor const ref_csr = clang_getCursorReferenced( cursor );
       if ( !tidy_Cursor_isInvalid( ref_csr ) ) {
-        tidy_symbol *const ref_sym = add_symbol( ref_csr );
+        tidy_symbol *const ref_sym = add_symbol( ref_csr, svd );
         if ( ref_sym != NULL ) {
           if ( svd->parent_sym != NULL )
             symbol_add_ref( svd->parent_sym, ref_sym );
@@ -540,28 +557,6 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
             ref_sym->is_root = true;
         }
       }
-      break;
-
-    case CXCursor_OverloadedDeclRef:;
-      //
-      // We have to iterate over all overloaded functions since calling
-      // clang_getCursorReferenced() on a CXCursor_OverloadedDeclRef returns an
-      // invalid or null cursor.
-      //
-      unsigned const num_decls = clang_getNumOverloadedDecls( cursor );
-      for ( unsigned i = 0; i < num_decls; ++i ) {
-        CXCursor dec_csr = clang_getOverloadedDecl( cursor, i );
-        if ( tidy_Cursor_isInvalid( dec_csr ) )
-          continue;                         // LCOV_EXCL_LINE
-        dec_csr = clang_getCanonicalCursor( dec_csr );
-        tidy_symbol *const dec_sym = add_symbol( dec_csr );
-        if ( dec_sym != NULL ) {
-          if ( svd->parent_sym != NULL )
-            symbol_add_ref( svd->parent_sym, dec_sym );
-          else
-            dec_sym->is_root = true;
-        }
-      } // for
       break;
 
     case CXCursor_FunctionDecl:
@@ -577,6 +572,32 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       is_definition = true;
       break;
 
+    case CXCursor_OverloadedDeclRef:;
+      //
+      // We have to iterate over all overloaded functions since calling
+      // clang_getCursorReferenced() on a CXCursor_OverloadedDeclRef returns an
+      // invalid or null cursor.
+      //
+      unsigned const num_decls = clang_getNumOverloadedDecls( cursor );
+      for ( unsigned i = 0; i < num_decls; ++i ) {
+        CXCursor dec_csr = clang_getOverloadedDecl( cursor, i );
+        if ( tidy_Cursor_isInvalid( dec_csr ) )
+          continue;                         // LCOV_EXCL_LINE
+        dec_csr = clang_getCanonicalCursor( dec_csr );
+        tidy_symbol *const dec_sym = add_symbol( dec_csr, svd );
+        if ( dec_sym != NULL ) {
+          if ( svd->parent_sym != NULL )
+            symbol_add_ref( svd->parent_sym, dec_sym );
+          else
+            dec_sym->is_root = true;
+        }
+      } // for
+      break;
+
+    case CXCursor_PreprocessingDirective:
+      visit_PreprocessingDirective( cursor, parent, svd );
+      break;
+
     default:
       /* suppress warning */;
   } // switch
@@ -584,7 +605,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
   tidy_symbol *sym = NULL;
 
   if ( is_definition ) {
-    sym = add_symbol( cursor );
+    sym = add_symbol( cursor, svd );
     if ( sym != NULL ) {
       /* Update file/line to point to the actual definition */
       CXFile file;
@@ -741,7 +762,7 @@ static void visit_FieldDecl( CXCursor field_csr, CXCursor parent,
       continue;
 
     CXCursor const sym_csr = tidy_Token_getScopedNameCursor(
-      svd->source->tu, tokens, token_count, &i, cls_csr, svd->source->lang
+      tu, tokens, token_count, &i, cls_csr, svd->source->lang
     );
     maybe_add_symbol( sym_csr, svd );
   } // for
@@ -807,6 +828,47 @@ static void visit_MacroDefinition( CXCursor macro_csr, CXCursor parent,
   } // for
 
   ht_table_cleanup( &param_set, /*free_fn=*/NULL );
+  clang_disposeTokens( tu, tokens, token_count );
+}
+
+/**
+ * Visits a `CXCursor_MacroDefinition` kind of cursor.
+ *
+ * @param ppdir_csr The preprocessing directive's cursor to visit.
+ * @param parent The parent cursor of \a macro_csr.
+ * @param svd The symbols_visit_data to use.
+ */
+static void visit_PreprocessingDirective( CXCursor ppdir_csr, CXCursor parent,
+                                          symbols_visit_data *svd ) {
+  (void)parent;
+  (void)svd;
+
+  CXSourceRange const ppdir_range = clang_getCursorExtent( ppdir_csr );
+  CXTranslationUnit const tu = clang_Cursor_getTranslationUnit( ppdir_csr );
+  CXCursor const tu_csr = clang_getTranslationUnitCursor( tu );
+
+  CXToken *tokens;
+  unsigned token_count;
+  clang_tokenize( tu, ppdir_range, &tokens, &token_count );
+  if ( unlikely( token_count == 0 ) )
+    return;                             // LCOV_EXCL_LINE
+
+  for ( unsigned i = 1; i < token_count; ++i ) {
+    if ( clang_getTokenKind( tokens[i] ) != CXToken_Identifier )
+      continue;
+    CXString const token_cxs = clang_getTokenSpelling( tu, tokens[i] );
+    char const *const token_cs = clang_getCString( token_cxs );
+
+    if ( strcmp( token_cs, "defined"  ) != 0 ) {
+      CXCursor const sym_csr = tidy_Token_getScopedNameCursor(
+        tu, tokens, token_count, &i, tu_csr, svd->source->lang
+      );
+      maybe_add_symbol( sym_csr, svd );
+    }
+
+    clang_disposeString( token_cxs );
+  } // for
+
   clang_disposeTokens( tu, tokens, token_count );
 }
 

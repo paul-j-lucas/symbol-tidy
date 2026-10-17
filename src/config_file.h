@@ -66,10 +66,11 @@ bool config_path_is_ignored( char const *path );
  * Gets whether \a sym_name should be ignored.
  *
  * @param sym_name The symbol name to check.
+ * @param sym_path The path containing \a sym_name.
  * @return Returns `true` only if \a sym_name should be ignored.
  */
 NODISCARD
-bool config_symbol_is_ignored( char const *sym_name );
+bool config_symbol_is_ignored( char const *sym_name, char const *sym_path );
 
 ///////////////////////////////////////////////////////////////////////////////
 

@@ -63,6 +63,13 @@
  * @{
  */
 
+////////// macros /////////////////////////////////////////////////////////////
+
+/**
+ * The name of the **symbol-tidy** table.
+ */
+#define TABLE_SYMBOL_TIDY_NAME    "symbol-tidy"
+
 ////////// enums //////////////////////////////////////////////////////////////
 
 /**
@@ -93,6 +100,7 @@ typedef enum    config_opts           config_opts;
 typedef struct  config_key            config_key;
 typedef struct  config_parse_fn_args  config_parse_fn_args;
 typedef enum    config_table_kind     config_table_kind;
+typedef struct  ignore_symbol         ignore_symbol;
 
 /**
  * Signature for a function that parses the value of a configuration key.
@@ -111,7 +119,7 @@ typedef void (*config_parse_fn)( config_parse_fn_args const *config );
  */
 struct config_key {
   char const       *name;               ///< Key name.
-  config_table_kind table_kinds;        ///< Table kind(s) allowed in.
+  config_table_kind ok_table_kinds;     ///< Table kind(s) OK in.
   config_parse_fn   parse_fn;           ///< Value parsing function.
 };
 
@@ -121,8 +129,17 @@ struct config_key {
 struct config_parse_fn_args {
   char const       *config_path;        ///< Configuration file path.
   toml_table const *table;              ///< Current table.
+  config_table_kind table_kind;         ///< Current table kind.
   toml_key const   *key;                ///< Current key.
   toml_value const *value;              ///< Value to parse.
+};
+
+/**
+ * A symbol to ignore set via the `ignore-symbols` key.
+ */
+struct ignore_symbol {
+  char const *path;                     ///< Symbol path; if NULL, any path.
+  char const *name;                     ///< Symbol name.
 };
 
 ////////// local functions ////////////////////////////////////////////////////
@@ -139,6 +156,7 @@ static char const*  home_dir( void );
 
 static void         ignore_paths_parse( config_parse_fn_args const* );
 static void         ignore_paths_parse_string( config_parse_fn_args const* );
+static void         ignore_symbol_cleanup( ignore_symbol* );
 static void         ignore_symbols_parse( config_parse_fn_args const* );
 static void         ignore_symbols_parse_string( config_parse_fn_args const* );
 static void         print_statistics( void );
@@ -158,7 +176,7 @@ static config_key const CONFIG_KEYS[] = {
   { "color",          TABLE_SYMBOL_TIDY,  &color_parse          },
   { "error",          TABLE_SYMBOL_TIDY,  &error_parse          },
   { "ignore-paths",   TABLE_SYMBOL_TIDY,  &ignore_paths_parse   },
-  { "ignore-symbols", TABLE_SYMBOL_TIDY,  &ignore_symbols_parse },
+  { "ignore-symbols", TABLE_TIDY_SOURCE,  &ignore_symbols_parse },
   { "symbols",        TABLE_TIDY_SOURCE,  &symbols_parse        },
 };
 
@@ -167,8 +185,8 @@ static config_key const CONFIG_KEYS[] = {
  */
 static char const *const TABLE_KINDS[] = {
   [ TABLE_NONE ] = "none",
-  [ TABLE_SYMBOL_TIDY ] = "symbol-tidy",
-  [ TABLE_TIDY_SOURCE ] = "symbol-tidy or source",
+  [ TABLE_SYMBOL_TIDY ] = TABLE_SYMBOL_TIDY_NAME,
+  [ TABLE_TIDY_SOURCE ] = TABLE_SYMBOL_TIDY_NAME " or source",
   [ TABLE_SOURCE ] = "source",
   [ TABLE_SYMBOL ] = "symbol"
 };
@@ -211,6 +229,7 @@ void toml_string_or_string_array_parse( config_parse_fn_args const *config,
         config_parse_fn_args const a_value_config = {
           .config_path = config->config_path,
           .table = config->table,
+          .table_kind = config->table_kind,
           .key = config->key,
           .value = a_value
         };
@@ -355,11 +374,16 @@ static void ignore_symbols_parse_string( config_parse_fn_args const *config ) {
   assert( config != NULL );
   assert( config->value->type == TOML_STRING );
 
-  ht_insert_rv_t const hti = ht_table_insert(
-    &ignore_symbol_set, CONST_CAST( char*, config->value->s ),
-    strlen( config->value->s ) + 1/*\0*/
-  );
-  if ( !hti.inserted ) {
+  ignore_symbol new_igsym = { .name = config->value->s };
+  ht_insert_rv_t const hti =
+    ht_table_insert( &ignore_symbol_set, &new_igsym, sizeof new_igsym );
+  if ( hti.inserted ) {
+    ignore_symbol *const igsym = HT_DINT( hti.entry );
+    igsym->name = strdup_or_exit( igsym->name );
+    if ( config->table_kind != TABLE_SYMBOL_TIDY )
+      igsym->path = strdup_or_exit( config->table->key.name );
+  }
+  else {
     print_file_warning(
       config->config_path, config->value->loc.line, config->value->loc.col,
       "\"%s\" already ignored\n",
@@ -404,7 +428,9 @@ static void symbols_parse_string( config_parse_fn_args const *config ) {
 static void config_cleanup( void ) {
   print_statistics();
   ht_table_cleanup( &ignore_path_set, /*free_fn=*/NULL );
-  ht_table_cleanup( &ignore_symbol_set, /*free_fn=*/NULL );
+  ht_table_cleanup(
+    &ignore_symbol_set, POINTER_CAST( ht_free_fn_t, &ignore_symbol_cleanup )
+  );
 }
 
 /**
@@ -629,9 +655,10 @@ static void config_parse( char const *config_path, FILE *config_file ) {
       continue;
     }
 
-    config_table_kind table_kinds =
-      strcmp( table.key.name, "symbol-tidy" ) == 0 ?
+    config_table_kind table_kind =
+      strcmp( table.key.name, TABLE_SYMBOL_TIDY_NAME ) == 0 ?
         TABLE_SYMBOL_TIDY : TABLE_NONE;
+    config_table_kind ok_table_kinds = table_kind;
 
     toml_iterator iter;
     toml_iterator_init( &iter, &table );
@@ -647,20 +674,27 @@ static void config_parse( char const *config_path, FILE *config_file ) {
         continue;
       }
 
-      if ( table_kinds == TABLE_NONE ||
-           is_0n_bit_only_in_set( found_key->table_kinds, table_kinds ) ) {
-        table_kinds = found_key->table_kinds;
+      if ( table_kind == TABLE_NONE ) {
+        table_kind = found_key->ok_table_kinds &
+                     ~TO_UNSIGNED_EXPR( TABLE_SYMBOL_TIDY );
+        assert( is_1_bit( table_kind ) );
       }
-      else if ( (found_key->table_kinds & table_kinds) == 0 ) {
-        assert( table_kinds < ARRAY_SIZE( TABLE_KINDS ) );
+
+      if ( ok_table_kinds == TABLE_NONE ||
+           is_0n_bit_only_in_set( found_key->ok_table_kinds,
+                                  ok_table_kinds ) ) {
+        ok_table_kinds = found_key->ok_table_kinds;
+      }
+      else if ( (found_key->ok_table_kinds & ok_table_kinds) == 0 ) {
+        assert( ok_table_kinds < ARRAY_SIZE( TABLE_KINDS ) );
         print_file_error(
           config_path, kv->key.loc.line, kv->key.loc.col,
           "\"%s\": key not allowed in %s table%s; allowed only in %s table%s\n",
           found_key->name,
-          TABLE_KINDS[ table_kinds ],
-          is_1_bit( table_kinds ) ? "" : "s",
-          TABLE_KINDS[ found_key->table_kinds ],
-          is_1_bit( found_key->table_kinds ) ? "" : "s"
+          TABLE_KINDS[ ok_table_kinds ],
+          is_1_bit( ok_table_kinds ) ? "" : "s",
+          TABLE_KINDS[ found_key->ok_table_kinds ],
+          is_1_bit( found_key->ok_table_kinds ) ? "" : "s"
         );
         ++error_count;
         continue;
@@ -669,6 +703,7 @@ static void config_parse( char const *config_path, FILE *config_file ) {
       config_parse_fn_args const config = {
         .config_path = config_path,
         .table = &table,
+        .table_kind = table_kind,
         .key = &kv->key,
         .value = &kv->value
       };
@@ -731,6 +766,47 @@ static char const* home_dir( void ) {
 }
 
 /**
+ * Cleans-up an ignore_symbol.
+ *
+ * @param igsym The ignore_symbol to clean-up.
+ */
+static void ignore_symbol_cleanup( ignore_symbol *igsym ) {
+  if ( igsym != NULL ) {
+    FREE( igsym->name );
+    FREE( igsym->path );
+  }
+}
+
+/**
+ * Compares to \ref ignore_symbol objects.
+ *
+ * @param i_igsym The first ignore_symbol.
+ * @param j_igsym The second ignore_symbol.
+ * @return eturns a number less than 0, 0, or greater than 0 if the name of \a
+ * i_igsym is less than, equal to, or greater than the name of \a j_igsym,
+ * respectively.
+ */
+static int ignore_symbol_cmp( ignore_symbol const *i_igsym,
+                              ignore_symbol const *j_igsym ) {
+  int const cmp = strcmp( i_igsym->name, j_igsym->name );
+  if ( cmp != 0 )
+    return cmp;
+  if ( i_igsym->path == NULL || j_igsym->path == NULL )
+    return 0;
+  return strcmp( i_igsym->path, j_igsym->path );
+}
+
+/**
+ * Calculates the hash of \a igsym.
+ *
+ * @param igsym The ignore_symbol to hash.
+ * @return Returns said hash.
+ */
+static fnv1a_t ignore_symbol_hash( ignore_symbol const *igsym ) {
+  return fnv1a_s( igsym->name );
+}
+
+/**
  * Prints an error message saying that \a value is invalid.
  *
  * @param config The config_parse_fn_args to use.
@@ -776,7 +852,7 @@ static void print_statistics( void ) {
   );
 
   verbose_printf(
-    "  ignore-symbol set:\n"
+    "  ignored-symbol set:\n"
   );
   verbose_printf(
     "    iss-load-factor = " TIDY_STAT_LF_FMT "\n",
@@ -824,8 +900,8 @@ void config_init( void ) {
   );
   ht_table_init(
     &ignore_symbol_set, HT_DINT, 2.0, 10,
-    POINTER_CAST( ht_cmp_fn_t, &strcmp ),
-    POINTER_CAST( ht_hash_fn_t, &fnv1a_s )
+    POINTER_CAST( ht_cmp_fn_t, &ignore_symbol_cmp ),
+    POINTER_CAST( ht_hash_fn_t, &ignore_symbol_hash )
   );
   ATEXIT( &config_cleanup );
 
@@ -848,8 +924,11 @@ bool config_path_is_ignored( char const *path ) {
   return ht_table_find( &ignore_path_set, path ) != NULL;
 }
 
-bool config_symbol_is_ignored( char const *sym_name ) {
-  return ht_table_find( &ignore_symbol_set, sym_name ) != NULL;
+bool config_symbol_is_ignored( char const *sym_name, char const *sym_path ) {
+  ignore_symbol const find_igsym = { .name = sym_name, .path = sym_path };
+  ht_entry_t const *const found_igsym =
+    ht_table_find( &ignore_symbol_set, &find_igsym );
+  return found_igsym != NULL;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

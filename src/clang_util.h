@@ -360,6 +360,50 @@ NODISCARD
 CXSourceRange tidy_getCursorExtent( CXCursor cursor );
 
 /**
+ * Calls `clang_getCursorLocation()` and returns only the file.
+ *
+ * @param cursor The cursor to use.
+ * @return Returns the file \a cursor is in, if any.
+ */
+NODISCARD
+CXFile tidy_getCursorLocation_File( CXCursor cursor );
+
+/**
+ * Calls `clang_getFileLocation()` and returns the `CXFile`.
+ *
+ * @param loc The `CXSourceLocation` to use.
+ * @return Returns its `CXFile`.
+ *
+ * @sa tidy_getSpellingLocation_File()
+ */
+NODISCARD
+inline CXFile tidy_getFileLocation_File( CXSourceLocation loc ) {
+  CXFile file;
+  clang_getFileLocation(
+    loc, &file, /*line=*/NULL, /*column=*/NULL, /*offset=*/NULL
+  );
+  return file;
+}
+
+/**
+ * Calls `clang_getSpellingLocation()` and returns only the file.
+ *
+ * @param loc The location to use.
+ * @return Returns the file of \a loc.
+ *
+ * @sa tidy_getFileLocation_File()
+ * @sa tidy_getSpellingLocation_offset()
+ */
+NODISCARD
+inline CXFile tidy_getSpellingLocation_File( CXSourceLocation loc ) {
+  CXFile file;
+  clang_getSpellingLocation(
+    loc, &file, /*line=*/NULL, /*column=*/NULL, /*offset=*/NULL
+  );
+  return file;
+}
+
+/**
  * Calls `clang_isCursorDefinition()` but, in C, also considers tentative
  * definitions as definitions.
  *
