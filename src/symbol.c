@@ -594,7 +594,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       } // for
       break;
 
-    case CXCursor_PreprocessingDirective:
+    case CXCursor_PreprocessingDirective: // except #define, #include
       visit_PreprocessingDirective( cursor, parent, svd );
       break;
 
