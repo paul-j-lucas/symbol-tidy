@@ -339,7 +339,7 @@ static void ignore_paths_parse_string( config_parse_fn_args const *config ) {
   assert( config->value->type == TOML_STRING );
 
   ht_insert_rv_t const hti = ht_table_insert(
-    &ignore_symbol_set, CONST_CAST( char*, config->value->s ),
+    &ignore_path_set, CONST_CAST( char*, config->value->s ),
     strlen( config->value->s ) + 1/*\0*/
   );
   if ( !hti.inserted ) {
