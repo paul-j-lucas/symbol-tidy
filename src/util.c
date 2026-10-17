@@ -112,11 +112,6 @@ void fputs_escaped( char const *s, FILE *fout ) {
   } // for
 }
 
-void free_pptr( void *pptr ) {
-  if ( pptr != NULL )
-    free( *POINTER_CAST( void**, pptr ) );
-}
-
 // LCOV_EXCL_START
 void perror_exit( int status ) {
   perror( prog_name );

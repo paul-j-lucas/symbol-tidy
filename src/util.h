@@ -831,13 +831,6 @@ _Noreturn void fatal_error( int status, char const *format, ... );
 void fputs_escaped( char const *s, FILE *fout );
 
 /**
- * Like **free**(3) except frees the pointer pointed to by \a pptr.
- *
- * @param pptr The pointer to pointer to free.
- */
-void free_pptr( void *pptr );
-
-/**
  * Prints an error message for `errno` to standard error and exits.
  *
  * @param status The exit status code.
