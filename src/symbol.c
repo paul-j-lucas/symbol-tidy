@@ -108,12 +108,13 @@ static hash_table_t symbol_set;         ///< Set of symbols.
  * @param sym_file The file that contains the declaration for \a sym_csr.
  * @param svd The symbols_visit_data to use.
  * @return Returns the new tidy_symbol or NULL if it could not be added.
- *
- * @sa maybe_add_symbol()
  */
 static tidy_symbol* add_symbol( CXCursor sym_csr,
                                 symbols_visit_data const *svd ) {
   (void)svd;
+
+  if ( symbol_is_excluded( sym_csr, svd ) )
+    return NULL;
 
   char *key = tidy_getCanonicalCursorUSR( sym_csr );
   if ( unlikely( key == NULL ) )
@@ -336,24 +337,6 @@ CXCursor macro_Token_getScopedNameCursor( CXTranslationUnit tu,
   }
 
   return rv_csr;
-}
-
-/**
- * Maybe adds a symbol to the global set and marks the header that declares is
- * as necessary.
- *
- * @remarks This is a convenience function for the common case of calling
- * symbol_is_excluded(), get_symbol_file(), and add_symbol().
- *
- * @param name_csr The cursor to use for the name of the symbol.  It may be
- * (and often is) the same as \a sym_csr.
- * @param sym_csr The cursor for the symbol to add.
- * @param svd The symbols_visit_data to use.
- */
-static void maybe_add_symbol( CXCursor sym_csr, symbols_visit_data *svd ) {
-  if ( symbol_is_excluded( sym_csr, svd ) )
-    return;
-  add_symbol( sym_csr, svd );
 }
 
 /**
@@ -764,7 +747,7 @@ static void visit_FieldDecl( CXCursor field_csr, CXCursor parent,
     CXCursor const sym_csr = tidy_Token_getScopedNameCursor(
       tu, tokens, token_count, &i, cls_csr, svd->source->lang
     );
-    maybe_add_symbol( sym_csr, svd );
+    add_symbol( sym_csr, svd );
   } // for
 
   clang_disposeTokens( tu, tokens, token_count );
@@ -824,7 +807,7 @@ static void visit_MacroDefinition( CXCursor macro_csr, CXCursor parent,
     CXCursor const sym_csr = macro_Token_getScopedNameCursor(
       svd->source->tu, tokens, token_count, &i, &param_set, svd->source->lang
     );
-    maybe_add_symbol( sym_csr, svd );
+    add_symbol( sym_csr, svd );
   } // for
 
   ht_table_cleanup( &param_set, /*free_fn=*/NULL );
@@ -863,7 +846,9 @@ static void visit_PreprocessingDirective( CXCursor ppdir_csr, CXCursor parent,
       CXCursor const sym_csr = tidy_Token_getScopedNameCursor(
         tu, tokens, token_count, &i, tu_csr, svd->source->lang
       );
-      maybe_add_symbol( sym_csr, svd );
+      tidy_symbol *const sym = add_symbol( sym_csr, svd );
+      if ( sym != NULL )
+        sym->is_root = true;
     }
 
     clang_disposeString( token_cxs );
