@@ -23,4 +23,24 @@ ignore-paths = [
   "config.h"
 ]
 
+[color.c]
+ignore-symbols = [
+  "SGR_BG_BLACK",
+  "SGR_BG_BLUE",
+  "SGR_BG_CYAN",
+  "SGR_BG_GREEN",
+  "SGR_BG_MAGENTA",
+  "SGR_BG_RED",
+  "SGR_BG_WHITE",
+  "SGR_BG_YELLOW",
+  "SGR_FG_BLACK",
+  "SGR_FG_BLUE",
+  "SGR_FG_CYAN",
+  "SGR_FG_GREEN",
+  "SGR_FG_MAGENTA",
+  "SGR_FG_RED",
+  "SGR_FG_WHITE",
+  "SGR_FG_YELLOW",
+]
+
 # vim:se et sw=2 ts=2:
