@@ -162,9 +162,9 @@ static tidy_symbol* add_symbol( CXCursor sym_csr,
     if ( sym_kind != CXCursor_FunctionDecl )
       goto done;
 
-    CXCursor const sem_parent = clang_getCursorSemanticParent( sym_csr );
-    enum CXCursorKind const sem_kind = clang_getCursorKind( sem_parent );
-    if ( sem_kind != CXCursor_TranslationUnit )
+    CXCursor const parent = clang_getCursorSemanticParent( sym_csr );
+    enum CXCursorKind const parent_kind = clang_getCursorKind( parent );
+    if ( parent_kind != CXCursor_TranslationUnit )
       goto done;
 
     if ( !tidy_Cursor_isExternalLinkage( sym_csr ) )
