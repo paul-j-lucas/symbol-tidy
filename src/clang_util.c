@@ -408,6 +408,20 @@ bool tidy_Cursor_isClassDecl( CXCursor cursor ) {
   } // switch
 }
 
+bool tidy_Cursor_isExternalGlobalFunction( CXCursor cursor ) {
+  enum CXCursorKind const kind = clang_getCursorKind( cursor );
+  if ( kind != CXCursor_FunctionDecl )
+    return false;
+  CXCursor const parent = clang_getCursorSemanticParent( cursor );
+  enum CXCursorKind const parent_kind = clang_getCursorKind( parent );
+  if ( parent_kind != CXCursor_TranslationUnit )
+    return false;
+  if ( !tidy_Cursor_isExternalLinkage( cursor ) )
+    return false;
+
+  return true;
+}
+
 bool tidy_Cursor_isExternalLinkage( CXCursor cursor ) {
   enum CXLinkageKind const linkage = clang_getCursorLinkage( cursor );
   switch ( linkage ) {

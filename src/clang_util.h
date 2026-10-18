@@ -149,6 +149,15 @@ NODISCARD
 bool tidy_Cursor_isClassDecl( CXCursor cursor );
 
 /**
+ * Gets whether \a cursor is an external, global function.
+ *
+ * @param cursor The cursor to check.
+ * @return Returns `true` only if \a cursor is an external, global function.
+ */
+NODISCARD
+bool tidy_Cursor_isExternalGlobalFunction( CXCursor cursor );
+
+/**
  * Gets whether \a cursor has external linkage.
  *
  * @param cursor The cursor to check.

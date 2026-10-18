@@ -157,19 +157,8 @@ static tidy_symbol* add_symbol( CXCursor sym_csr,
   // in C, anything named "main" must be main(); however, in C++, other things,
   // e.g., member functions, can also be named "main".
   //
-  if ( strcmp( sym->name, "main" ) == 0 ) {
-    enum CXCursorKind const sym_kind = clang_getCursorKind( sym_csr );
-    if ( sym_kind != CXCursor_FunctionDecl )
-      goto done;
-
-    CXCursor const parent = clang_getCursorSemanticParent( sym_csr );
-    enum CXCursorKind const parent_kind = clang_getCursorKind( parent );
-    if ( parent_kind != CXCursor_TranslationUnit )
-      goto done;
-
-    if ( !tidy_Cursor_isExternalLinkage( sym_csr ) )
-      goto done;
-
+  if ( strcmp( sym->name, "main" ) == 0 &&
+       tidy_Cursor_isExternalGlobalFunction( sym_csr ) ) {
     sym->is_root = true;
   }
 
