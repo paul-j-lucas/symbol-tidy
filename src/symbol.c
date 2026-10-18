@@ -128,9 +128,9 @@ static tidy_symbol* add_symbol( CXCursor sym_csr,
     goto done;
 
   bool is_sym_ignored = false;
-  CXFile sym_path_file = tidy_getCursorLocation_File( sym_csr );
-  if ( sym_path_file != NULL ) {
-    CXString const sym_path_cxs = clang_getFileName( sym_path_file );
+  CXFile sym_file = tidy_getCursorLocation_File( sym_csr );
+  if ( sym_file != NULL ) {
+    CXString const sym_path_cxs = clang_getFileName( sym_file );
     char const *const sym_path_cs = clang_getCString( sym_path_cxs );
     is_sym_ignored = config_symbol_is_ignored( sym_name_cs, sym_path_cs );
     clang_disposeString( sym_path_cxs );
