@@ -111,8 +111,6 @@ static hash_table_t symbol_set;         ///< Set of symbols.
  */
 static tidy_symbol* add_symbol( CXCursor sym_csr,
                                 symbols_visit_data const *svd ) {
-  (void)svd;
-
   if ( symbol_is_excluded( sym_csr, svd ) )
     return NULL;
 
