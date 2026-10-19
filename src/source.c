@@ -130,6 +130,7 @@ void source_cleanup( tidy_source *source ) {
     // source->path points to an argv so it doesn't need freeing
     if ( source->tu != NULL )
       clang_disposeTranslationUnit( source->tu );
+    // source->text is owned by tu so it doesn't need freeing
   }
 };
 
@@ -200,8 +201,11 @@ void source_init( tidy_source *source, int argc, char const *const argv[] ) {
       break;
   } // switch
 
-  source->file = clang_getFile( source->tu, source->path );
   source_check_for_errors( source );
+
+  source->file = clang_getFile( source->tu, source->path );
+  source->text =
+    clang_getFileContents( source->tu, source->file, &source->text_size );
 }
 
 ///////////////////////////////////////////////////////////////////////////////

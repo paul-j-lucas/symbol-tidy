@@ -92,8 +92,6 @@ static bool symbol_is_excluded( CXCursor, symbols_visit_data const* );
 
 static void visit_FieldDecl( CXCursor, CXCursor, symbols_visit_data* );
 static void visit_MacroDefinition( CXCursor, CXCursor, symbols_visit_data* );
-static void visit_PreprocessingDirective( CXCursor, CXCursor,
-                                          symbols_visit_data* );
 
 ////////// local variables ////////////////////////////////////////////////////
 
@@ -102,7 +100,37 @@ static hash_table_t symbol_set;         ///< Set of symbols.
 ////////// local functions ////////////////////////////////////////////////////
 
 /**
- * Adds a symbol to the global set.
+ * Adds a macro to symbol_set.
+ *
+ * @param macro_name The name of the macro to add.
+ * @param source The tidy_source to use.
+ * @return Returns the new tidy_symbol or NULL if it could not be added.
+ */
+static tidy_symbol* add_macro( char const *macro_name,
+                               tidy_source const *source ) {
+  assert( macro_name != NULL );
+  assert( source != NULL );
+
+  if ( config_symbol_is_ignored( macro_name, source->path ) )
+    return NULL;
+
+  tidy_symbol new_sym = { .key = macro_name };
+  ht_insert_rv_t const hti =
+    ht_table_insert( &symbol_set, &new_sym, sizeof new_sym );
+  tidy_symbol *const sym = HT_DINT( hti.entry );
+
+  if ( !hti.inserted )
+    goto done;
+
+  sym->key = strdup_or_exit( sym->key );
+  sym->name = strdup_or_exit( sym->key );
+
+done:
+  return sym;
+}
+
+/**
+ * Adds a symbol to symbol_set.
  *
  * @param sym_csr The cursor for the symbol to add.
  * @param sym_file The file that contains the declaration for \a sym_csr.
@@ -166,6 +194,49 @@ done:
   free( key );
   clang_disposeString( sym_name_cxs );
   return sym;
+}
+
+/**
+ * Gets whether \a source has an escaped newline between \a tokens \a token_idx
+ * - 1 and \a token_idx.
+ *
+ * @param source The source to check.
+ * @param tokens The tokens for \a source.
+ * @param token_idx The current index into \a tokens.
+ * @return Returns `true` only if there's an escaped newline.
+ */
+NODISCARD
+static bool is_escaped_newline( tidy_source const *source,
+                                CXToken const *tokens, unsigned token_idx ) {
+  assert( source != NULL );
+  assert( tokens != NULL );
+  assert( token_idx > 0 );
+
+  CXSourceRange const prev_range =
+    clang_getTokenExtent( source->tu, tokens[ token_idx - 1 ] );
+  CXSourceRange const curr_range =
+    clang_getTokenExtent( source->tu, tokens[ token_idx ] );
+  CXSourceLocation const prev_loc = clang_getRangeEnd( prev_range );
+  CXSourceLocation const curr_loc = clang_getRangeStart( curr_range );
+  unsigned const prev_offset = tidy_getSpellingLocation_offset( prev_loc );
+  unsigned const curr_offset = tidy_getSpellingLocation_offset( curr_loc );
+
+  bool saw_backslash = false;
+  for ( unsigned i = prev_offset; i < curr_offset; ++i ) {
+    switch ( source->text[i] ) {
+      case '\\':
+        saw_backslash = true;
+        break;
+      case '\n':
+      case '\r':
+        if ( !saw_backslash )
+          return false;
+        saw_backslash = false;
+        break;
+    } // switch
+  } // for
+
+  return true;
 }
 
 /**
@@ -536,7 +607,29 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
         tidy_Cursor_isExternalLinkage( cursor );
       break;
 
-    case CXCursor_MacroDefinition:
+    case CXCursor_MacroDefinition:;
+      CXString const macro_name_cxs = clang_getCursorSpelling( cursor );
+      char const *const macro_name_cs = clang_getCString( macro_name_cxs );
+      tidy_symbol *const sym = add_macro( macro_name_cs, svd->source );
+      if ( sym != NULL ) {
+        /* Update file/line to point to the actual definition */
+        CXFile file;
+        clang_getSpellingLocation( loc, &file, &sym->line, &sym->col, NULL );
+        CXString const path_cxs = clang_getFileName( file );
+        char const *const path_cs = clang_getCString( path_cxs );
+        if ( path_cs != NULL && path_cs[0] != '\0' ) {
+          ht_entry_t const *const found_ht =
+            ht_table_find( &tidy_source_path_set, path_cs );
+          if ( found_ht != NULL ) {
+            FREE( sym->path );              // just in case
+            sym->path = strdup_or_exit( path_cs );
+          };
+        }
+        clang_disposeString( path_cxs );
+      }
+      clang_disposeString( macro_name_cxs );
+      break;
+
     case CXCursor_TypeAliasDecl:
     case CXCursor_TypedefDecl:
       is_definition = true;
@@ -562,10 +655,6 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
             dec_sym->is_root = true;
         }
       } // for
-      break;
-
-    case CXCursor_PreprocessingDirective: // except #define, #include
-      visit_PreprocessingDirective( cursor, parent, svd );
       break;
 
     default:
@@ -802,46 +891,79 @@ static void visit_MacroDefinition( CXCursor macro_csr, CXCursor parent,
 }
 
 /**
- * Visits a `CXCursor_MacroDefinition` kind of cursor.
+ * Visits all preprocessor directives that can reference symbols to mark them
+ * as used.
  *
- * @param ppdir_csr The preprocessing directive's cursor to visit.
- * @param parent The parent cursor of \a macro_csr.
- * @param svd The symbols_visit_data to use.
+ * @remarks Libclang's AST doesn't include conditional preprocessor directives,
+ * e.g., `#if`, `#ifdef`, etc.), so `clang_visitChildren()` can't visit them to
+ * look for symbols that are referenced to mark them as used.  Consequently,
+ * we're forced to iterate through all of \a source's tokens looking for `#`
+ * followed by a directive name and check subsequent tokens for identifiers.
+ *
+ * @param source The source file whose preprocessor directives to visit.
  */
-static void visit_PreprocessingDirective( CXCursor ppdir_csr, CXCursor parent,
-                                          symbols_visit_data *svd ) {
-  (void)parent;
-  (void)svd;
+static void visit_preprocessor_directives( tidy_source const *source ) {
+  assert( source != NULL );
 
-  CXSourceRange const ppdir_range = clang_getCursorExtent( ppdir_csr );
-  CXTranslationUnit const tu = clang_Cursor_getTranslationUnit( ppdir_csr );
-  CXCursor const tu_csr = clang_getTranslationUnitCursor( tu );
+  CXCursor const tu_csr = clang_getTranslationUnitCursor( source->tu );
+  CXSourceRange const tu_range = clang_getCursorExtent( tu_csr );
 
   CXToken *tokens;
   unsigned token_count;
-  clang_tokenize( tu, ppdir_range, &tokens, &token_count );
+  clang_tokenize( source->tu, tu_range, &tokens, &token_count );
   if ( unlikely( token_count == 0 ) )
     return;                             // LCOV_EXCL_LINE
 
-  for ( unsigned i = 1; i < token_count; ++i ) {
-    if ( clang_getTokenKind( tokens[i] ) != CXToken_Identifier )
+  for ( unsigned i = 0; i < token_count; ++i ) {
+    if ( clang_getTokenKind( tokens[i] ) != CXToken_Punctuation )
       continue;
-    CXString const token_cxs = clang_getTokenSpelling( tu, tokens[i] );
-    char const *const token_cs = clang_getCString( token_cxs );
+    if ( !tidy_Token_isEqualTo( source->tu, tokens[i], "#" ) )
+      continue;
+    if ( ++i == token_count )
+      break;
 
-    if ( strcmp( token_cs, "defined"  ) != 0 ) {
-      CXCursor const sym_csr = tidy_Token_getScopedNameCursor(
-        tu, tokens, token_count, &i, tu_csr, svd->source->lang
-      );
-      tidy_symbol *const sym = add_symbol( sym_csr, svd );
-      if ( sym != NULL )
-        sym->is_root = true;
-    }
+    CXTokenKind token_kind = clang_getTokenKind( tokens[i] );
+    if ( token_kind != CXToken_Identifier )
+      continue;
+    int const p_directive = tidy_Token_isEqualToAny( source->tu, tokens[i],
+      "if", "ifdef", "ifndef", "elif", "elifdef", "elifndef"
+    );
+    if ( p_directive == -1 )
+      continue;
 
-    clang_disposeString( token_cxs );
+    unsigned last_line = tidy_getTokenLocation_Line( source->tu, tokens[i] );
+
+    while ( ++i < token_count ) {
+      unsigned const token_line =
+        tidy_getTokenLocation_Line( source->tu, tokens[i] );
+      if ( token_line > last_line ) {
+        if ( !is_escaped_newline( source, tokens, i ) ) {
+          --i;
+          break;
+        }
+        last_line = token_line;
+      }
+
+      token_kind = clang_getTokenKind( tokens[i] );
+      if ( token_kind != CXToken_Identifier )
+        continue;
+      CXString const token_cxs =
+        clang_getTokenSpelling( source->tu, tokens[i] );
+      char const *const token_cs = clang_getCString( token_cxs );
+
+      if ( strcmp( token_cs, "defined" ) != 0 &&
+           strcmp( token_cs, "__VA_ARGS__" ) != 0 &&
+           strcmp( token_cs, "__VA_OPT__" ) != 0 ) {
+        tidy_symbol *const sym = add_macro( token_cs, source );
+        if ( sym != NULL )
+          sym->is_used = true;
+      }
+
+      clang_disposeString( token_cxs );
+    } // while
   } // for
 
-  clang_disposeTokens( tu, tokens, token_count );
+  clang_disposeTokens( source->tu, tokens, token_count );
 }
 
 ////////// extern functions ///////////////////////////////////////////////////
@@ -937,6 +1059,7 @@ void symbols_visit( tidy_source *source ) {
   symbols_visit_data svd = { .source = source };
   CXCursor const cursor = clang_getTranslationUnitCursor( source->tu );
   clang_visitChildren( cursor, &symbols_visitor, &svd );
+  visit_preprocessor_directives( source );
 }
 
 ///////////////////////////////////////////////////////////////////////////////

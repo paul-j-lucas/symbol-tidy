@@ -48,9 +48,11 @@ typedef struct tidy_source tidy_source;
  * A source file being tidied.
  */
 struct tidy_source {
-  char const         *path;             ///< Source file path.
+  char const         *path;             ///< Source file's path.
   CXTranslationUnit   tu;               ///< Translation unit for \ref path.
   CXFile              file;             ///< File for \ref path.
+  char const         *text;             ///< Text of \ref path.
+  size_t              text_size;        ///< Size of \ref text.
   bool                is_ignored;       ///< Is \ref path ignored?
   enum CXLanguageKind lang;             ///< Language of \a ref path.
 };

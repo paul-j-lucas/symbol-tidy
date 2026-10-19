@@ -697,6 +697,26 @@ bool tidy_Token_isEqualTo( CXTranslationUnit tu, CXToken token,
   return cmp == 0;
 }
 
+int tidy_Token_isEqualToAny_impl( CXTranslationUnit tu, CXToken token,
+                                  char const *values[] ) {
+  assert( values != NULL );
+
+  CXString const    token_cxs = clang_getTokenSpelling( tu, token );
+  char const *const token_cs = clang_getCString( token_cxs );
+
+  int equal_idx = -1;
+
+  for ( int i = 0; values[i] != NULL; ++i ) {
+    if ( strcmp( token_cs, values[i] ) == 0 ) {
+      equal_idx = i;
+      break;
+    }
+  } // for
+
+  clang_disposeString( token_cxs );
+  return equal_idx;
+}
+
 bool tidy_Token_isScopeQualifier( CXTranslationUnit tu, CXToken token ) {
   if ( clang_getTokenKind( token ) != CXToken_Punctuation )
     return false;
@@ -713,6 +733,8 @@ extern inline CXCursor tidy_Cursor_getCanonicalTypeDeclaration( CXCursor );
 extern inline bool tidy_Cursor_isInvalid( CXCursor );
 extern inline CXFile tidy_getFileLocation_File( CXSourceLocation );
 extern inline CXFile tidy_getSpellingLocation_File( CXSourceLocation );
+extern inline unsigned tidy_getSpellingLocation_offset( CXSourceLocation );
+extern inline unsigned tidy_getTokenLocation_Line( CXTranslationUnit, CXToken );
 
 /// @endcond
 

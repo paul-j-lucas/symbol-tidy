@@ -297,10 +297,11 @@ NODISCARD
 CXString tidy_File_getRealPathName( CXFile file );
 
 /**
- * TODO
+ * Calls `clang_getCursorUSR()` on the canonical cursor of \a cursor.
  *
- * @param cursor TODO.
- * @return Returns TODO.
+ * @param cursor The cursor to use.
+ * @return Returns the result of `clang_getCursorUSR()` on the canonical cursor
+ * of \a cursor.
  *
  * @note The caller is responsible for freeing the returned string.
  */
@@ -413,6 +414,42 @@ inline CXFile tidy_getSpellingLocation_File( CXSourceLocation loc ) {
 }
 
 /**
+ * Calls `clang_getSpellingLocation()` and returns only the offset.
+ *
+ * @param loc The location to use.
+ * @return Returns the file of \a loc.
+ *
+ * @sa tidy_getFileLocation_File()
+ * @sa tidy_getSpellingLocation_File()
+ */
+NODISCARD
+inline unsigned tidy_getSpellingLocation_offset( CXSourceLocation loc ) {
+  unsigned offset;
+  clang_getSpellingLocation(
+    loc, /*file=*/NULL, /*line=*/NULL, /*column=*/NULL, &offset
+  );
+  return offset;
+}
+
+/**
+ * Calls `clang_getTokenLocation()` and returns only the line.
+ *
+ * @param tu The `CXTranslationUnit` to use.
+ * @param token The `CXToken` to use.
+ * @return Returns the line of \a token.
+ */
+NODISCARD
+inline unsigned tidy_getTokenLocation_Line( CXTranslationUnit tu,
+                                            CXToken token ) {
+  CXSourceLocation const loc = clang_getTokenLocation( tu, token );
+  unsigned line;
+  clang_getSpellingLocation(
+    loc, /*file=*/NULL, &line, /*column=*/NULL, /*offset=*/NULL
+  );
+  return line;
+}
+
+/**
  * Calls `clang_isCursorDefinition()` but, in C, also considers tentative
  * definitions as definitions.
  *
@@ -461,6 +498,38 @@ CXToken const* tidy_Token_getNext( CXToken const tokens[], unsigned token_count,
 NODISCARD
 bool tidy_Token_isEqualTo( CXTranslationUnit tu, CXToken token,
                            char const *value );
+
+/**
+ * Gets whether the spelling of \a token equals any one of \a values.
+ *
+ * @param TU The translation unit to use.
+ * @param TOKEN The token to compare.
+ * @param ... A comma separated list of values to compare against.  It is
+ * implicitly NULL terminated.
+ * @return Returns the index of the matched value or -1 for none.
+ *
+ * @sa tidy_Token_isEqualTo()
+ */
+#define tidy_Token_isEqualToAny(TU,TOKEN,...)   \
+  tidy_Token_isEqualToAny_impl( (TU), (TOKEN),  \
+                                (char const*[]){ __VA_ARGS__, NULL } )
+
+/**
+ * Gets whether the spelling of \a token equals any one of \a values.
+ *
+ * @note This function isn't normally called directly; use the
+ * #tidy_Token_isEqualToAny() macro instead.
+ *
+ * @param tu The translation unit to use.
+ * @param token The token to compare.
+ * @param values The NULL terminated array of values to compare against.
+ * @return Returns the index of the matched value or -1 for none.
+ *
+ * @sa tidy_Token_isEqualTo()
+ */
+NODISCARD
+int tidy_Token_isEqualToAny_impl( CXTranslationUnit tu, CXToken token,
+                                  char const *values[] );
 
 /**
  * Gets whether the spelling of \a token is the scope qualifier `"::"`.
