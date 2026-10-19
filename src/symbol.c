@@ -92,6 +92,7 @@ static bool symbol_is_excluded( CXCursor, symbols_visit_data const* );
 
 static void visit_FieldDecl( CXCursor, CXCursor, symbols_visit_data* );
 static void visit_MacroDefinition( CXCursor, CXCursor, symbols_visit_data* );
+static void visit_MacroExpansion( CXCursor, CXCursor, symbols_visit_data* );
 
 ////////// local variables ////////////////////////////////////////////////////
 
@@ -584,7 +585,6 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
   switch ( kind ) {
     case CXCursor_CallExpr:
     case CXCursor_DeclRefExpr:
-    case CXCursor_MacroExpansion:
     case CXCursor_MemberRefExpr:
     case CXCursor_TemplateRef:
     case CXCursor_TypeRef:;
@@ -607,27 +607,12 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
         tidy_Cursor_isExternalLinkage( cursor );
       break;
 
-    case CXCursor_MacroDefinition:;
-      CXString const macro_name_cxs = clang_getCursorSpelling( cursor );
-      char const *const macro_name_cs = clang_getCString( macro_name_cxs );
-      tidy_symbol *const sym = add_macro( macro_name_cs, svd->source );
-      if ( sym != NULL ) {
-        /* Update file/line to point to the actual definition */
-        CXFile file;
-        clang_getSpellingLocation( loc, &file, &sym->line, &sym->col, NULL );
-        CXString const path_cxs = clang_getFileName( file );
-        char const *const path_cs = clang_getCString( path_cxs );
-        if ( path_cs != NULL && path_cs[0] != '\0' ) {
-          ht_entry_t const *const found_ht =
-            ht_table_find( &tidy_source_path_set, path_cs );
-          if ( found_ht != NULL ) {
-            FREE( sym->path );              // just in case
-            sym->path = strdup_or_exit( path_cs );
-          };
-        }
-        clang_disposeString( path_cxs );
-      }
-      clang_disposeString( macro_name_cxs );
+    case CXCursor_MacroDefinition:
+      visit_MacroDefinition( cursor, parent, svd );
+      break;
+
+    case CXCursor_MacroExpansion:
+      visit_MacroExpansion( cursor, parent, svd );
       break;
 
     case CXCursor_TypeAliasDecl:
@@ -693,10 +678,6 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
         visit_FieldDecl( cursor, parent, svd );
         break;
 
-      case CXCursor_MacroDefinition:
-        svd->parent_sym = sym;
-        visit_MacroDefinition( cursor, parent, svd );
-        break;
       default:
         /* suppress warning */;
     } // switch
@@ -853,12 +834,36 @@ static void visit_MacroDefinition( CXCursor macro_csr, CXCursor parent,
   (void)parent;
   assert( svd != NULL );
 
+  CXString const      macro_name_cxs = clang_getCursorSpelling( macro_csr );
+  char const *const   macro_name_cs = clang_getCString( macro_name_cxs );
+  tidy_symbol *const  sym = add_macro( macro_name_cs, svd->source );
+
+  if ( sym != NULL ) {
+    CXFile macro_file;
+    CXSourceLocation const macro_loc = clang_getCursorLocation( macro_csr );
+    clang_getSpellingLocation(
+      macro_loc, &macro_file, &sym->line, &sym->col, /*offset=*/NULL
+    );
+    CXString const path_cxs = clang_getFileName( macro_file );
+    char const *const path_cs = clang_getCString( path_cxs );
+    if ( path_cs != NULL && path_cs[0] != '\0' ) {
+      ht_entry_t const *const found_ht =
+        ht_table_find( &tidy_source_path_set, path_cs );
+      if ( found_ht != NULL ) {
+        FREE( sym->path );              // just in case
+        sym->path = strdup_or_exit( path_cs );
+      };
+    }
+    clang_disposeString( path_cxs );
+  }
+
+  clang_disposeString( macro_name_cxs );
+
   CXSourceRange const macro_range = clang_getCursorExtent( macro_csr );
-  CXTranslationUnit const tu = clang_Cursor_getTranslationUnit( macro_csr );
 
   CXToken *tokens;
   unsigned token_count;
-  clang_tokenize( tu, macro_range, &tokens, &token_count );
+  clang_tokenize( svd->source->tu, macro_range, &tokens, &token_count );
   if ( unlikely( token_count == 0 ) )
     return;                             // LCOV_EXCL_LINE
 
@@ -887,7 +892,29 @@ static void visit_MacroDefinition( CXCursor macro_csr, CXCursor parent,
   } // for
 
   ht_table_cleanup( &param_set, /*free_fn=*/NULL );
-  clang_disposeTokens( tu, tokens, token_count );
+  clang_disposeTokens( svd->source->tu, tokens, token_count );
+}
+
+/**
+ * Visits a `CXCursor_MacroExpansion` kind of cursor.
+ *
+ * @param macro_csr The macro expansion's cursor to visit.
+ * @param parent The parent cursor of \a macro_csr.
+ * @param svd The symbols_visit_data to use.
+ */
+static void visit_MacroExpansion( CXCursor macro_csr, CXCursor parent,
+                                  symbols_visit_data *svd ) {
+  (void)parent;
+  assert( svd != NULL );
+
+  CXString const      macro_name_cxs = clang_getCursorSpelling( macro_csr );
+  char const *const   macro_name_cs = clang_getCString( macro_name_cxs );
+  tidy_symbol *const  sym = add_macro( macro_name_cs, svd->source );
+
+  if ( sym != NULL )
+    sym->is_used = true;
+
+  clang_disposeString( macro_name_cxs );
 }
 
 /**
