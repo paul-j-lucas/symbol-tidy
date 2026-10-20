@@ -113,25 +113,10 @@ char* path_dirname( char const *path );
  * @param end_path_len The length of \a end_path.
  * @return Returns `true` only if \a path ends with \a end_path at a directory
  * boundary.
- *
- * @sa path_equal()
  */
 NODISCARD
 bool path_ends_with( char const *path, size_t path_len, char const *end_path,
                      size_t end_path_len );
-
-/**
- * Gets whether \a i_path equals \a j_path ignoring trailing slashes.
- *
- * @param i_path The first path.
- * @param j_path The second path.
- * @return Returns `true` only if the paths are equal ignoring trailing
- * slashes.
- *
- * @sa path_ends_with()
- */
-NODISCARD
-bool path_equal( char const *i_path, char const *j_path );
 
 /**
  * Gets the filename extension of \a path, if any.

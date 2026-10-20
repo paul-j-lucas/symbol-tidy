@@ -119,24 +119,6 @@ bool path_ends_with( char const *path, size_t path_len, char const *end_path,
           (suffix == path || suffix[-1] == '/');
 }
 
-bool path_equal( char const *i_path, char const *j_path ) {
-  assert( i_path != NULL );
-  assert( j_path != NULL );
-
-  if ( i_path == j_path )
-    return true;                        // LCOV_EXCL_LINE
-
-  size_t i_len = strlen( i_path );
-  while ( i_len > 1 && i_path[ i_len - 1 ] == '/' )
-    --i_len;
-
-  size_t j_len = strlen( j_path );
-  while ( j_len > 1 && j_path[ j_len - 1 ] == '/' )
-    --j_len;
-
-  return i_len == j_len && memcmp( i_path, j_path, i_len ) == 0;
-}
-
 char const* path_ext( char const *path ) {
   assert( path != NULL );
   // Do path_basename() first for a case like "a.b/c".
