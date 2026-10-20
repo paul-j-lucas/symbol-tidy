@@ -195,7 +195,6 @@ static bool is_escaped_newline( tidy_source const *source,
   clang_getSpellingLocation(
     curr_loc, &curr_file, /*line=*/NULL, /*column=*/NULL, &curr_offset
   );
-
   if ( prev_file == NULL || prev_file != curr_file )
     return false;
 
