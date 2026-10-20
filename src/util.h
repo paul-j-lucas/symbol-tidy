@@ -175,7 +175,6 @@
 #define CHARIFY_z 'z'
 
 #define CHARIFY_HELPER(X)         CHARIFY_##X
-#define STRINGIFY_HELPER(X)       #X
 
 /// @endcond
 
@@ -272,8 +271,6 @@
  *
  * @param X The unquoted character to charify.  It can be only in the set
  * `[0-9_A-Za-z]`.
- *
- * @sa #STRINGIFY()
  */
 #define CHARIFY(X)                CHARIFY_HELPER(X)
 
@@ -653,19 +650,6 @@
  * Shorthand for calling **strerror**(3) with `errno`.
  */
 #define STRERROR()                strerror( errno )
-
-/**
- * Macro that "string-ifies" its argument, e.g., <code>%STRINGIFY(x)</code>
- * becomes `"x"`.
- *
- * @param X The unquoted string to stringify.
- *
- * @note This macro is sometimes necessary in cases where it's mixed with uses
- * of `##` by forcing re-scanning for token substitution.
- *
- * @sa #CHARIFY()
- */
-#define STRINGIFY(X)              STRINGIFY_HELPER(X)
 
 /**
  * Strips the enclosing parentheses from \a ARG.
