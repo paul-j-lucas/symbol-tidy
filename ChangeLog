@@ -1,3 +1,18 @@
+2026-10-19  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * symbol-tidy.toml: Now ignoring ARGS_*.
+   * str_util.h: Now using SKIP_WS.
+   * util.h: Eliminated STRINGIFY --- not used.
+   * symbol-tidy.toml: Added more symbols to ignore.
+   * cli_options.h: Removed SOPT().
+   * symbol.c: Eliminated visit_MacroExpansion().
+   * clang_util.c, clang_util.h: No longer calling clang_getCursorReferenced().
+   * symbol.c: Added "const".
+   * symbol-tidy.toml: Ignoring verbose_print_tokens.
+   * symbol.c: Split off symbols_mark_used().
+   * path_util.c, path_util.h: Removed path_is_equal() --- not used.
+   * clang_util.c, clang_util.h, symbol.c: Macros work much better.
+
 2026-10-18  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
    * symbol.c: Better macro handling.
