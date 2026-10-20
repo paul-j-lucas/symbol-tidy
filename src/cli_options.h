@@ -60,9 +60,6 @@
 /// Command-line option character as a character literal.
 #define COPT(X)                   CHARIFY(OPT_##X)
 
-/// Command-line option as a string literal.
-#define SOPT(X)                   STRINGIFY(OPT_##X)
-
 ////////// extern functions ///////////////////////////////////////////////////
 
 /**
