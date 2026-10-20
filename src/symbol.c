@@ -804,7 +804,9 @@ static void visit_FieldDecl( CXCursor field_csr, CXCursor parent,
     CXCursor const sym_csr = tidy_Token_getScopedNameCursor(
       tu, tokens, token_count, &i, cls_csr, svd->source->lang
     );
-    add_symbol( sym_csr, svd );
+    tidy_symbol *const sym = add_symbol( sym_csr, svd );
+    if ( sym != NULL )
+      symbol_add_ref( svd->parent_sym, sym );
   } // for
 
   clang_disposeTokens( tu, tokens, token_count );
