@@ -144,26 +144,6 @@ inline bool path_is_absolute( char const *path ) {
 }
 
 /**
- * Gets whether \a abs_path refers to a local file relative to the current
- * working directory.
- *
- * @par Example
- * @parblock
- * Assuming the current working directory is `/home/pjl/src/cdecl/src`:
- *
- * `abs_path`                       | Local?
- * -------------------------------- | ------
- * `/home/pjl/src/cdecl/src/util.h` | true
- * `/usr/include/stdio.h`           | false
- * @endparblock
- *
- * @param abs_path The absolute path of a file.
- * @return Returns `true` only if \a abs_path refers to a local file.
- */
-NODISCARD
-bool path_is_local( char const *abs_path );
-
-/**
  * Gets whether \a path is a relative path.
  *
  * @param path the path to check.

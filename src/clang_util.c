@@ -637,7 +637,6 @@ bool tidy_Token_isScopeQualifier( CXTranslationUnit tu, CXToken token ) {
 
 /// @cond DOXYGEN_IGNORE
 
-extern inline CXCursor tidy_Cursor_getCanonicalTypeDeclaration( CXCursor );
 extern inline bool tidy_Cursor_isInvalid( CXCursor );
 extern inline CXFile tidy_getFileLocation_File( CXSourceLocation );
 extern inline CXFile tidy_getSpellingLocation_File( CXSourceLocation );

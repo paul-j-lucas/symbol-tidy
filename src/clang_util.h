@@ -63,19 +63,6 @@ NODISCARD
 int tidy_Cursor_compare( CXCursor i_csr, CXCursor j_csr );
 
 /**
- * Gets the cursor for the type declaration of the canonical type of \a cursor.
- *
- * @param cursor The cursor to get type declaration of the canonical type of.
- * @return Returns the cursor for the type declaration of the canonical type of
- * \a cursor.
- */
-NODISCARD
-inline CXCursor tidy_Cursor_getCanonicalTypeDeclaration( CXCursor cursor ) {
-  CXType const type = clang_getCanonicalType( clang_getCursorType( cursor ) );
-  return clang_getTypeDeclaration( type );
-}
-
-/**
  * Given a cursor at a local name of an enumeration, class, class data member,
  * class member function, structure, union, or namespace, gets its fully scoped
  * "display" name that includes template parameters (if any).

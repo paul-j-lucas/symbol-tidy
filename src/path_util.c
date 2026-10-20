@@ -127,15 +127,6 @@ char const* path_ext( char const *path ) {
   return dot != NULL && dot[1] != '\0' ? dot + 1 : NULL;
 }
 
-bool path_is_local( char const *abs_path ) {
-  assert( abs_path != NULL );
-  assert( path_is_absolute( abs_path ) );
-
-  size_t cwd_path_len;
-  char const *const cwd_path = path_cwd( &cwd_path_len );
-  return strncmp( abs_path, cwd_path, cwd_path_len ) == 0;
-}
-
 char const* path_no_dot_slash( char const *path ) {
   assert( path != NULL );
   while ( STRNCMPLIT( path, "./" ) == 0 )
