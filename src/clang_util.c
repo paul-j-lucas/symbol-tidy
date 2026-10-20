@@ -607,6 +607,7 @@ bool tidy_Token_isScopeQualifier( CXTranslationUnit tu, CXToken token ) {
 extern inline bool tidy_Cursor_isInvalid( CXCursor );
 extern inline CXFile tidy_getFileLocation_File( CXSourceLocation );
 extern inline CXFile tidy_getSpellingLocation_File( CXSourceLocation );
+extern inline unsigned tidy_getSpellingLocation_Line( CXSourceLocation );
 extern inline unsigned tidy_getTokenLocation_Line( CXTranslationUnit, CXToken );
 
 /// @endcond

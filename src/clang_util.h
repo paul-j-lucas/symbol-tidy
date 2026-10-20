@@ -316,6 +316,7 @@ inline CXFile tidy_getFileLocation_File( CXSourceLocation loc ) {
  * @return Returns the file of \a loc.
  *
  * @sa tidy_getFileLocation_File()
+ * @sa tidy_getSpellingLocation_Line()
  */
 NODISCARD
 inline CXFile tidy_getSpellingLocation_File( CXSourceLocation loc ) {
@@ -324,6 +325,23 @@ inline CXFile tidy_getSpellingLocation_File( CXSourceLocation loc ) {
     loc, &file, /*line=*/NULL, /*column=*/NULL, /*offset=*/NULL
   );
   return file;
+}
+
+/**
+ * Calls `clang_getSpellingLocation()` and returns only the line.
+ *
+ * @param loc The location to use.
+ * @return Returns the line of \a loc.
+ *
+ * @sa tidy_getSpellingLocation_File()
+ */
+NODISCARD
+inline unsigned tidy_getSpellingLocation_Line( CXSourceLocation loc ) {
+  unsigned line;
+  clang_getSpellingLocation(
+    loc, /*file=*/NULL, &line, /*column=*/NULL, /*offset=*/NULL
+  );
+  return line;
 }
 
 /**

@@ -88,7 +88,7 @@ struct symbols_visit_data {
 static void symbol_cleanup( tidy_symbol* );
 
 NODISCARD
-static bool symbol_is_excluded( CXCursor, symbols_visit_data const* );
+static bool symbol_is_excluded( CXCursor, tidy_source const* );
 
 static void visit_FieldDecl( CXCursor, CXCursor, symbols_visit_data* );
 static void visit_MacroDefinition( CXCursor, CXCursor, symbols_visit_data* );
@@ -104,12 +104,11 @@ static hash_table_t symbol_set;         ///< Set of symbols.
  *
  * @param sym_csr The cursor for the symbol to add.
  * @param sym_file The file that contains the declaration for \a sym_csr.
- * @param svd The symbols_visit_data to use.
+ * @param source The tidy_source to use.
  * @return Returns the new tidy_symbol or NULL if it could not be added.
  */
-static tidy_symbol* add_symbol( CXCursor sym_csr,
-                                symbols_visit_data const *svd ) {
-  if ( symbol_is_excluded( sym_csr, svd ) )
+static tidy_symbol* add_symbol( CXCursor sym_csr, tidy_source const *source ) {
+  if ( symbol_is_excluded( sym_csr, source ) )
     return NULL;
   char *key = tidy_getCursorUSR( sym_csr );
   if ( unlikely( key == NULL ) )
@@ -469,23 +468,22 @@ static int symbol_cmp_by_path( tidy_symbol const *i_sym,
  * Gets whether \a sym_csr should be excluded from the global set.
  *
  * @param sym_csr The symbol's cursor to check.
- * @param svd The symbols_visit_data to use.
+ * @param source The tidy_source to use.
  * @return Returns `true` only if \a sym_csr is excluded.
  */
 NODISCARD
-static bool symbol_is_excluded( CXCursor sym_csr,
-                                symbols_visit_data const *svd ) {
+static bool symbol_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
   if ( tidy_Cursor_isInvalid( sym_csr ) )
     return true;
 
-  assert( svd != NULL );
+  assert( source != NULL );
 
   //
   // We can't use clang_getCursorLanguage() because libclang doesn't initially
   // set what it thinks the current language is until it encounters something
-  // language-specific.  So just use svd->source->lang.
+  // language-specific.  So just use source->lang.
   //
-  if ( tidy_Cursor_isReservedName( sym_csr, svd->source->lang ) )
+  if ( tidy_Cursor_isReservedName( sym_csr, source->lang ) )
     return true;
 
   enum CXCursorKind const sym_kind = clang_getCursorKind( sym_csr );
@@ -596,7 +594,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
     case CXCursor_TypeRef:;
       CXCursor const ref_csr = clang_getCursorReferenced( cursor );
       if ( !tidy_Cursor_isInvalid( ref_csr ) ) {
-        tidy_symbol *const ref_sym = add_symbol( ref_csr, svd );
+        tidy_symbol *const ref_sym = add_symbol( ref_csr, svd->source );
         if ( ref_sym != NULL ) {
           if ( svd->parent_sym != NULL )
             symbol_add_ref( svd->parent_sym, ref_sym );
@@ -634,7 +632,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
         if ( tidy_Cursor_isInvalid( dec_csr ) )
           continue;                         // LCOV_EXCL_LINE
         dec_csr = clang_getCanonicalCursor( dec_csr );
-        tidy_symbol *const dec_sym = add_symbol( dec_csr, svd );
+        tidy_symbol *const dec_sym = add_symbol( dec_csr, svd->source );
         if ( dec_sym != NULL ) {
           if ( svd->parent_sym != NULL )
             symbol_add_ref( svd->parent_sym, dec_sym );
@@ -651,7 +649,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
   tidy_symbol *sym = NULL;
 
   if ( is_definition ) {
-    sym = add_symbol( cursor, svd );
+    sym = add_symbol( cursor, svd->source );
     if ( sym != NULL ) {
       /* Update file/line to point to the actual definition */
       CXFile file;
@@ -799,7 +797,7 @@ static void visit_FieldDecl( CXCursor field_csr, CXCursor parent,
     CXCursor const sym_csr = tidy_Token_getScopedNameCursor(
       tu, tokens, token_count, &i, cls_csr, svd->source->lang
     );
-    tidy_symbol *const sym = add_symbol( sym_csr, svd );
+    tidy_symbol *const sym = add_symbol( sym_csr, svd->source );
     if ( sym != NULL )
       symbol_add_ref( svd->parent_sym, sym );
   } // for
@@ -831,7 +829,7 @@ static void visit_MacroDefinition( CXCursor macro_csr, CXCursor parent,
   (void)parent;
   assert( svd != NULL );
 
-  tidy_symbol *const macro_sym = add_symbol( macro_csr, svd );
+  tidy_symbol *const macro_sym = add_symbol( macro_csr, svd->source );
   if ( macro_sym == NULL )
     return;
 
@@ -882,7 +880,7 @@ static void visit_MacroDefinition( CXCursor macro_csr, CXCursor parent,
       svd->source->tu, tokens, token_count, &i, &param_set, svd->source->lang
     );
     if ( !tidy_Cursor_isInvalid( sym_csr ) ) {
-      tidy_symbol *const sym = add_symbol( sym_csr, svd );
+      tidy_symbol *const sym = add_symbol( sym_csr, svd->source );
       if ( sym != NULL )
         symbol_add_ref( macro_sym, sym );
     }
@@ -939,12 +937,7 @@ static void visit_preprocessor_directives( tidy_source const *source ) {
     if ( directive_idx == -1 )
       continue;
 
-    unsigned last_line;
-    clang_getSpellingLocation(
-      token_loc, /*file=*/NULL, &last_line, /*column=*/NULL, /*offset=*/NULL
-    );
-
-    symbols_visit_data const svd = { .source = source };
+    unsigned last_line = tidy_getSpellingLocation_Line( token_loc );
 
     while ( ++i < token_count ) {
       unsigned const token_line =
@@ -967,7 +960,7 @@ static void visit_preprocessor_directives( tidy_source const *source ) {
       if ( strcmp( token_cs, "defined" ) != 0 &&
            strcmp( token_cs, "__has_include" ) != 0 ) {
         CXCursor const sym_csr = tidy_getCursorByName( token_cs, tu_csr );
-        tidy_symbol *const sym = add_symbol( sym_csr, &svd );
+        tidy_symbol *const sym = add_symbol( sym_csr, source );
         if ( sym != NULL )
           sym->is_used = true;
       }
