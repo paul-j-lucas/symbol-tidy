@@ -75,7 +75,18 @@
 ////////// extern variables ///////////////////////////////////////////////////
 
 extern char const  *prog_name;            ///< Program name.
-extern hash_table_t tidy_source_path_set; ///< Source files being tidied.
+
+////////// extern functions ///////////////////////////////////////////////////
+
+/**
+ * Gets whether \a path is among the source paths given on the command line.
+ *
+ * @param path The path to check.
+ * @return Returns `true` only if \a path is among the source paths given on
+ * the command line.
+ */
+NODISCARD
+bool is_source_path( char const *path );
 
 ///////////////////////////////////////////////////////////////////////////////
 

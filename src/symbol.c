@@ -126,7 +126,7 @@ static tidy_symbol* add_symbol( CXCursor sym_csr, tidy_source const *source ) {
   bool is_sym_ignored = false;
   CXFile const sym_file = tidy_getCursorLocation_File( sym_csr );
   if ( sym_file != NULL ) {
-    CXString const sym_path_cxs = clang_getFileName( sym_file );
+    CXString const    sym_path_cxs = clang_getFileName( sym_file );
     char const *const sym_path_cs = clang_getCString( sym_path_cxs );
     is_sym_ignored = config_symbol_is_ignored( sym_name_cs, sym_path_cs );
     clang_disposeString( sym_path_cxs );
@@ -653,15 +653,11 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       /* Update file/line to point to the actual definition */
       CXFile file;
       clang_getSpellingLocation( loc, &file, &sym->line, &sym->col, NULL );
-      CXString const path_cxs = clang_getFileName( file );
-      char const *const path_cs = clang_getCString( path_cxs );
-      if ( path_cs != NULL && path_cs[0] != '\0' ) {
-        ht_entry_t const *const found_ht =
-          ht_table_find( &tidy_source_path_set, path_cs );
-        if ( found_ht != NULL ) {
-          FREE( sym->path );              // just in case
-          sym->path = strdup_or_exit( path_cs );
-        };
+      CXString const    path_cxs = clang_getFileName( file );
+      char const *const path = clang_getCString( path_cxs );
+      if ( path != NULL && path[0] != '\0' && is_source_path( path ) ) {
+        FREE( sym->path );              // just in case
+        sym->path = strdup_or_exit( path );
       }
       clang_disposeString( path_cxs );
 
@@ -837,15 +833,11 @@ static void visit_MacroDefinition( CXCursor macro_csr, CXCursor parent,
   clang_getSpellingLocation(
     macro_loc, &macro_file, &macro_sym->line, &macro_sym->col, /*offset=*/NULL
   );
-  CXString const path_cxs = clang_getFileName( macro_file );
-  char const *const path_cs = clang_getCString( path_cxs );
-  if ( path_cs != NULL && path_cs[0] != '\0' ) {
-    ht_entry_t const *const found_ht =
-      ht_table_find( &tidy_source_path_set, path_cs );
-    if ( found_ht != NULL ) {
-      FREE( macro_sym->path );          // just in case
-      macro_sym->path = strdup_or_exit( path_cs );
-    };
+  CXString const    path_cxs = clang_getFileName( macro_file );
+  char const *const path = clang_getCString( path_cxs );
+  if ( path != NULL && path[0] != '\0' && is_source_path( path ) ) {
+    FREE( macro_sym->path );            // just in case
+    macro_sym->path = strdup_or_exit( path );
   }
   clang_disposeString( path_cxs );
 

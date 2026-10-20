@@ -54,13 +54,16 @@ enum {
   TIDY_EX_NO_UNUSED_ERROR = 2     ///< No unused symbols, but error anyway.
 };
 
+////////// local variables ////////////////////////////////////////////////////
+
+static hash_table_t source_path_set;    ///< Source files being tidied.
+
 ////////// extern variables ///////////////////////////////////////////////////
 
 /// @cond DOXYGEN_IGNORE
 /// Otherwise Doxygen generates two entries.
 
 char const   *prog_name;
-hash_table_t  tidy_source_path_set;
 
 /// @endcond
 
@@ -88,7 +91,7 @@ void test_init( char const *env_var ) {
  * Cleans-up **symbol-tidy**.
  */
 static void tidy_cleanup( void ) {
-  ht_table_cleanup( &tidy_source_path_set, /*free_fn=*/NULL );
+  ht_table_cleanup( &source_path_set, /*free_fn=*/NULL );
 }
 
 /**
@@ -110,6 +113,13 @@ static int tidy_status( unsigned unused_symbols ) {
 
 ////////// extern functions ///////////////////////////////////////////////////
 
+bool is_source_path( char const *path ) {
+  assert( path != NULL );
+  ht_entry_t const *const found_ht =
+    ht_table_find( &source_path_set, path );
+  return found_ht != NULL;
+}
+
 /**
  * The main entry point.
  *
@@ -129,7 +139,7 @@ int main( int argc, char const *argv[] ) {
   symbols_init();
 
   ht_table_init(
-    &tidy_source_path_set, HT_DPTR, 2.0, 256,
+    &source_path_set, HT_DPTR, 2.0, 256,
     POINTER_CAST( ht_cmp_fn_t, strcmp ),
     POINTER_CAST( ht_hash_fn_t, fnv1a_s )
   );
@@ -138,7 +148,7 @@ int main( int argc, char const *argv[] ) {
     if ( config_path_is_ignored( argv[i] ) )
       continue;
     ht_insert_rv_t const hti = ht_table_insert(
-      &tidy_source_path_set, CONST_CAST( char*, argv[i] ), strlen( argv[i] ) + 1
+      &source_path_set, CONST_CAST( char*, argv[i] ), strlen( argv[i] ) + 1
     );
     if ( !hti.inserted )
       continue;
