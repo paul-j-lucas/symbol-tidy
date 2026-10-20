@@ -396,7 +396,7 @@ bool tidy_Cursor_isReservedName( CXCursor cursor, enum CXLanguageKind lang ) {
     is_reserved = true;
   }
   else if ( name[0] == '_' ) {
-    if ( isupper( name[1] ) ) {
+    if ( isupper( STATIC_CAST( unsigned char, name[1] ) ) ) {
       is_reserved = true;
     }
     else {
