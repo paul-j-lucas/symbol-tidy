@@ -455,15 +455,14 @@ static int symbol_cmp_by_path( tidy_symbol const *i_sym,
   assert( j_sym != NULL );
   assert( j_sym->path != NULL );
 
-  int cmp;
-
-  cmp = strcmp( i_sym->path, j_sym->path );
+  int const cmp = strcmp( i_sym->path, j_sym->path );
   if ( cmp != 0 )
     return cmp;
-  cmp = STATIC_CAST( int, i_sym->line ) - STATIC_CAST( int, j_sym->line );
-  if ( cmp != 0 )
-    return cmp;
-  return STATIC_CAST( int, i_sym->col ) - STATIC_CAST( int, j_sym->col );
+  if ( i_sym->line < j_sym->line ) return -1;
+  if ( i_sym->line > j_sym->line ) return  1;
+  if ( i_sym->col  < j_sym->col  ) return -1;
+  if ( i_sym->col  > j_sym->col  ) return  1;
+  return 0;
 }
 
 /**
