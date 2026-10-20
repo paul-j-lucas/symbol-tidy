@@ -641,7 +641,6 @@ CXFile tidy_getCursorLocation_File( CXCursor cursor ) {
 }
 
 char* tidy_getCursorUSR( CXCursor cursor ) {
-  cursor = clang_getCursorReferenced( cursor );
   cursor = clang_getCanonicalCursor( cursor );
   CXString const usr_cxs = clang_getCursorUSR( cursor );
   char const *const usr_cs = clang_getCString( usr_cxs );
