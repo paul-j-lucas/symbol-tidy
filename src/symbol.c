@@ -526,6 +526,30 @@ static void symbols_cleanup( void ) {
 }
 
 /**
+ * Marks all used symbols as used.
+ *
+ * @return Returns the number of unused symbols.
+ */
+static unsigned symbols_mark_used( void ) {
+  ht_iterator_t iter;
+
+  ht_iterator_init( &iter, &symbol_set );
+  for ( tidy_symbol *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
+    if ( sym->is_root )
+      symbol_mark_used( sym );
+  } // for
+
+  unsigned unused = 0;
+  ht_iterator_init( &iter, &symbol_set );
+  for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
+    if ( !(sym->path == NULL || sym->line == 0 || sym->is_used) )
+      ++unused;
+  } // for
+
+  return unused;
+}
+
+/**
  * Visits each symbol in a translation unit.
  *
  * @param cursor The cursor for the symbol in the AST being visited.
@@ -924,7 +948,7 @@ static void visit_preprocessor_directives( tidy_source const *source ) {
 
     unsigned last_line = tidy_getTokenLocation_Line( source->tu, tokens[i] );
 
-    symbols_visit_data svd = { .source = source };
+    symbols_visit_data const svd = { .source = source };
 
     while ( ++i < token_count ) {
       unsigned const token_line =
@@ -981,26 +1005,14 @@ void symbols_init( void ) {
 }
 
 unsigned symbols_print_unused( void ) {
-  ht_iterator_t iter;
-  ht_iterator_init( &iter, &symbol_set );
-  for ( tidy_symbol *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
-    if ( sym->is_root )
-      symbol_mark_used( sym );
-  } // for
-
-  unsigned unused = 0;
-  ht_iterator_init( &iter, &symbol_set );
-  for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
-    if ( !(sym->path == NULL || sym->line == 0 || sym->is_used) )
-      ++unused;
-  } // for
-
+  unsigned const unused = symbols_mark_used();
   if ( unused == 0 )
     return 0;
 
   array_t symbol_array = ARRAY_INIT( sizeof(tidy_symbol) );
   array_reserve( &symbol_array, unused );
 
+  ht_iterator_t iter;
   ht_iterator_init( &iter, &symbol_set );
   for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
     if ( !(sym->path == NULL || sym->line == 0 || sym->is_used) )
