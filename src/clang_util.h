@@ -49,21 +49,6 @@
 ////////// extern functions ///////////////////////////////////////////////////
 
 /**
- * Compares two CXCursor objects.
- *
- * @remarks What it means for one cursor to be "less than" another is
- * arbitrary, but consistent. Hence, this function is transitive and imposes a
- * strict total ordering.
- *
- * @param i_csr The first cursor.
- * @param j_csr The second cursor.
- * @return Returns a number less than 0, 0, or greater than 0 if \a i_csr is
- * less than, equal to, or greater than \a j_csr, respectively.
- */
-NODISCARD
-int tidy_Cursor_compare( CXCursor i_csr, CXCursor j_csr );
-
-/**
  * Given a cursor at a local name of an enumeration, class, class data member,
  * class member function, structure, union, or namespace, gets its fully scoped
  * "display" name that includes template parameters (if any).
@@ -72,26 +57,9 @@ int tidy_Cursor_compare( CXCursor i_csr, CXCursor j_csr );
  * @return Returns the fully scoped name.
  *
  * @note The caller is responsible for freeing the returned string.
- *
- * @sa tidy_Cursor_getScopedSpelling()
  */
 NODISCARD
 char* tidy_Cursor_getScopedDisplayName( CXCursor cursor );
-
-/**
- * Given a cursor at a local name of an enumeration, class, class data member,
- * class member function, structure, union, or namespace, gets its fully scoped
- * "spelling" name that does _not_ include template parameters (if any).
- *
- * @param cursor The cursor for a symbol.
- * @return Returns the fully scoped name.
- *
- * @note The caller is responsible for freeing the returned string.
- *
- * @sa tidy_Cursor_getScopedDisplayName()
- */
-NODISCARD
-char* tidy_Cursor_getScopedSpelling( CXCursor cursor );
 
 /**
  * Gets whether \a cursor is a class, class template, structure, or union
@@ -348,7 +316,6 @@ inline CXFile tidy_getFileLocation_File( CXSourceLocation loc ) {
  * @return Returns the file of \a loc.
  *
  * @sa tidy_getFileLocation_File()
- * @sa tidy_getSpellingLocation_offset()
  */
 NODISCARD
 inline CXFile tidy_getSpellingLocation_File( CXSourceLocation loc ) {
@@ -357,24 +324,6 @@ inline CXFile tidy_getSpellingLocation_File( CXSourceLocation loc ) {
     loc, &file, /*line=*/NULL, /*column=*/NULL, /*offset=*/NULL
   );
   return file;
-}
-
-/**
- * Calls `clang_getSpellingLocation()` and returns only the offset.
- *
- * @param loc The location to use.
- * @return Returns the file of \a loc.
- *
- * @sa tidy_getFileLocation_File()
- * @sa tidy_getSpellingLocation_File()
- */
-NODISCARD
-inline unsigned tidy_getSpellingLocation_offset( CXSourceLocation loc ) {
-  unsigned offset;
-  clang_getSpellingLocation(
-    loc, /*file=*/NULL, /*line=*/NULL, /*column=*/NULL, &offset
-  );
-  return offset;
 }
 
 /**

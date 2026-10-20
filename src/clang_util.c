@@ -184,8 +184,7 @@ done:
 }
 
 /**
- * Helper function for both tidy_Cursor_getScopedDisplayName() and
- * tidy_Cursor_getScopedSpelling().
+ * Helper function both tidy_Cursor_getScopedDisplayName().
  *
  * @param cursor The cursor at a symbol.
  * @param name_fn The libclang function to use to get the name of \a cursor.
@@ -273,39 +272,8 @@ static bool tidy_Cursor_isInheritable( CXCursor cursor ) {
 
 ////////// extern functions ///////////////////////////////////////////////////
 
-int tidy_Cursor_compare( CXCursor i_csr, CXCursor j_csr ) {
-  if ( i_csr.kind < j_csr.kind )
-    return -1;
-  if ( i_csr.kind > j_csr.kind )
-    return 1;
-
-  if ( i_csr.xdata < j_csr.xdata )
-    return -1;                          // LCOV_EXCL_LINE
-  if ( i_csr.xdata > j_csr.xdata )
-    return 1;                           // LCOV_EXCL_LINE
-
-  // See <https://github.com/llvm/llvm-project/blob/4f5675a0500f9ccc60dcbabb57e1c4dc88c40a84/clang/tools/libclang/CIndex.cpp#L6706>.
-  if ( clang_isDeclaration( i_csr.kind ) )
-    i_csr.data[1] = j_csr.data[1] = NULL;
-
-  for ( unsigned i = 0; i < ARRAY_SIZE( ((CXCursor*)0)->data ); ++i ) {
-    uintptr_t const i_uint = STATIC_CAST( uintptr_t, i_csr.data[i] );
-    uintptr_t const j_uint = STATIC_CAST( uintptr_t, j_csr.data[i] );
-    if ( i_uint < j_uint )
-      return -1;
-    if ( i_uint > j_uint )
-      return 1;
-  } // for
-
-  return 0;
-}
-
 char* tidy_Cursor_getScopedDisplayName( CXCursor cursor ) {
   return getScopedName_thunk( cursor, &clang_getCursorDisplayName );
-}
-
-char* tidy_Cursor_getScopedSpelling( CXCursor cursor ) {
-  return getScopedName_thunk( cursor, &clang_getCursorSpelling );
 }
 
 bool tidy_Cursor_isClassDecl( CXCursor cursor ) {
@@ -640,7 +608,6 @@ bool tidy_Token_isScopeQualifier( CXTranslationUnit tu, CXToken token ) {
 extern inline bool tidy_Cursor_isInvalid( CXCursor );
 extern inline CXFile tidy_getFileLocation_File( CXSourceLocation );
 extern inline CXFile tidy_getSpellingLocation_File( CXSourceLocation );
-extern inline unsigned tidy_getSpellingLocation_offset( CXSourceLocation );
 extern inline unsigned tidy_getTokenLocation_Line( CXTranslationUnit, CXToken );
 
 /// @endcond
