@@ -1,5 +1,13 @@
 2026-10-20  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * src/Makefile.am: Removed red_black.[hc] --- not used.
+   * config_file.c: Eliminated symbols_parse*.
+   * symbol-tidy.toml: Ignoring more symbols.
+   * clang_util.c: #include fixes.
+   * clang_util.c, clang_util.h: Eliminated some include-tidy code not needed
+     here.
+   * symbol-tidy.toml: Excluding more symbols.
+   * type_traits.h: Eliminated IS_POINTER_EXPR().
    * symbol.c: Eliminated possibility of signed int underflow.
    * symbol.c: Added token_count check.
 
