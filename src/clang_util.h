@@ -297,16 +297,17 @@ NODISCARD
 CXString tidy_File_getRealPathName( CXFile file );
 
 /**
- * Calls `clang_getCursorUSR()` on the canonical cursor of \a cursor.
+ * Calls `clang_getCursorUSR()` on the canonical, referenced cursor of \a
+ * cursor.
  *
  * @param cursor The cursor to use.
- * @return Returns the result of `clang_getCursorUSR()` on the canonical cursor
- * of \a cursor.
+ * @return Returns the result of `clang_getCursorUSR()` on the canonical,
+ * referenced cursor of \a cursor.
  *
  * @note The caller is responsible for freeing the returned string.
  */
 NODISCARD
-char* tidy_getCanonicalCursorUSR( CXCursor cursor );
+char* tidy_getCursorUSR( CXCursor cursor );
 
 /**
  * Attempts to get the cursor for the identifier having \a name within \a

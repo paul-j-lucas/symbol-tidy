@@ -101,36 +101,6 @@ static hash_table_t symbol_set;         ///< Set of symbols.
 ////////// local functions ////////////////////////////////////////////////////
 
 /**
- * Adds a macro to symbol_set.
- *
- * @param macro_name The name of the macro to add.
- * @param source The tidy_source to use.
- * @return Returns the new tidy_symbol or NULL if it could not be added.
- */
-static tidy_symbol* add_macro( char const *macro_name,
-                               tidy_source const *source ) {
-  assert( macro_name != NULL );
-  assert( source != NULL );
-
-  if ( config_symbol_is_ignored( macro_name, source->path ) )
-    return NULL;
-
-  tidy_symbol new_sym = { .key = macro_name };
-  ht_insert_rv_t const hti =
-    ht_table_insert( &symbol_set, &new_sym, sizeof new_sym );
-  tidy_symbol *const sym = HT_DINT( hti.entry );
-
-  if ( !hti.inserted )
-    goto done;
-
-  sym->key = strdup_or_exit( sym->key );
-  sym->name = strdup_or_exit( sym->key );
-
-done:
-  return sym;
-}
-
-/**
  * Adds a symbol to symbol_set.
  *
  * @param sym_csr The cursor for the symbol to add.
@@ -142,22 +112,21 @@ static tidy_symbol* add_symbol( CXCursor sym_csr,
                                 symbols_visit_data const *svd ) {
   if ( symbol_is_excluded( sym_csr, svd ) )
     return NULL;
-
-  char *key = tidy_getCanonicalCursorUSR( sym_csr );
+  char *key = tidy_getCursorUSR( sym_csr );
   if ( unlikely( key == NULL ) )
     return NULL;
 
-  tidy_symbol *sym = NULL;
-
-  CXString const sym_name_cxs = clang_getCursorSpelling( sym_csr );
+  tidy_symbol      *sym = NULL;
+  CXString const    sym_name_cxs = clang_getCursorSpelling( sym_csr );
   char const *const sym_name_cs = clang_getCString( sym_name_cxs );
+
   if ( sym_name_cs == NULL || sym_name_cs[0] == '\0' )
     goto done;
   if ( strcmp( sym_name_cs, TIDY_COMPILER_ID ) == 0 )
     goto done;
 
   bool is_sym_ignored = false;
-  CXFile sym_file = tidy_getCursorLocation_File( sym_csr );
+  CXFile const sym_file = tidy_getCursorLocation_File( sym_csr );
   if ( sym_file != NULL ) {
     CXString const sym_path_cxs = clang_getFileName( sym_file );
     char const *const sym_path_cs = clang_getCString( sym_path_cxs );
@@ -834,30 +803,26 @@ static void visit_MacroDefinition( CXCursor macro_csr, CXCursor parent,
   (void)parent;
   assert( svd != NULL );
 
-  CXString const      macro_name_cxs = clang_getCursorSpelling( macro_csr );
-  char const *const   macro_name_cs = clang_getCString( macro_name_cxs );
-  tidy_symbol *const  sym = add_macro( macro_name_cs, svd->source );
+  tidy_symbol *const macro_sym = add_symbol( macro_csr, svd );
+  if ( macro_sym == NULL )
+    return;
 
-  if ( sym != NULL ) {
-    CXFile macro_file;
-    CXSourceLocation const macro_loc = clang_getCursorLocation( macro_csr );
-    clang_getSpellingLocation(
-      macro_loc, &macro_file, &sym->line, &sym->col, /*offset=*/NULL
-    );
-    CXString const path_cxs = clang_getFileName( macro_file );
-    char const *const path_cs = clang_getCString( path_cxs );
-    if ( path_cs != NULL && path_cs[0] != '\0' ) {
-      ht_entry_t const *const found_ht =
-        ht_table_find( &tidy_source_path_set, path_cs );
-      if ( found_ht != NULL ) {
-        FREE( sym->path );              // just in case
-        sym->path = strdup_or_exit( path_cs );
-      };
-    }
-    clang_disposeString( path_cxs );
+  CXFile macro_file;
+  CXSourceLocation const macro_loc = clang_getCursorLocation( macro_csr );
+  clang_getSpellingLocation(
+    macro_loc, &macro_file, &macro_sym->line, &macro_sym->col, /*offset=*/NULL
+  );
+  CXString const path_cxs = clang_getFileName( macro_file );
+  char const *const path_cs = clang_getCString( path_cxs );
+  if ( path_cs != NULL && path_cs[0] != '\0' ) {
+    ht_entry_t const *const found_ht =
+      ht_table_find( &tidy_source_path_set, path_cs );
+    if ( found_ht != NULL ) {
+      FREE( macro_sym->path );          // just in case
+      macro_sym->path = strdup_or_exit( path_cs );
+    };
   }
-
-  clang_disposeString( macro_name_cxs );
+  clang_disposeString( path_cxs );
 
   CXSourceRange const macro_range = clang_getCursorExtent( macro_csr );
 
@@ -888,7 +853,11 @@ static void visit_MacroDefinition( CXCursor macro_csr, CXCursor parent,
     CXCursor const sym_csr = macro_Token_getScopedNameCursor(
       svd->source->tu, tokens, token_count, &i, &param_set, svd->source->lang
     );
-    add_symbol( sym_csr, svd );
+    if ( !tidy_Cursor_isInvalid( sym_csr ) ) {
+      tidy_symbol *sym = add_symbol( sym_csr, svd );
+      if ( sym != NULL )
+        symbol_add_ref( macro_sym, sym );
+    }
   } // for
 
   ht_table_cleanup( &param_set, /*free_fn=*/NULL );
@@ -907,14 +876,9 @@ static void visit_MacroExpansion( CXCursor macro_csr, CXCursor parent,
   (void)parent;
   assert( svd != NULL );
 
-  CXString const      macro_name_cxs = clang_getCursorSpelling( macro_csr );
-  char const *const   macro_name_cs = clang_getCString( macro_name_cxs );
-  tidy_symbol *const  sym = add_macro( macro_name_cs, svd->source );
-
+  tidy_symbol *const sym = add_symbol( macro_csr, svd );
   if ( sym != NULL )
     sym->is_used = true;
-
-  clang_disposeString( macro_name_cxs );
 }
 
 /**
@@ -960,6 +924,8 @@ static void visit_preprocessor_directives( tidy_source const *source ) {
 
     unsigned last_line = tidy_getTokenLocation_Line( source->tu, tokens[i] );
 
+    symbols_visit_data svd = { .source = source };
+
     while ( ++i < token_count ) {
       unsigned const token_line =
         tidy_getTokenLocation_Line( source->tu, tokens[i] );
@@ -978,10 +944,9 @@ static void visit_preprocessor_directives( tidy_source const *source ) {
         clang_getTokenSpelling( source->tu, tokens[i] );
       char const *const token_cs = clang_getCString( token_cxs );
 
-      if ( strcmp( token_cs, "defined" ) != 0 &&
-           strcmp( token_cs, "__VA_ARGS__" ) != 0 &&
-           strcmp( token_cs, "__VA_OPT__" ) != 0 ) {
-        tidy_symbol *const sym = add_macro( token_cs, source );
+      if ( strcmp( token_cs, "defined" ) != 0 ) {
+        CXCursor const sym_csr = tidy_getCursorByName( token_cs, tu_csr );
+        tidy_symbol *const sym = add_symbol( sym_csr, &svd );
         if ( sym != NULL )
           sym->is_used = true;
       }

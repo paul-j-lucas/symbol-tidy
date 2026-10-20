@@ -560,17 +560,6 @@ CXString tidy_File_getRealPathName( CXFile file ) {
   return abs_path_cxs;
 }
 
-char* tidy_getCanonicalCursorUSR( CXCursor cursor ) {
-  cursor = clang_getCanonicalCursor( cursor );
-  CXString const usr_cxs = clang_getCursorUSR( cursor );
-  char const *const usr_cs = clang_getCString( usr_cxs );
-  char *usr = NULL;
-  if ( usr_cs != NULL && usr_cs[0] != '\0' )
-    usr = strdup_or_exit( usr_cs );
-  clang_disposeString( usr_cxs );
-  return usr;
-}
-
 CXCursor tidy_getCursorByName( char const *name, CXCursor scope_csr ) {
   assert( name != NULL );
 
@@ -649,6 +638,18 @@ CXFile tidy_getCursorLocation_File( CXCursor cursor ) {
   }
 
   return file;
+}
+
+char* tidy_getCursorUSR( CXCursor cursor ) {
+  cursor = clang_getCursorReferenced( cursor );
+  cursor = clang_getCanonicalCursor( cursor );
+  CXString const usr_cxs = clang_getCursorUSR( cursor );
+  char const *const usr_cs = clang_getCString( usr_cxs );
+  char *usr = NULL;
+  if ( usr_cs != NULL && usr_cs[0] != '\0' )
+    usr = strdup_or_exit( usr_cs );
+  clang_disposeString( usr_cxs );
+  return usr;
 }
 
 bool tidy_isCursorDefinition( CXCursor cursor ) {
