@@ -163,8 +163,6 @@ static void         ignore_symbols_parse_string( config_parse_fn_args const* );
 static void         print_statistics( void );
 static void         print_invalid_value( config_parse_fn_args const*,
                                          toml_value const*, toml_type );
-static void         symbols_parse( config_parse_fn_args const* );
-static void         symbols_parse_string( config_parse_fn_args const* );
 
 static void         toml_value_print( toml_value const*, FILE* );
 
@@ -178,7 +176,6 @@ static config_key const CONFIG_KEYS[] = {
   { "error",          TABLE_SYMBOL_TIDY,  &error_parse          },
   { "ignore-paths",   TABLE_SYMBOL_TIDY,  &ignore_paths_parse   },
   { "ignore-symbols", TABLE_TIDY_SOURCE,  &ignore_symbols_parse },
-  { "symbols",        TABLE_TIDY_SOURCE,  &symbols_parse        },
 };
 
 /**
@@ -392,33 +389,6 @@ static void ignore_symbols_parse_string( config_parse_fn_args const *config ) {
     );
     ++warning_count;
   }
-}
-
-/**
- * Parses the value of a `"symbols"` key.
- *
- * @param config The config_parse_fn_args to use.
- *
- * @sa symbols_parse_string()
- */
-static void symbols_parse( config_parse_fn_args const *config ) {
-  toml_string_or_string_array_parse( config, &symbols_parse_string );
-}
-
-/**
- * Parses a single string value of a `"symbols"` key.
- *
- * @param config The config_parse_fn_args to use.
- *
- * @sa includes_parse_string()
- * @sa symbols_parse()
- */
-static void symbols_parse_string( config_parse_fn_args const *config ) {
-  assert( config != NULL );
-  assert( config->value->type == TOML_STRING );
-
-  (void)config;
-  // TODO
 }
 
 ////////// local functions ////////////////////////////////////////////////////
