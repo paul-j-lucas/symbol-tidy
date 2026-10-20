@@ -878,7 +878,7 @@ static void visit_MacroDefinition( CXCursor macro_csr, CXCursor parent,
       svd->source->tu, tokens, token_count, &i, &param_set, svd->source->lang
     );
     if ( !tidy_Cursor_isInvalid( sym_csr ) ) {
-      tidy_symbol *sym = add_symbol( sym_csr, svd );
+      tidy_symbol *const sym = add_symbol( sym_csr, svd );
       if ( sym != NULL )
         symbol_add_ref( macro_sym, sym );
     }
