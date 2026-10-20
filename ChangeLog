@@ -1,3 +1,8 @@
+2026-10-20  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * symbol.c: Eliminated possibility of signed int underflow.
+   * symbol.c: Added token_count check.
+
 2026-10-19  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
    * clang_util.c: Now always checking for leading __.
