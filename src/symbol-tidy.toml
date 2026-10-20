@@ -23,6 +23,11 @@ ignore-paths = [
   "config.h"
 ]
 
+[cli_options.c]
+ignore-symbols = [
+  "PUT_CONFIG_OPT"
+]
+
 [color.c]
 ignore-symbols = [
   "SGR_BG_BLACK",
@@ -41,6 +46,16 @@ ignore-symbols = [
   "SGR_FG_RED",
   "SGR_FG_WHITE",
   "SGR_FG_YELLOW",
+]
+
+[util.h]
+ignore-symbols = [
+  "NO_OP"
+]
+
+[verbose.h]
+ignore-symbols = [
+  "VERBOSE_DEBUG_CURSOR"
 ]
 
 [verbose.c]
