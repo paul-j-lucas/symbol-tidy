@@ -78,7 +78,7 @@ struct symbols_visit_data {
   tidy_source const *source;
 
   /**
-   * TODO.
+   * Current parent symbol.
    */
   tidy_symbol *parent_sym;
 };
