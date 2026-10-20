@@ -1,5 +1,6 @@
 2026-10-20  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * symbol-tidy.c, symbol-tidy.h, symbol.c: Added is_source_path().
    * src/Makefile.am: Removed red_black.[hc] --- not used.
    * config_file.c: Eliminated symbols_parse*.
    * symbol-tidy.toml: Ignoring more symbols.
