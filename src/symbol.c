@@ -92,7 +92,6 @@ static bool symbol_is_excluded( CXCursor, symbols_visit_data const* );
 
 static void visit_FieldDecl( CXCursor, CXCursor, symbols_visit_data* );
 static void visit_MacroDefinition( CXCursor, CXCursor, symbols_visit_data* );
-static void visit_MacroExpansion( CXCursor, CXCursor, symbols_visit_data* );
 
 ////////// local variables ////////////////////////////////////////////////////
 
@@ -578,6 +577,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
   switch ( kind ) {
     case CXCursor_CallExpr:
     case CXCursor_DeclRefExpr:
+    case CXCursor_MacroExpansion:
     case CXCursor_MemberRefExpr:
     case CXCursor_TemplateRef:
     case CXCursor_TypeRef:;
@@ -602,10 +602,6 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
 
     case CXCursor_MacroDefinition:
       visit_MacroDefinition( cursor, parent, svd );
-      break;
-
-    case CXCursor_MacroExpansion:
-      visit_MacroExpansion( cursor, parent, svd );
       break;
 
     case CXCursor_TypeAliasDecl:
@@ -886,23 +882,6 @@ static void visit_MacroDefinition( CXCursor macro_csr, CXCursor parent,
 
   ht_table_cleanup( &param_set, /*free_fn=*/NULL );
   clang_disposeTokens( svd->source->tu, tokens, token_count );
-}
-
-/**
- * Visits a `CXCursor_MacroExpansion` kind of cursor.
- *
- * @param macro_csr The macro expansion's cursor to visit.
- * @param parent The parent cursor of \a macro_csr.
- * @param svd The symbols_visit_data to use.
- */
-static void visit_MacroExpansion( CXCursor macro_csr, CXCursor parent,
-                                  symbols_visit_data *svd ) {
-  (void)parent;
-  assert( svd != NULL );
-
-  tidy_symbol *const sym = add_symbol( macro_csr, svd );
-  if ( sym != NULL )
-    sym->is_used = true;
 }
 
 /**
