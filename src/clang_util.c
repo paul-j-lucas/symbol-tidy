@@ -149,55 +149,6 @@ skip:
 }
 
 /**
- * A helper function for tidy_Cursor_getFirstChild() that visits only the first
- * child cursor, if any, of a cursor.
- *
- * @param cursor The cursor being visited.
- * @param parent Not used.
- * @param data A pointer to receive the first child cursor.
- * @return Always returns `CXChildVisit_Break`.
- *
- * @sa getFirstExprChild_visitor()
- */
-static enum CXChildVisitResult getFirstChild_visitor( CXCursor cursor,
-                                                      CXCursor parent,
-                                                      CXClientData data ) {
-  (void)parent;
-  assert( data != NULL );
-
-  CXCursor *const first_csr = data;
-  *first_csr = cursor;
-  return CXChildVisit_Break;
-}
-
-/**
- * A helper function for tidy_Cursor_getFirstExprChild() that visits only the
- * first expression child cursor, if any, of a cursor.
- *
- * @param cursor The cursor being visited.
- * @param parent The parent of \a cursor.
- * @param data A pointer to receive the first expression child cursor.
- * @return Returns `CXChildVisit_Break` if \a cursor is an expression or
- * `CXChildVisit_Continue` otherwise.
- *
- * @sa getFirstChild_visitor()
- */
-static enum CXChildVisitResult getFirstExprChild_visitor( CXCursor cursor,
-                                                          CXCursor parent,
-                                                          CXClientData data ) {
-  (void)parent;
-
-  enum CXCursorKind const kind = clang_getCursorKind( cursor );
-  if ( clang_isExpression( kind ) ) {
-    assert( data != NULL );
-    CXCursor *const expr_csr = data;
-    *expr_csr = cursor;
-    return CXChildVisit_Break;
-  }
-  return CXChildVisit_Continue;
-}
-
-/**
  * Given a cursor at a local name of an enumeration, class, class data member,
  * class member function, structure, union, or namespace, gets the fully scoped
  * name skipping inline namespaces.
@@ -294,22 +245,6 @@ static enum CXChildVisitResult isBaseClass_visitor( CXCursor cursor,
 }
 
 /**
- * Gets the first expression child cursor of \a cursor, if any.
- *
- * @param cursor The cursor to get the first expression child cursor of, if
- * any.
- * @return Returns the first child expression cursor of \a cursor, or the null
- * cursor if none.
- *
- * @sa tidy_Cursor_getFirstChild()
- */
-static CXCursor tidy_Cursor_getFirstExprChild( CXCursor cursor ) {
-  CXCursor child_csr = clang_getNullCursor();
-  clang_visitChildren( cursor, &getFirstExprChild_visitor, &child_csr );
-  return child_csr;
-}
-
-/**
  * Gets whether the kind of \a cursor can be inherited from a base class into a
  * derived class.
  *
@@ -365,33 +300,12 @@ int tidy_Cursor_compare( CXCursor i_csr, CXCursor j_csr ) {
   return 0;
 }
 
-CXCursor tidy_Cursor_getFirstChild( CXCursor cursor ) {
-  CXCursor child_csr = clang_getNullCursor();
-  clang_visitChildren( cursor, &getFirstChild_visitor, &child_csr );
-  return child_csr;
-}
-
 char* tidy_Cursor_getScopedDisplayName( CXCursor cursor ) {
   return getScopedName_thunk( cursor, &clang_getCursorDisplayName );
 }
 
 char* tidy_Cursor_getScopedSpelling( CXCursor cursor ) {
   return getScopedName_thunk( cursor, &clang_getCursorSpelling );
-}
-
-CXCursor tidy_Cursor_getVarInit( CXCursor expr_csr ) {
-  expr_csr = tidy_Cursor_skipUnexposedDown( expr_csr );
-  enum CXCursorKind kind = clang_getCursorKind( expr_csr );
-  if ( kind == CXCursor_DeclRefExpr ) {
-    CXCursor const ref_csr = clang_getCursorReferenced( expr_csr );
-    kind = clang_getCursorKind( ref_csr );
-    if ( kind == CXCursor_VarDecl ) {
-      CXCursor const init_csr = tidy_Cursor_getFirstExprChild( ref_csr );
-      if ( !clang_Cursor_isNull( init_csr ) )
-        return tidy_Cursor_getVarInit( init_csr );
-    }
-  }
-  return expr_csr;
 }
 
 bool tidy_Cursor_isClassDecl( CXCursor cursor ) {
@@ -536,12 +450,6 @@ bool tidy_Cursor_isTemplateSpecializationOf( CXCursor cursor,
       return true;
   }
   return false;
-}
-
-CXCursor tidy_Cursor_skipUnexposedDown( CXCursor cursor ) {
-  while ( clang_isUnexposed( clang_getCursorKind( cursor ) ) )
-    cursor = tidy_Cursor_getFirstChild( cursor );
-  return cursor;
 }
 
 CXString tidy_File_getRealPathName( CXFile file ) {

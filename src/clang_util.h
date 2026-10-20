@@ -76,16 +76,6 @@ inline CXCursor tidy_Cursor_getCanonicalTypeDeclaration( CXCursor cursor ) {
 }
 
 /**
- * Gets the first child cursor of \a cursor, if any.
- *
- * @param cursor The cursor to get the first child cursor of, if any.
- * @return Returns the first child cursor of \a cursor, or the null cursor if
- * none.
- */
-NODISCARD
-CXCursor tidy_Cursor_getFirstChild( CXCursor cursor );
-
-/**
  * Given a cursor at a local name of an enumeration, class, class data member,
  * class member function, structure, union, or namespace, gets its fully scoped
  * "display" name that includes template parameters (if any).
@@ -114,26 +104,6 @@ char* tidy_Cursor_getScopedDisplayName( CXCursor cursor );
  */
 NODISCARD
 char* tidy_Cursor_getScopedSpelling( CXCursor cursor );
-
-/**
- * Gets the root initializer for a variable.
- *
- * @par Example
- * @parblock
- * Given:
- *
- *      int a = 42;
- *      int b = a;
- *
- * If passed the cursor for the DeclRefExpr for `b`, will return `42`.
- * @endparblock
- *
- * @param expr_csr The cursor for the initializing expression.
- * @return Returns the root initializer expression or \a expr_csr (without
- * UnexposedExpr) if no other initializer expressions exist.
- */
-NODISCARD
-CXCursor tidy_Cursor_getVarInit( CXCursor expr_csr );
 
 /**
  * Gets whether \a cursor is a class, class template, structure, or union
@@ -272,18 +242,6 @@ bool tidy_Cursor_isScopeDecl( CXCursor cursor );
 NODISCARD
 bool tidy_Cursor_isTemplateSpecializationOf( CXCursor cursor,
                                              CXCursor template_csr );
-
-/**
- * If \a cursor is an UnexposedExpr, gets its first child cursor.
- *
- * @param cursor The cursor.
- * @return If \a cursor is an UnexposedExpr, returns its first exposed child;
- * otherwise returns \a cursor.
- *
- * @sa tidy_Cursor_getFirstExposedChild()
- */
-NODISCARD
-CXCursor tidy_Cursor_skipUnexposedDown( CXCursor cursor );
 
 /**
  * Gets the real path of \a file.
