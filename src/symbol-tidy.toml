@@ -48,13 +48,25 @@ ignore-symbols = [
   "SGR_FG_YELLOW",
 ]
 
+[strbuf.c]
+ignore-symbols = [
+  "strbuf_sepsn_putsn"
+]
+[strbuf.h]
+ignore-symbols = [
+  "strbuf_sepsn_puts"
+]
+
 [util.h]
 ignore-symbols = [
   "ARG_11",
+  "ARGS_HAS_COMMA",
   "ARGS_IS_EMPTY",
   "ARGS_IS_EMPTY_CASES",
   "ARGS_IS_EMPTY_COMMA",
   "ARGS_IS_EMPTY_RESULT_0001",
+  "NAME5",
+  "NAME5_HELPER",
   "NO_OP"
 ]
 
