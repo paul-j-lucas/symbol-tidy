@@ -38,6 +38,7 @@
 #include "strbuf.h"
 #include "symbol-tidy.h"
 #include "toml_lite.h"
+#include "type_traits.h"
 #include "util.h"
 #include "verbose.h"
 

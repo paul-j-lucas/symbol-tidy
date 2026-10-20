@@ -26,11 +26,15 @@
  * Declares a structure and functions for a source file being tidied.
  */
 
+// local
+#include "pjl_config.h"
+
 // libclang
 #include <clang-c/Index.h>
 
 // standard
 #include <stdbool.h>
+#include <stddef.h>
 
 /**
  * @defgroup tidy-source-group Source File
