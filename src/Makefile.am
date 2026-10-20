@@ -78,7 +78,6 @@ symbol_tidy_SOURCES =	array.c array.h \
 			symbol.c symbol.h \
 			toml_lite.c toml_lite.h \
 			type_traits.h \
-			typedef.c typedef.h \
 			unicode.c unicode.h \
 			util.c util.h \
 			verbose.c verbose.h
