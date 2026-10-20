@@ -25,7 +25,6 @@ bin_PROGRAMS =		symbol-tidy
 check_PROGRAMS =	array_test \
 			hash_table_test \
 			path_util_test \
-			red_black_test \
 			str_util_test \
 			strbuf_test \
 			toml_test \
@@ -70,7 +69,6 @@ symbol_tidy_SOURCES =	array.c array.h \
 			path_util.c path_util.h \
 			pjl_config.h config.h \
 			print.c print.h \
-			red_black.c red_black.h \
 			source.c source.h \
 			str_util.c str_util.h \
 			strbuf.c strbuf.h \
@@ -101,10 +99,6 @@ hash_table_test_SOURCES=$(BASE_TEST_SOURCES) \
 
 path_util_test_SOURCES=	$(BASE_TEST_SOURCES) \
 			path_util_test.c
-
-red_black_test_SOURCES=	$(BASE_TEST_SOURCES) \
-			red_black.c red_black.h \
-			red_black_test.c
 
 str_util_test_SOURCES= 	$(BASE_TEST_SOURCES) \
 			str_util_test.c
