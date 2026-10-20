@@ -187,8 +187,18 @@ static bool is_escaped_newline( tidy_source const *source,
     clang_getTokenExtent( source->tu, tokens[ token_idx ] );
   CXSourceLocation const prev_loc = clang_getRangeEnd( prev_range );
   CXSourceLocation const curr_loc = clang_getRangeStart( curr_range );
-  unsigned const prev_offset = tidy_getSpellingLocation_offset( prev_loc );
-  unsigned const curr_offset = tidy_getSpellingLocation_offset( curr_loc );
+
+  CXFile prev_file, curr_file;
+  unsigned prev_offset, curr_offset;
+  clang_getSpellingLocation(
+    prev_loc, &prev_file, /*line=*/NULL, /*column=*/NULL, &prev_offset
+  );
+  clang_getSpellingLocation(
+    curr_loc, &curr_file, /*line=*/NULL, /*column=*/NULL, &curr_offset
+  );
+
+  if ( prev_file == NULL || prev_file != curr_file )
+    return false;
 
   bool saw_backslash = false;
   for ( unsigned i = prev_offset; i < curr_offset; ++i ) {
