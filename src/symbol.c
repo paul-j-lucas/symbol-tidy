@@ -910,6 +910,11 @@ static void visit_preprocessor_directives( tidy_source const *source ) {
     return;                             // LCOV_EXCL_LINE
 
   for ( unsigned i = 0; i < token_count; ++i ) {
+    CXSourceLocation const token_loc =
+      clang_getTokenLocation( source->tu, tokens[i] );
+    if ( clang_Location_isInSystemHeader( token_loc ) )
+      continue;
+
     if ( clang_getTokenKind( tokens[i] ) != CXToken_Punctuation )
       continue;
     if ( !tidy_Token_isEqualTo( source->tu, tokens[i], "#" ) )
@@ -926,7 +931,10 @@ static void visit_preprocessor_directives( tidy_source const *source ) {
     if ( p_directive == -1 )
       continue;
 
-    unsigned last_line = tidy_getTokenLocation_Line( source->tu, tokens[i] );
+    unsigned last_line;
+    clang_getSpellingLocation(
+      token_loc, /*file=*/NULL, &last_line, /*column=*/NULL, /*offset=*/NULL
+    );
 
     symbols_visit_data const svd = { .source = source };
 
