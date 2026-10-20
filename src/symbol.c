@@ -570,6 +570,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
 
   assert( data != NULL );
   symbols_visit_data *const svd = data;
+  tidy_symbol *const prev_parent_sym = svd->parent_sym;
 
   bool is_definition = false;
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
@@ -673,7 +674,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
   }
 
   clang_visitChildren( cursor, symbols_visitor, svd );
-  svd->parent_sym = NULL;
+  svd->parent_sym = prev_parent_sym;
 
 skip:
   return CXChildVisit_Continue;
