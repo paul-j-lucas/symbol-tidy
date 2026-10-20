@@ -1,5 +1,17 @@
 2026-10-19  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * symbol.c: Added call to symbol_add_ref.
+   * symbol.c: In is_escaped_newline(), now ensuring that tokens are in same
+     file.
+   * clang_util.c: Added cast for isupper().
+   * clang_util.h, config_file.c, source.h: #include fixes.
+   * clang_util.c, clang_util.h, path_util.c, path_util.h: Eliminated some
+     include-tidy code not needed here.
+   * src/Makefile.am: Eliminated some include-tidy code not needed here.
+   * clang_util.c, clang_util.h: Eliminated some include-tidy code not needed
+     here.
+   * symbol.c: Now skipping tokens in system headers.
+   * symbol.c: Now storing parent_sym in prev_parent_sym.
    * symbol-tidy.toml: Now ignoring ARGS_*.
    * str_util.h: Now using SKIP_WS.
    * util.h: Eliminated STRINGIFY --- not used.
