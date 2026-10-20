@@ -922,20 +922,21 @@ static void visit_preprocessor_directives( tidy_source const *source ) {
     if ( clang_Location_isInSystemHeader( token_loc ) )
       continue;
 
-    if ( clang_getTokenKind( tokens[i] ) != CXToken_Punctuation )
+    CXTokenKind token_kind = clang_getTokenKind( tokens[i] );
+    if ( token_kind != CXToken_Punctuation )
       continue;
     if ( !tidy_Token_isEqualTo( source->tu, tokens[i], "#" ) )
       continue;
     if ( ++i == token_count )
       break;
 
-    CXTokenKind token_kind = clang_getTokenKind( tokens[i] );
+    token_kind = clang_getTokenKind( tokens[i] );
     if ( token_kind != CXToken_Identifier )
       continue;
-    int const p_directive = tidy_Token_isEqualToAny( source->tu, tokens[i],
+    int const directive_idx = tidy_Token_isEqualToAny( source->tu, tokens[i],
       "if", "ifdef", "ifndef", "elif", "elifdef", "elifndef"
     );
-    if ( p_directive == -1 )
+    if ( directive_idx == -1 )
       continue;
 
     unsigned last_line;
@@ -963,7 +964,8 @@ static void visit_preprocessor_directives( tidy_source const *source ) {
         clang_getTokenSpelling( source->tu, tokens[i] );
       char const *const token_cs = clang_getCString( token_cxs );
 
-      if ( strcmp( token_cs, "defined" ) != 0 ) {
+      if ( strcmp( token_cs, "defined" ) != 0 &&
+           strcmp( token_cs, "__has_include" ) != 0 ) {
         CXCursor const sym_csr = tidy_getCursorByName( token_cs, tu_csr );
         tidy_symbol *const sym = add_symbol( sym_csr, &svd );
         if ( sym != NULL )
