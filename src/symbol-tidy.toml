@@ -43,4 +43,9 @@ ignore-symbols = [
   "SGR_FG_YELLOW",
 ]
 
+[verbose.c]
+ignore-symbols = [
+  "verbose_print_tokens"
+]
+
 # vim:se et sw=2 ts=2:
