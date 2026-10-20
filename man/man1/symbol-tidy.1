@@ -35,7 +35,7 @@
 .if !'\\$1'0' .sp
 ..
 .\" ---------------------------------------------------------------------------
-.TH \f3symbol-tidy\fP 1 "October 14, 2026" "PJL TOOLS"
+.TH \f3symbol-tidy\fP 1 "October 20, 2026" "PJL TOOLS"
 .SH NAME
 symbol-tidy \(em Symbol tidier
 .SH SYNOPSIS
@@ -51,10 +51,19 @@ symbol-tidy \(em Symbol tidier
 is a command-line tool
 that can be used to ``tidy'' the
 symbols
-used in a C
+used in C
 or C++
-source file
-by TODO
+source files
+comprising an entire
+program or library
+by reporting
+unused symbols,
+specifically unused
+macros,
+functions,
+variables,
+and
+types.
 .SS General Use
 .B symbol-tidy
 should be run
@@ -191,7 +200,7 @@ option to distinguish it from a C or C++ compiler option.
 For example,
 in:
 .cS
-symbol-tidy -Xtidy --error=never \-I../lib source.c
+symbol-tidy -Xtidy --error=never \-I../lib *.[hc]
 .cE
 the
 .BR \-\-error
@@ -268,22 +277,6 @@ that produce color.
 .IP
 The default is
 .BR not_file .
-.TP
-.BI \-\-comment-style \f1=\fPs "\f1 | \fP" "" \-s " s"
-Specifies the comment style to use.
-The choices for
-.I s
-are:
-\f(CW//\fP,
-\f(CW/*\fP,
-or
-\f(CWnone\fP.
-The default is \f(CW//\fP.
-(Note that \f(CW/*\fP
-may need to be quoted
-to prevent shell expansion.)
-Comments for unnecessary headers
-are always printed.
 .TP
 .BI \-\-compiler \f1=\fPf "\f1 | \fP" "" \-C " f"
 Specifies the path to either the C or C++ compiler to use;
@@ -404,11 +397,6 @@ only if in violation.
 .B F
 Name of
 .IR source-file .
-.TP
-.B s
-Symbols referenced
-and the include files
-declaring them.
 .TP
 .B S
 Configuration file symbols.
@@ -564,67 +552,14 @@ but without having to specify them
 via the command-line
 every time.
 .TP 6
-.BI add-c-includes " \f1=\fP " [ s " \f1[,\fP " s "\f1]*\fP ]"
-Like
-.BR std-c-includes ,
-but these are
-.I additionally
-to be considered ``standard'' C include files.
-.IP
-As one of only two special cases to configuration file layering,
-the include files given for
-.B add-c-includes
-are
-.I cumulative
-from all configuration files.
-.TP
-.BI add-cxx-includes " \f1=\fP " [ s " \f1[,\fP " s "\f1]*\fP ]"
-Like
-.BR std-cxx-includes ,
-but these are
-.I additionally
-to be considered ``standard'' C++ include files.
-.IP
-As one of only two special cases to configuration file layering,
-the include files given for
-.B add-cxx-includes
-are
-.I cumulative
-from all configuration files.
-.TP
-.BI align-column " \f1=\fP n"
-Same as the
-.B \-\-align-column
-command-line option.
-.TP
-.BI all-includes " \f1=\fP b"
-Same as the
-.B \-\-all-includes
-command-line option.
-.TP
 .BI color " \f1=\fP s"
 Same as the
 .B \-\-color
 command-line option.
 .TP
-.BI comment-style " \f1=\fP s"
-Same as the
-.B \-\-comment-style
-command-line option.
-.TP
-.BI comment-symbols " \f1=\fP s"
-Same as the
-.B \-\-comment-symbols
-command-line option.
-.TP
 .BI error " \f1=\fP s"
 Same as the
 .B \-\-error
-command-line option.
-.TP
-.BI line-length " \f1=\fP n"
-Same as the
-.B \-\-line-length
 command-line option.
 .TP
 .BI ignore-as-argument " \f1=\fP b"
@@ -669,16 +604,6 @@ and so are apparently necessary,
 the include file declaring them,
 if omitted,
 will not be reported as a violation.
-.TP
-.BI keep " \f1=\fP b"
-If true,
-the include file given for the table name
-is to be ``kept,''
-that is,
-even if no symbols from it are referenced
-and so is apparently unnecessary,
-it will not be reported as a violation
-when included into other files.
 .SS Source Tables
 This type of table specifies a source file,
 either a \f(CW.c\fP or \f(CW.cpp\fP
@@ -695,11 +620,6 @@ Same as in
 but for a source file.
 .TP
 .BI ignore-symbols " \f1=\fP s" "\f1 | \fP[" s " \f1[,\fP " s "\f1]*\fP ]"
-Same as in
-.BR "Header Tables" ,
-but for a source file.
-.TP
-.BI keep-includes " \f1=\fP s" "\f1 | \fP[" s " \f1[,\fP " s "\f1]*\fP ]"
 Same as in
 .BR "Header Tables" ,
 but for a source file.
@@ -747,58 +667,6 @@ ignores
 .I symbol
 only in
 .IR header.h .
-.TP
-.BR includes " \f1=\fP s" "\f1 | \fP[" s " \f1[,\fP " s "\f1]*\fP ]"
-Specifies that the symbol
-given for the table name
-is to be considered declared
-in one or more
-of the include files listed.
-For example,
-this:
-.RS 5
-.cS
-[NULL]
-includes = [
-    "locale.h",
-    "stddef.h",
-    "stdio.h",
-    "stdlib.h",
-    "string.h",
-    "time.h",
-    "wchar.h",
-]
-.cE 0
-.RE
-.IP
-says that \f(CWNULL\fP
-is declared in
-.I all
-of those files
-so including any
-.I one
-of them is sufficient.
-Note that:
-.RS 5
-.cS
-[\f2symbol\fP]
-includes = [ "\f2header.h\fP" ]
-.cE 0
-.RE
-.IP
-is equivalent to:
-.RS 5
-.cS
-[\f2header.h\fP]
-symbols = [ "\f2symbol\fP" ]
-.cE 0
-.RE
-.IP
-Use a header table to map one header to many symbols
-or a symbol table to map one symbol to many headers,
-whichever is preferred
-for a given set of headers
-and symbols.
 .SS Locations and Search Order
 One or more configuration files
 can be used to configure
@@ -888,31 +756,16 @@ for
 .B symbol-tidy
 itself.)
 .TP 6
-.B is-size
-The total number of files included.
-.TP
-.B is-path
-The path of the include file having the most symbols from it referenced.
-.TP
-.B isss-load-factor
-The load factor for the symbol hash table for
-.BR is-path .
-.TP
-.B isss-size
-The total number of relevant symbols referenced from
-.BR is-path .
+.B ips-size
+The total number of ignored files.
+.B ips-load-factor
+The load factor for the ignoted files hash table.
 .TP
 .B ss-load-factor
 The load factor for the symbol hash table.
 .TP
 .B ss-size
 The total number of relevant symbols.
-.TP
-.B tm-load-factor
-The load factor for the \f(CWtypedef\fP hash table.
-.TP
-.B tm-size
-The total number of useful \f(CWtypedef\fPs.
 .SH EXIT STATUS
 .PD 0
 .IP 0
