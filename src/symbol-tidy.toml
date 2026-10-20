@@ -50,6 +50,11 @@ ignore-symbols = [
 
 [util.h]
 ignore-symbols = [
+  "ARG_11",
+  "ARGS_IS_EMPTY",
+  "ARGS_IS_EMPTY_CASES",
+  "ARGS_IS_EMPTY_COMMA",
+  "ARGS_IS_EMPTY_RESULT_0001",
   "NO_OP"
 ]
 
