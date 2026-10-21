@@ -585,29 +585,42 @@ static int get_source_index( int argc, char const *argv[],
 }
 
 /**
- * Gets the language of the compiler's `-x` option, if given.
+ * Gets the language of the compiler's `-x` or `--language` option, if given.
  *
  * @param argc The command-line argument count from `main()`.
  * @param argv The command-line argument values from `main()`.
- * @return Returns the language of the compiler's `-x` option or
- * `CXLanguage_Invalid` if not given.
+ * @return Returns the language or `CXLanguage_Invalid` if not given.
  */
 NODISCARD
-static enum CXLanguageKind get_x_language( int argc,
-                                           char const *const argv[] ) {
+static enum CXLanguageKind get_source_language( int argc,
+                                                char const *const argv[] ) {
   assert( argc > 0 );
   assert( argv != NULL );
 
+  struct lang_libclang_map {
+    char const         *lang_name;
+    enum CXLanguageKind lang_kind;
+  };
+  typedef struct lang_libclang_map lang_libclang_map;
+
+  static lang_libclang_map LANG_LIBCLANG_MAP[] = {
+    { "c",    CXLanguage_C          },
+    { "c++",  CXLanguage_CPlusPlus  },
+    { "none", CXLanguage_Invalid    }
+  };
+
   for ( int i = 1; i < argc; ++i ) {
-    char const *const lang = get_short_opt_value( argc, argv, 'x', &i );
+    char const *lang = get_short_opt_value( argc, argv, 'x', &i );
+    if ( lang == NULL )
+      lang = get_long_opt_value( argc, argv, "language", &i );
     if ( lang == NULL )
       continue;
-    if ( strcmp( lang, "c" ) == 0 )
-      return CXLanguage_C;
-    if ( strcmp( lang, "c++" ) == 0 )
-      return CXLanguage_CPlusPlus;
-    if ( strcmp( lang, "none" ) == 0 )
-      break;
+
+    FOREACH_ARRAY_ELEMENT( lang_libclang_map, map, LANG_LIBCLANG_MAP ) {
+      if ( strcmp( lang, map->lang_name ) == 0 )
+        return map->lang_kind;
+    } // for
+
     fatal_error( EX_USAGE,
       "\"%s\": invalid value for -x; must be either \"c\" or \"c++\"\n", lang
     );
@@ -1063,7 +1076,7 @@ int cli_options_init( int *pargc, char const **pargv[] ) {
 
   move_tidy_args( pargc, *pargv, &tidy_argc, &tidy_argv );
 
-  opt_lang = get_x_language( *pargc, *pargv );
+  opt_lang = get_source_language( *pargc, *pargv );
   int arg_source1 = get_source_index( *pargc, *pargv, &opt_lang );
   char const *const compiler_path = get_compiler_path( *pargc, *pargv );
   if ( compiler_path != NULL )
