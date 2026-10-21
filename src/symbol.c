@@ -572,8 +572,8 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
                                                 CXClientData data ) {
   (void)parent;
 
-  CXSourceLocation const loc = clang_getCursorLocation( cursor );
-  if ( clang_Location_isInSystemHeader( loc ) )
+  CXSourceLocation const sym_loc = clang_getCursorLocation( cursor );
+  if ( clang_Location_isInSystemHeader( sym_loc ) )
     goto skip;
 
   if ( IS_VERBOSE( CURSORS ) )
@@ -634,7 +634,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
     if ( likely( sym != NULL ) ) {
       CXFile sym_file;
       clang_getSpellingLocation(
-        loc, &sym_file, &sym->line, &sym->col, /*offset=*/NULL
+        sym_loc, &sym_file, &sym->line, &sym->col, /*offset=*/NULL
       );
 
       CXString const    path_cxs = clang_getFileName( sym_file );
