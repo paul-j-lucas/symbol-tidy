@@ -607,13 +607,6 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       }
       break;
 
-    case CXCursor_EnumDecl:
-    case CXCursor_StructDecl:
-    case CXCursor_UnionDecl:
-      if ( clang_Cursor_isAnonymous( cursor ) )
-        break;
-      FALLTHROUGH;
-
     case CXCursor_ClassDecl:
     case CXCursor_ClassTemplate:
     case CXCursor_ClassTemplatePartialSpecialization:
@@ -628,6 +621,14 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
         tidy_Cursor_isExternalLinkage( cursor );
       break;
 
+    case CXCursor_EnumDecl:
+    case CXCursor_StructDecl:
+    case CXCursor_UnionDecl:
+      if ( clang_Cursor_isAnonymous( cursor ) )
+        break;
+      FALLTHROUGH;
+
+    case CXCursor_EnumConstantDecl:
     case CXCursor_MacroDefinition:
     case CXCursor_TypeAliasDecl:
     case CXCursor_TypedefDecl:
