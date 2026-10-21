@@ -613,9 +613,6 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       break;
 
     case CXCursor_MacroDefinition:
-      visit_MacroDefinition( cursor, parent, svd );
-      break;
-
     case CXCursor_TypeAliasDecl:
     case CXCursor_TypedefDecl:
       is_definition = true;
@@ -656,6 +653,11 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
 
         case CXCursor_FunctionDecl:
           svd->parent_sym = sym;
+          break;
+
+        case CXCursor_MacroDefinition:
+          svd->parent_sym = sym;
+          visit_MacroDefinition( cursor, parent, svd );
           break;
 
         default:
@@ -810,23 +812,6 @@ static void visit_MacroDefinition( CXCursor macro_csr, CXCursor parent,
   (void)parent;
   assert( svd != NULL );
 
-  tidy_symbol *const macro_sym = add_symbol( macro_csr, svd->source );
-  if ( macro_sym == NULL )
-    return;
-
-  CXFile macro_file;
-  CXSourceLocation const macro_loc = clang_getCursorLocation( macro_csr );
-  clang_getSpellingLocation(
-    macro_loc, &macro_file, &macro_sym->line, &macro_sym->col, /*offset=*/NULL
-  );
-  CXString const    path_cxs = clang_getFileName( macro_file );
-  char const *const path = clang_getCString( path_cxs );
-  if ( path != NULL && path[0] != '\0' && is_source_path( path ) ) {
-    FREE( macro_sym->path );            // just in case
-    macro_sym->path = strdup_or_exit( path );
-  }
-  clang_disposeString( path_cxs );
-
   CXSourceRange const macro_range = clang_getCursorExtent( macro_csr );
 
   CXToken *tokens;
@@ -859,7 +844,7 @@ static void visit_MacroDefinition( CXCursor macro_csr, CXCursor parent,
     if ( !tidy_Cursor_isInvalid( sym_csr ) ) {
       tidy_symbol *const sym = add_symbol( sym_csr, svd->source );
       if ( sym != NULL )
-        symbol_add_ref( macro_sym, sym );
+        symbol_add_ref( svd->parent_sym, sym );
     }
   } // for
 
