@@ -92,6 +92,8 @@ static bool symbol_is_excluded( CXCursor, tidy_source const* );
 
 static void visit_FieldDecl( CXCursor, CXCursor, symbols_visit_data* );
 static void visit_MacroDefinition( CXCursor, CXCursor, symbols_visit_data* );
+static void visit_OverloadedDeclRef( CXCursor, CXCursor,
+                                     symbols_visit_data* );
 
 ////////// local variables ////////////////////////////////////////////////////
 
@@ -619,26 +621,8 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       is_definition = true;
       break;
 
-    case CXCursor_OverloadedDeclRef:;
-      //
-      // We have to iterate over all overloaded functions since calling
-      // clang_getCursorReferenced() on a CXCursor_OverloadedDeclRef returns an
-      // invalid or null cursor.
-      //
-      unsigned const num_decls = clang_getNumOverloadedDecls( cursor );
-      for ( unsigned i = 0; i < num_decls; ++i ) {
-        CXCursor dec_csr = clang_getOverloadedDecl( cursor, i );
-        if ( tidy_Cursor_isInvalid( dec_csr ) )
-          continue;                         // LCOV_EXCL_LINE
-        dec_csr = clang_getCanonicalCursor( dec_csr );
-        tidy_symbol *const dec_sym = add_symbol( dec_csr, svd->source );
-        if ( dec_sym != NULL ) {
-          if ( svd->parent_sym != NULL )
-            symbol_add_ref( svd->parent_sym, dec_sym );
-          else
-            dec_sym->is_root = true;
-        }
-      } // for
+    case CXCursor_OverloadedDeclRef:
+      visit_OverloadedDeclRef( cursor, parent, svd );
       break;
 
     default:
@@ -879,6 +863,37 @@ static void visit_MacroDefinition( CXCursor macro_csr, CXCursor parent,
 
   ht_table_cleanup( &param_set, /*free_fn=*/NULL );
   clang_disposeTokens( svd->source->tu, tokens, token_count );
+}
+
+/**
+ * Visits a `CXCursor_OverloadedDeclRef` kind of cursor.
+ *
+ * @remarks We have to iterate over all overloaded functions since calling
+ * clang_getCursorReferenced() on a CXCursor_OverloadedDeclRef returns an
+ * invalid or null cursor.
+ *
+ * @param overloaded_csr The overloaded definition's cursor to visit.
+ * @param parent Not used.
+ * @param svd The symbols_visitor_data to use.
+ */
+static void visit_OverloadedDeclRef( CXCursor overloaded_csr, CXCursor parent,
+                                     symbols_visit_data *svd ) {
+  (void)parent;
+
+  unsigned const num_decls = clang_getNumOverloadedDecls( overloaded_csr );
+  for ( unsigned i = 0; i < num_decls; ++i ) {
+    CXCursor dec_csr = clang_getOverloadedDecl( overloaded_csr, i );
+    if ( tidy_Cursor_isInvalid( dec_csr ) )
+      continue;                         // LCOV_EXCL_LINE
+    dec_csr = clang_getCanonicalCursor( dec_csr );
+    tidy_symbol *const dec_sym = add_symbol( dec_csr, svd->source );
+    if ( dec_sym != NULL ) {
+      if ( svd->parent_sym != NULL )
+        symbol_add_ref( svd->parent_sym, dec_sym );
+      else
+        dec_sym->is_root = true;
+    }
+  } // for
 }
 
 /**
