@@ -183,7 +183,8 @@ done:
 }
 
 /**
- * Helper function both tidy_Cursor_getScopedDisplayName().
+ * Helper function for both tidy_Cursor_getScopedDisplayName() and
+ * tidy_Cursor_getScopedSpelling().
  *
  * @param cursor The cursor at a symbol.
  * @param name_fn The libclang function to use to get the name of \a cursor.
@@ -273,6 +274,10 @@ static bool tidy_Cursor_isInheritable( CXCursor cursor ) {
 
 char* tidy_Cursor_getScopedDisplayName( CXCursor cursor ) {
   return getScopedName_thunk( cursor, &clang_getCursorDisplayName );
+}
+
+char* tidy_Cursor_getScopedSpelling( CXCursor cursor ) {
+  return getScopedName_thunk( cursor, &clang_getCursorSpelling );
 }
 
 bool tidy_Cursor_isClassDecl( CXCursor cursor ) {

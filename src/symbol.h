@@ -63,6 +63,7 @@ struct tidy_sym_ref {
 struct tidy_symbol {
   char const   *key;                    ///< Unique key.
   char const   *name;                   ///< Name.
+  char const   *display_name;           ///< Display name.
   char const   *path;                   ///< File defined in.
   unsigned      line;                   ///< Line defined on.
   unsigned      col;                    ///< Column defined at.

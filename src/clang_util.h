@@ -57,9 +57,26 @@
  * @return Returns the fully scoped name.
  *
  * @note The caller is responsible for freeing the returned string.
+ *
+ * @sa tidy_Cursor_getScopedSpelling()
  */
 NODISCARD
 char* tidy_Cursor_getScopedDisplayName( CXCursor cursor );
+
+/**
+ * Given a cursor at a local name of an enumeration, class, class data member,
+ * class member function, structure, union, or namespace, gets its fully scoped
+ * "spelling" name that does _not_ include template parameters (if any).
+ *
+ * @param cursor The cursor for a symbol.
+ * @return Returns the fully scoped name.
+ *
+ * @note The caller is responsible for freeing the returned string.
+ *
+ * @sa tidy_Cursor_getScopedDisplayName()
+ */
+NODISCARD
+char* tidy_Cursor_getScopedSpelling( CXCursor cursor );
 
 /**
  * Gets whether \a cursor is a class, class template, structure, or union

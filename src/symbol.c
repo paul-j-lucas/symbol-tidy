@@ -116,13 +116,12 @@ static tidy_symbol* add_symbol( CXCursor sym_csr, tidy_source const *source ) {
   if ( unlikely( key == NULL ) )
     return NULL;
 
-  tidy_symbol      *sym = NULL;
-  CXString const    sym_name_cxs = clang_getCursorSpelling( sym_csr );
-  char const *const sym_name_cs = clang_getCString( sym_name_cxs );
+  tidy_symbol  *sym = NULL;
+  char         *sym_name = tidy_Cursor_getScopedSpelling( sym_csr );
 
-  if ( sym_name_cs == NULL || sym_name_cs[0] == '\0' )
+  if ( sym_name == NULL )
     goto done;
-  if ( strcmp( sym_name_cs, TIDY_COMPILER_ID ) == 0 )
+  if ( strcmp( sym_name, TIDY_COMPILER_ID ) == 0 )
     goto done;
 
   bool is_sym_ignored = false;
@@ -130,14 +129,15 @@ static tidy_symbol* add_symbol( CXCursor sym_csr, tidy_source const *source ) {
   if ( sym_file != NULL ) {
     CXString const    sym_path_cxs = clang_getFileName( sym_file );
     char const *const sym_path_cs = clang_getCString( sym_path_cxs );
-    is_sym_ignored = config_symbol_is_ignored( sym_name_cs, sym_path_cs );
+    is_sym_ignored = config_symbol_is_ignored( sym_name, sym_path_cs );
     clang_disposeString( sym_path_cxs );
   }
   if ( is_sym_ignored )
     goto done;
 
-  tidy_symbol new_sym = { .key = key };
+  tidy_symbol new_sym = { .key = key, .name = sym_name };
   key = NULL;                           // new_sym owns this now
+  sym_name = NULL;                      // new_sym owns this now
   ht_insert_rv_t const hti =
     ht_table_insert( &symbol_set, &new_sym, sizeof new_sym );
   sym = HT_DINT( hti.entry );
@@ -147,7 +147,8 @@ static tidy_symbol* add_symbol( CXCursor sym_csr, tidy_source const *source ) {
     goto done;
   }
 
-  sym->name = strdup_or_exit( sym_name_cs );
+  if ( source->lang == CXLanguage_CPlusPlus )
+    sym->display_name = tidy_Cursor_getScopedDisplayName( sym_csr );
 
   //
   // If the symbol's name is "main", we have to mark it as a root since nothing
@@ -162,7 +163,7 @@ static tidy_symbol* add_symbol( CXCursor sym_csr, tidy_source const *source ) {
 
 done:
   free( key );
-  clang_disposeString( sym_name_cxs );
+  free( sym_name );
   return sym;
 }
 
@@ -428,6 +429,7 @@ static void symbol_cleanup( tidy_symbol *sym ) {
   if ( sym != NULL ) {
     FREE( sym->key );
     FREE( sym->name );
+    FREE( sym->display_name );
     FREE( sym->path );
 
     for ( tidy_sym_ref *ref = sym->refs, *next; ref != NULL; ref = next ) {
@@ -1038,7 +1040,7 @@ unsigned symbols_print_unused( void ) {
     color_start( stderr, sgr_locus );
     EPRINTF( "%2u", sym->col );
     color_end( stderr, sgr_locus );
-    EPRINTF( " | \"%s\"\n", sym->name );
+    EPRINTF( " | \"%s\"\n", sym->display_name ? sym->display_name : sym->name );
   } // for
 
   array_cleanup( &symbol_array, /*free_fn=*/NULL );
