@@ -92,6 +92,7 @@ static bool symbol_is_excluded( CXCursor, tidy_source const* );
 
 static void visit_FieldDecl( CXCursor, CXCursor, symbols_visit_data* );
 static void visit_MacroDefinition( CXCursor, CXCursor, symbols_visit_data* );
+static void visit_most_Ref( CXCursor, CXCursor, symbols_visit_data* );
 static void visit_OverloadedDeclRef( CXCursor, CXCursor,
                                      symbols_visit_data* );
 
@@ -594,17 +595,8 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
     case CXCursor_MacroExpansion:
     case CXCursor_MemberRefExpr:
     case CXCursor_TemplateRef:
-    case CXCursor_TypeRef:;
-      CXCursor const ref_csr = clang_getCursorReferenced( cursor );
-      if ( !tidy_Cursor_isInvalid( ref_csr ) ) {
-        tidy_symbol *const ref_sym = add_symbol( ref_csr, svd->source );
-        if ( ref_sym != NULL ) {
-          if ( svd->parent_sym != NULL )
-            symbol_add_ref( svd->parent_sym, ref_sym );
-          else
-            ref_sym->is_root = true;
-        }
-      }
+    case CXCursor_TypeRef:
+      visit_most_Ref( cursor, parent, svd );
       break;
 
     case CXCursor_ClassDecl:
@@ -621,18 +613,18 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
         tidy_Cursor_isExternalLinkage( cursor );
       break;
 
-    case CXCursor_EnumDecl:
-    case CXCursor_StructDecl:
-    case CXCursor_UnionDecl:
-      if ( clang_Cursor_isAnonymous( cursor ) )
-        break;
-      FALLTHROUGH;
-
     case CXCursor_EnumConstantDecl:
     case CXCursor_MacroDefinition:
     case CXCursor_TypeAliasDecl:
     case CXCursor_TypedefDecl:
       is_definition = true;
+      break;
+
+    case CXCursor_EnumDecl:
+    case CXCursor_StructDecl:
+    case CXCursor_UnionDecl:
+      if ( !clang_Cursor_isAnonymous( cursor ) )
+        is_definition = true;
       break;
 
     case CXCursor_OverloadedDeclRef:
@@ -877,6 +869,44 @@ static void visit_MacroDefinition( CXCursor macro_csr, CXCursor parent,
 
   ht_table_cleanup( &param_set, /*free_fn=*/NULL );
   clang_disposeTokens( svd->source->tu, tokens, token_count );
+}
+
+/**
+ * Visits most kinds of reference cursor.
+ *
+ * @param cursor The cursor to visit.
+ * @param parent Not used.
+ * @param svd The symbols_visitor_data to use.
+ */
+static void visit_most_Ref( CXCursor cursor, CXCursor parent,
+                            symbols_visit_data *svd ) {
+  (void)parent;
+  assert( svd != NULL );
+
+  CXCursor const ref_csr = clang_getCursorReferenced( cursor );
+  if ( unlikely( tidy_Cursor_isInvalid( ref_csr ) ) )
+    return;
+
+  tidy_symbol *const ref_sym = add_symbol( ref_csr, svd->source );
+  if ( ref_sym != NULL ) {
+    if ( svd->parent_sym != NULL )
+      symbol_add_ref( svd->parent_sym, ref_sym );
+    else
+      ref_sym->is_root = true;
+  }
+
+  CXCursor const sem_parent = clang_getCursorSemanticParent( ref_csr );
+  enum CXCursorKind const sem_parent_kind = clang_getCursorKind( sem_parent );
+  if ( sem_parent_kind == CXCursor_EnumDecl ) {
+    //
+    // Special case: if any enumeration constant is referenced (which means its
+    // semantic parent is an EnumDecl), mark the enumeration as a whole as
+    // used.
+    //
+    tidy_symbol *const parent_sym = add_symbol( sem_parent, svd->source );
+    if ( parent_sym != NULL )
+      parent_sym->is_used = true;
+  }
 }
 
 /**
