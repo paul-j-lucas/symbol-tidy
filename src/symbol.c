@@ -629,15 +629,18 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       /* suppress warning */;
   } // switch
 
-  tidy_symbol *sym = NULL;
-
   if ( is_definition ) {
-    sym = add_symbol( cursor, svd->source );
-    if ( sym != NULL ) {
-      /* Update file/line to point to the actual definition */
-      CXFile file;
-      clang_getSpellingLocation( loc, &file, &sym->line, &sym->col, NULL );
-      CXString const    path_cxs = clang_getFileName( file );
+    //
+    // For a definition, look-up the symbol to update its definition location.
+    //
+    tidy_symbol *const sym = add_symbol( cursor, svd->source );
+    if ( likely( sym != NULL ) ) {
+      CXFile sym_file;
+      clang_getSpellingLocation(
+        loc, &sym_file, &sym->line, &sym->col, /*offset=*/NULL
+      );
+
+      CXString const    path_cxs = clang_getFileName( sym_file );
       char const *const path = clang_getCString( path_cxs );
       if ( path != NULL && path[0] != '\0' && is_source_path( path ) ) {
         FREE( sym->path );              // just in case
@@ -645,21 +648,20 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       }
       clang_disposeString( path_cxs );
 
-      if ( kind == CXCursor_FunctionDecl )
-        svd->parent_sym = sym;
+      switch ( kind ) {
+        case CXCursor_FieldDecl:
+          svd->parent_sym = sym;
+          visit_FieldDecl( cursor, parent, svd );
+          break;
+
+        case CXCursor_FunctionDecl:
+          svd->parent_sym = sym;
+          break;
+
+        default:
+          /* suppress warning */;
+      } // switch
     }
-  }
-
-  if ( sym != NULL ) {
-    switch ( kind ) {
-      case CXCursor_FieldDecl:
-        svd->parent_sym = sym;
-        visit_FieldDecl( cursor, parent, svd );
-        break;
-
-      default:
-        /* suppress warning */;
-    } // switch
   }
 
   clang_visitChildren( cursor, symbols_visitor, svd );
