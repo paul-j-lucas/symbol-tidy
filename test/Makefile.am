@@ -25,8 +25,7 @@ AUTOMAKE_OPTIONS = 1.12			# needed for TEST_LOG_DRIVER
 
 ###############################################################################
 
-# Basic sanity tests
-TESTS=	tests/hello.test
+TESTS=	tests/enum_special_case.test
 
 ###############################################################################
 

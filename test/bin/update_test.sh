@@ -44,9 +44,9 @@ fail() {
   echo FAIL $TEST_NAME
 }
 
-test_include_tidy() {
-  echo '$ include-tidy' $@
-  include-tidy $@ 2>&1
+test_symbol_tidy() {
+  echo '$ symbol-tidy' $@
+  symbol-tidy $@ 2>&1
   STATUS=$?
   echo
   return $STATUS
@@ -93,19 +93,19 @@ trap "x=$?; rm -f $TMPDIR/*_$$_* 2>/dev/null; exit $x" EXIT HUP INT TERM
 
 DATA_DIR="$srcdir/data"
 EXPECTED_DIR="$srcdir/expected"
-ACTUAL_OUTPUT="$TMPDIR/symbol_include_test_output_$$_"
+ACTUAL_OUTPUT="$TMPDIR/symbol_tidy_test_output_$$_"
 
 # If you update any of this, update the same in run_test.sh also.
 export INCLUDE_TIDY_TEST=eh
 TIDY_TEST_CXXFLAGS="-std=c++20"
-TIDY_TEST_CONFIG="-Xtidy --config=../$TOP_SRCDIR/etc/config.toml"
+#TIDY_TEST_CONFIG="-Xtidy --config=../$TOP_SRCDIR/etc/config.toml"
 TIDY_TEST_OPTIONS="-Xtidy --directory=data -Xtidy --no-config-layers"
 unset XDG_CONFIG_HOME
 unset XDG_CONFIG_DIRS
 
 ##
 # Must put $ABS_TOP_BUILDDIR/src first in PATH so we get the correct version of
-# include-tidy.
+# symbol-tidy.
 ##
 PATH="$ABS_TOP_BUILDDIR/src:$PATH"
 
@@ -117,7 +117,7 @@ ulimit -c 0
 
 ########## Update tests #######################################################
 
-update_symbol_include_test() {
+update_symbol_tidy_test() {
   TEST_PATH="$1"
   TEST_NAME=$(local_basename "$TEST_PATH")
   EXPECTED_OUTPUT="$EXPECTED_DIR/$(echo $TEST_NAME | sed s/test$/out/)"
@@ -137,7 +137,7 @@ update_symbol_include_test() {
 for TEST in $*
 do
   case "$TEST" in
-  *.test) update_symbol_include_test "$TEST" ;;
+  *.test) update_symbol_tidy_test "$TEST" ;;
   esac
 done
 
