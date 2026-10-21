@@ -35,7 +35,7 @@
 .if !'\\$1'0' .sp
 ..
 .\" ---------------------------------------------------------------------------
-.TH \f3symbol-tidy\fP 1 "October 20, 2026" "PJL TOOLS"
+.TH \f3symbol-tidy\fP 1 "October 21, 2026" "PJL TOOLS"
 .SH NAME
 symbol-tidy \(em Symbol tidier
 .SH SYNOPSIS
@@ -138,14 +138,12 @@ that affect compilation.
 .PP
 The
 .B \-\-verbose=f
-prints each source file's name
-(so you know which file
-any printed violations are for);
+prints each source file's name;
 .B \-\-error=never
 causes
 .B symbol-tidy
 always to exit with a zero status
-even for violations so
+even with unused symbols so
 .B make
 doesn't think anything went wrong.
 (See the
@@ -340,21 +338,21 @@ Always exit with non-zero.
 .B never
 Always exit with zero.
 .TP
-.B violations
-Exit with non-zero only when violations.
+.B unused
+Exit with non-zero only when there are unused symbols.
 .RE
 .PD
 .IP
 Using
 .B never
 always exits with a zero status
-even for violations so
+even when there are unused symbols so
 .BR make (1)
 doesn't think anything went wrong.
 (See
 .BR "Use with Make" .)
 The default is
-.BR violations .
+.BR unused .
 .TP
 .BR \-\-no-config-layers " | " \-L
 Suppresses configuration file layering.
@@ -394,7 +392,7 @@ option.
 .B f
 Name of
 .I source-file
-only if in violation.
+only if it has unused symbols.
 .TP
 .B F
 Name of
@@ -568,15 +566,15 @@ command-line option.
 .TP
 .BI ignore-as-argument " \f1=\fP b"
 If true,
-the include file given for the table name
-is not checked for violations
+the file given for the table name
+is not checked for unused symbols
 when given as
 .IR source-file .
 .IP
-This allows there to be include files
+This allows there to be files
 you don't control
 (third-party or generated)
-present and not check them for violations
+present and not check them for unused symbols
 yet still use \f(CW*.h\fP with a shell
 .B for
 loop.
@@ -773,13 +771,13 @@ The total number of relevant symbols.
 .SH EXIT STATUS
 .PD 0
 .IP 0
-No violations or the
+No unused symbols or the
 .B \-\-error=never
 option was given.
 .IP 1
-One or more violations.
+One or more unused symbols.
 .IP 2
-No violations, but the
+No unused symbols, but the
 .B \-\-error=always
 option was given.
 .IP 64
