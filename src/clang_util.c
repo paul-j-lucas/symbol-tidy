@@ -50,11 +50,20 @@
 
 ////////// typedefs ///////////////////////////////////////////////////////////
 
-typedef struct getCursorByName_data getCursorByName_data;
-typedef CXString                  (*getCursorName_fn)( CXCursor );
-typedef struct isBaseClass_data     isBaseClass_data;
+typedef struct callsBaseConstructor_data  callsBaseConstructor_data;
+typedef struct getCursorByName_data       getCursorByName_data;
+typedef CXString                        (*getCursorName_fn)( CXCursor );
+typedef struct isBaseClass_data           isBaseClass_data;
 
 ////////// structs ////////////////////////////////////////////////////////////
+
+/**
+ * Additional data passed to callsBaseConstructor_visitor().
+ */
+struct callsBaseConstructor_data {
+  CXCursor  base_csr;                   ///< The base class cursor.
+  bool      found_explicit_call;        ///< Called base constructor explicitly?
+};
 
 /**
  * Additional data passed to getCursorByName_visitor().
@@ -86,7 +95,48 @@ struct isBaseClass_data {
 ////////// local functions ////////////////////////////////////////////////////
 
 /**
- * A helper function for tidy_getCursorByName() that Visits each symbol within
+ * A helper function for tidy_Cursor_callsBaseConstructor() that looks for an
+ * explicit base class constructor call.
+ *
+ * @param cursor The cursor being visited.
+ * @param parent Not used.
+ * @param data The getCursorByName_data to use.
+ * @return Returns either `CXChildVisit_Break` or `CXChildVisit_Continue`.
+ */
+static
+enum CXChildVisitResult callsBaseConstructor_visitor( CXCursor cursor,
+                                                      CXCursor parent,
+                                                      CXClientData data ) {
+  (void)parent;
+
+  enum CXCursorKind const kind = clang_getCursorKind( cursor );
+  if ( kind != CXCursor_CallExpr )
+    goto skip;
+
+  CXCursor const ref_csr = clang_getCursorReferenced( cursor );
+  if ( tidy_Cursor_isInvalid( ref_csr ) )
+    goto skip;
+
+  enum CXCursorKind const ref_kind = clang_getCursorKind( ref_csr );
+  if ( ref_kind != CXCursor_Constructor )
+    goto skip;
+
+  CXCursor sem_parent = clang_getCursorSemanticParent( ref_csr );
+  sem_parent = clang_getCanonicalCursor( sem_parent );
+
+  assert( data != NULL );
+  callsBaseConstructor_data *const cbcd = data;
+  if ( clang_equalCursors( sem_parent, cbcd->base_csr ) ) {
+    cbcd->found_explicit_call = true;
+    return CXChildVisit_Break;
+  }
+
+skip:
+  return CXChildVisit_Continue;
+}
+
+/**
+ * A helper function for tidy_getCursorByName() that visits each symbol within
  * a scope attempting to find one having \ref getCursorByName_data::find_name
  * "find_name".
  *
@@ -144,6 +194,31 @@ static enum CXChildVisitResult getCursorByName_visitor( CXCursor cursor,
   } // switch
 
 skip:
+  return CXChildVisit_Continue;
+}
+
+/**
+ * A helper function for tidy_Cursor_getDefaultConstructor() that visits each
+ * symbol attempting to find a default constructor.
+ *
+ * @param cursor The cursor being visited.
+ * @param parent Not used.
+ * @param data A pointer to receive the cursor for the default constructor.
+ * @return Returns either `CXChildVisit_Break` or `CXChildVisit_Recurse`.
+ */
+static
+enum CXChildVisitResult getDefaultConstructor_visitor( CXCursor cursor,
+                                                       CXCursor parent,
+                                                       CXClientData data ) {
+  (void)parent;
+
+  if ( clang_CXXConstructor_isDefaultConstructor( cursor ) ) {
+    assert( data != NULL );
+    CXCursor *const default_ctor_csr = data;
+    *default_ctor_csr = cursor;
+    return CXChildVisit_Break;
+  }
+
   return CXChildVisit_Continue;
 }
 
@@ -271,6 +346,23 @@ static bool tidy_Cursor_isInheritable( CXCursor cursor ) {
 }
 
 ////////// extern functions ///////////////////////////////////////////////////
+
+bool tidy_Cursor_callsBaseConstructor( CXCursor ctor_csr, CXCursor base_csr ) {
+  callsBaseConstructor_data cbcd = {
+    .base_csr = clang_getCanonicalCursor( base_csr )
+  };
+  clang_visitChildren( ctor_csr, &callsBaseConstructor_visitor, &cbcd );
+  return cbcd.found_explicit_call;
+}
+
+CXCursor tidy_Cursor_getDefaultConstructor( CXCursor class_csr ) {
+  class_csr = clang_getCanonicalCursor( class_csr );
+  CXCursor default_ctor_csr = clang_getNullCursor();
+  clang_visitChildren(
+    class_csr, &getDefaultConstructor_visitor, &default_ctor_csr
+  );
+  return default_ctor_csr;
+}
 
 char* tidy_Cursor_getScopedDisplayName( CXCursor cursor ) {
   return getScopedName_thunk( cursor, &clang_getCursorDisplayName );

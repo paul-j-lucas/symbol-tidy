@@ -49,6 +49,26 @@
 ////////// extern functions ///////////////////////////////////////////////////
 
 /**
+ * Gets whether a constructor calls a constructor of a base class explicitly.
+ *
+ * @param ctor_csr The constructor.
+ * @param base_csr The base class.
+ * @return Returns `true` only if the constructor calls a constructor of a base
+ * class explicitly.
+ */
+NODISCARD
+bool tidy_Cursor_callsBaseConstructor( CXCursor ctor_csr, CXCursor base_csr );
+
+/**
+ * Gets the default constructor of a class, if any.
+ *
+ * @param class_csr The cursor for the class to get the default constructor of.
+ * @return Returns the cursor for the default constructor, if any.
+ */
+NODISCARD
+CXCursor tidy_Cursor_getDefaultConstructor( CXCursor class_csr );
+
+/**
  * Given a cursor at a local name of an enumeration, class, class data member,
  * class member function, structure, union, or namespace, gets its fully scoped
  * "display" name that includes template parameters (if any).
