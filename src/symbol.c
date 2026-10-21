@@ -607,6 +607,16 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       }
       break;
 
+    case CXCursor_EnumDecl:
+    case CXCursor_StructDecl:
+    case CXCursor_UnionDecl:
+      if ( clang_Cursor_isAnonymous( cursor ) )
+        break;
+      FALLTHROUGH;
+
+    case CXCursor_ClassDecl:
+    case CXCursor_ClassTemplate:
+    case CXCursor_ClassTemplatePartialSpecialization:
     case CXCursor_Constructor:
     case CXCursor_ConversionFunction:
     case CXCursor_CXXMethod:
@@ -652,11 +662,17 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       clang_disposeString( path_cxs );
 
       switch ( kind ) {
+        case CXCursor_ClassDecl:
+        case CXCursor_ClassTemplate:
+        case CXCursor_ClassTemplatePartialSpecialization:
         case CXCursor_Constructor:
         case CXCursor_ConversionFunction:
         case CXCursor_CXXMethod:
         case CXCursor_Destructor:
+        case CXCursor_EnumDecl:
         case CXCursor_FunctionDecl:
+        case CXCursor_StructDecl:
+        case CXCursor_UnionDecl:
           svd->parent_sym = sym;
           break;
 
