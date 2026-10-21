@@ -66,6 +66,7 @@ ignore-symbols = [
 ignore-symbols = [
   "strbuf_sepsn_putsn"
 ]
+
 [strbuf.h]
 ignore-symbols = [
   "strbuf_sepsn_puts"
