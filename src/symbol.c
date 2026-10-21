@@ -605,6 +605,10 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       }
       break;
 
+    case CXCursor_Constructor:
+    case CXCursor_ConversionFunction:
+    case CXCursor_CXXMethod:
+    case CXCursor_Destructor:
     case CXCursor_FunctionDecl:
     case CXCursor_VarDecl:
       is_definition =
@@ -646,13 +650,17 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       clang_disposeString( path_cxs );
 
       switch ( kind ) {
+        case CXCursor_Constructor:
+        case CXCursor_ConversionFunction:
+        case CXCursor_CXXMethod:
+        case CXCursor_Destructor:
+        case CXCursor_FunctionDecl:
+          svd->parent_sym = sym;
+          break;
+
         case CXCursor_FieldDecl:
           svd->parent_sym = sym;
           visit_FieldDecl( cursor, parent, svd );
-          break;
-
-        case CXCursor_FunctionDecl:
-          svd->parent_sym = sym;
           break;
 
         case CXCursor_MacroDefinition:
