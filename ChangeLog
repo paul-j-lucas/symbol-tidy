@@ -1,5 +1,14 @@
+2026-10-21  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * test/Makefile.am, run_test.sh, update_test.sh, enum_special_case.c,
+     enum_special_case.out, enum_special_case.test: First test.
+   * symbol.c: Added special case for enumerations.
+
 2026-10-20  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * symbol.c: Added cases for class, struct, enum, etc.
+   * clang_util.c, clang_util.h, symbol.c, symbol.h: Added display name.
+   * symbol.c: Added CXCursor_Constructor, etc.
    * symbol.c: Refactored visit_MacroDefinition().
    * symbol.c: Addedvisit_OverloadedDeclRef().
    * symbol-tidy.c, symbol-tidy.h: #include fixes.
