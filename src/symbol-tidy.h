@@ -88,7 +88,7 @@ extern char const  *prog_name;            ///< Program name.
  * the command line.
  */
 NODISCARD
-bool is_source_path( char const *path );
+bool is_argv_path( char const *path );
 
 ///////////////////////////////////////////////////////////////////////////////
 
