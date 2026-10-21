@@ -25,7 +25,8 @@ AUTOMAKE_OPTIONS = 1.12			# needed for TEST_LOG_DRIVER
 
 ###############################################################################
 
-TESTS=	tests/enum_special_case.test
+TESTS=	tests/enum_not_used.test \
+	tests/enum_special_case.test
 
 ###############################################################################
 
