@@ -28,7 +28,9 @@
 
 // local
 #include "pjl_config.h"
-#include "hash_table.h"
+
+// standard
+#include <stdbool.h>
 
 /**
  * @defgroup misc-globals Miscellaneous Globals
