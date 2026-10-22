@@ -715,9 +715,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
     case CXCursor_Destructor:
     case CXCursor_FunctionDecl:
     case CXCursor_VarDecl:
-      is_definition =
-        tidy_isCursorDefinition( cursor ) &&
-        tidy_Cursor_isExternalLinkage( cursor );
+      is_definition = tidy_isCursorDefinition( cursor );
       break;
 
     case CXCursor_CXXForRangeStmt:
