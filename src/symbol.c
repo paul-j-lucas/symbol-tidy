@@ -93,6 +93,7 @@ NODISCARD
 static bool symbol_is_excluded( CXCursor, tidy_source const* );
 
 static void visit_Constructor( CXCursor, CXCursor, symbols_visit_data* );
+static void visit_CXXMethod( CXCursor, CXCursor, symbols_visit_data* );
 static void visit_FieldDecl( CXCursor, CXCursor, symbols_visit_data* );
 static void visit_MacroDefinition( CXCursor, CXCursor, symbols_visit_data* );
 static void visit_most_Ref( CXCursor, CXCursor, symbols_visit_data* );
@@ -669,37 +670,39 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       }
       clang_disposeString( path_cxs );
 
+      svd->parent_sym = sym;
+
       switch ( kind ) {
         case CXCursor_ClassDecl:
         case CXCursor_ClassTemplate:
         case CXCursor_ClassTemplatePartialSpecialization:
         case CXCursor_ConversionFunction:
-        case CXCursor_CXXMethod:
         case CXCursor_Destructor:
         case CXCursor_EnumDecl:
         case CXCursor_FunctionDecl:
         case CXCursor_StructDecl:
         case CXCursor_UnionDecl:
-          svd->parent_sym = sym;
           break;
 
         case CXCursor_Constructor:
-          svd->parent_sym = sym;
           visit_Constructor( cursor, parent, svd );
           break;
 
+        case CXCursor_CXXMethod:
+          visit_CXXMethod( cursor, parent, svd );
+          break;
+
         case CXCursor_FieldDecl:
-          svd->parent_sym = sym;
           visit_FieldDecl( cursor, parent, svd );
           break;
 
         case CXCursor_MacroDefinition:
-          svd->parent_sym = sym;
           visit_MacroDefinition( cursor, parent, svd );
           break;
 
         default:
-          /* suppress warning */;
+          svd->parent_sym = NULL;
+          break;
       } // switch
     }
   }
@@ -780,6 +783,7 @@ static void visit_Constructor( CXCursor ctor_csr, CXCursor parent,
     assert( svd != NULL );
     svd->cxx_ctor_csr = ctor_csr;
     clang_visitChildren( cls_csr, &visit_Constructor_vistor, svd );
+    svd->cxx_ctor_csr = clang_getNullCursor();
   }
 }
 
@@ -835,6 +839,37 @@ skip:
   // CXChildVisit_Continue.
   //
   return CXChildVisit_Continue;
+}
+
+/**
+ * Visits a `CXCursor_CXXMethod` kind of cursor.
+ *
+ * @remarks When a C++ virtual member function is called, libclang generates an
+ * AST containing only the base class's member function since it can't know
+ * which overridden functions are actually called.  So as not to them as
+ * unused, add references from the base one to all the overridden ones.
+ *
+ * @param method_csr The method's cursor to visit.
+ * @param parent The parent cursor of \a method_csr.
+ * @param svd The symbols_visit_data to use.
+ */
+static void visit_CXXMethod( CXCursor method_csr, CXCursor parent,
+                             symbols_visit_data *svd ) {
+  (void)parent;
+
+  CXCursor *overridden_csrs;
+  unsigned  overridden_csrs_count;
+  clang_getOverriddenCursors(
+    method_csr, &overridden_csrs, &overridden_csrs_count
+  );
+
+  for ( unsigned i = 0; i < overridden_csrs_count; ++i ) {
+    tidy_symbol *const base_sym = add_symbol( overridden_csrs[i], svd->source );
+    if ( base_sym != NULL )
+      symbol_add_ref( base_sym, svd->parent_sym );
+  } // for
+
+  clang_disposeOverriddenCursors( overridden_csrs );
 }
 
 /**
