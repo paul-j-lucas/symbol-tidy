@@ -223,6 +223,31 @@ enum CXChildVisitResult getDefaultConstructor_visitor( CXCursor cursor,
 }
 
 /**
+ * A helper function for tidy_Cursor_getDestructor() that visits each symbol
+ * attempting to find a destructor.
+ *
+ * @param cursor The cursor being visited.
+ * @param parent Not used.
+ * @param data A pointer to receive the cursor for the default constructor.
+ * @return Returns either `CXChildVisit_Break` or `CXChildVisit_Recurse`.
+ */
+static enum CXChildVisitResult getDestructor_visitor( CXCursor cursor,
+                                                      CXCursor parent,
+                                                      CXClientData data ) {
+  (void)parent;
+
+  enum CXCursorKind const kind = clang_getCursorKind( cursor );
+  if ( kind == CXCursor_Destructor ) {
+    assert( data != NULL );
+    CXCursor *const dtor_csr = data;
+    *dtor_csr = cursor;
+    return CXChildVisit_Break;
+  }
+
+  return CXChildVisit_Continue;
+}
+
+/**
  * Given a cursor at a local name of an enumeration, class, class data member,
  * class member function, structure, union, or namespace, gets the fully scoped
  * name skipping inline namespaces.
@@ -362,6 +387,13 @@ CXCursor tidy_Cursor_getDefaultConstructor( CXCursor class_csr ) {
     class_csr, &getDefaultConstructor_visitor, &default_ctor_csr
   );
   return default_ctor_csr;
+}
+
+CXCursor tidy_Cursor_getDestructor( CXCursor class_csr ) {
+  class_csr = clang_getCanonicalCursor( class_csr );
+  CXCursor dtor_csr = clang_getNullCursor();
+  clang_visitChildren( class_csr, &getDestructor_visitor, &dtor_csr );
+  return dtor_csr;
 }
 
 char* tidy_Cursor_getScopedDisplayName( CXCursor cursor ) {

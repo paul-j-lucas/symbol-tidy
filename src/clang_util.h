@@ -69,6 +69,15 @@ NODISCARD
 CXCursor tidy_Cursor_getDefaultConstructor( CXCursor class_csr );
 
 /**
+ * Gets the destructor of a class, if any.
+ *
+ * @param class_csr The cursor for the class to get the destructor of.
+ * @return Returns the cursor for the destructor, if any.
+ */
+NODISCARD
+CXCursor tidy_Cursor_getDestructor( CXCursor class_csr );
+
+/**
  * Given a cursor at a local name of an enumeration, class, class data member,
  * class member function, structure, union, or namespace, gets its fully scoped
  * "display" name that includes template parameters (if any).

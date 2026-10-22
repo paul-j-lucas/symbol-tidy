@@ -784,6 +784,18 @@ static void visit_Constructor( CXCursor ctor_csr, CXCursor parent,
     svd->cxx_ctor_csr = ctor_csr;
     clang_visitChildren( cls_csr, &visit_Constructor_vistor, svd );
     svd->cxx_ctor_csr = clang_getNullCursor();
+
+    //
+    // Since destructors are called implicitly, they're not in the AST.
+    // However, since a constructor was called, then its destructor must be
+    // called, so add a reference to it.
+    //
+    CXCursor const dtor_csr = tidy_Cursor_getDestructor( cls_csr );
+    if ( !tidy_Cursor_isInvalid( dtor_csr ) ) {
+      tidy_symbol *const dtor_sym = add_symbol( dtor_csr, svd->source );
+      if ( dtor_sym != NULL )
+        symbol_add_ref( svd->parent_sym, dtor_sym );
+    }
   }
 }
 
