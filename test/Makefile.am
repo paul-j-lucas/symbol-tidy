@@ -28,7 +28,7 @@ AUTOMAKE_OPTIONS = 1.12			# needed for TEST_LOG_DRIVER
 TESTS=	tests/enum.test
 
 # C++
-TESTS+=	tests/constructors.test
+TESTS+=	tests/constructors-implicit.test
 
 ###############################################################################
 
