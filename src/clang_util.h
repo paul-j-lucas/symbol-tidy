@@ -52,12 +52,13 @@
  * Gets whether a constructor calls a constructor of a base class explicitly.
  *
  * @param ctor_csr The constructor.
- * @param base_csr The base class.
+ * @param base_cls_csr The base class.
  * @return Returns `true` only if the constructor calls a constructor of a base
  * class explicitly.
  */
 NODISCARD
-bool tidy_Cursor_callsBaseConstructor( CXCursor ctor_csr, CXCursor base_csr );
+bool tidy_Cursor_callsBaseConstructor( CXCursor ctor_csr,
+                                       CXCursor base_cls_csr );
 
 /**
  * Gets the default constructor of a class, if any.
@@ -140,14 +141,14 @@ bool tidy_Cursor_isExternalLinkage( CXCursor cursor );
 
 /**
  * Gets whether a class, data member, or member function given by \a cursor is
- * derived, inherited, or specialized from the class given by \a base_csr.
+ * derived, inherited, or specialized from the class given by \a base_cls_csr.
  *
  * @param cursor The candidate cursor.
- * @param base_csr The candidate base class cursor.
- * @return Returns `true` only if \a cursor is inherited from \a base_csr.
+ * @param base_cls_csr The candidate base class cursor.
+ * @return Returns `true` only if \a cursor is inherited from \a base_cls_csr.
  */
 NODISCARD
-bool tidy_Cursor_isInheritedFrom( CXCursor cursor, CXCursor base_csr );
+bool tidy_Cursor_isInheritedFrom( CXCursor cursor, CXCursor base_cls_csr );
 
 #ifdef NEED_tidy_Cursor_isInheritedMemberFunctionCall
 // All code guarded by NEED_tidy_Cursor_isInheritedMemberFunctionCall is code

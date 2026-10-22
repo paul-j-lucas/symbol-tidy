@@ -61,7 +61,7 @@ typedef struct isBaseClass_data           isBaseClass_data;
  * Additional data passed to callsBaseConstructor_visitor().
  */
 struct callsBaseConstructor_data {
-  CXCursor  base_csr;                   ///< The base class cursor.
+  CXCursor  base_cls_csr;               ///< The base class cursor.
   bool      found_explicit_call;        ///< Called base constructor explicitly?
 };
 
@@ -84,10 +84,10 @@ struct isBaseClass_data {
    *
    * @note This _must_ be set to a canonical cursor.
    */
-  CXCursor base_csr;
+  CXCursor base_cls_csr;
 
   /**
-   * Set to `true` only if \ref base_csr is a base class of a given cursor.
+   * Set to `true` only if \ref base_cls_csr is a base class of a given cursor.
    */
   bool is_base;
 };
@@ -126,7 +126,7 @@ enum CXChildVisitResult callsBaseConstructor_visitor( CXCursor cursor,
 
   assert( data != NULL );
   callsBaseConstructor_data *const cbcd = data;
-  if ( clang_equalCursors( sem_parent, cbcd->base_csr ) ) {
+  if ( clang_equalCursors( sem_parent, cbcd->base_cls_csr ) ) {
     cbcd->found_explicit_call = true;
     return CXChildVisit_Break;
   }
@@ -173,15 +173,15 @@ static enum CXChildVisitResult getCursorByName_visitor( CXCursor cursor,
 
   switch ( kind ) {
     case CXCursor_CXXBaseSpecifier:;
-      CXCursor base_csr = clang_getCursorReferenced( cursor );
-      if ( tidy_Cursor_isInvalid( base_csr ) ) {
+      CXCursor base_cls_csr = clang_getCursorReferenced( cursor );
+      if ( tidy_Cursor_isInvalid( base_cls_csr ) ) {
         // LCOV_EXCL_START
         CXType const type = clang_getCursorType( cursor );
-        base_csr = clang_getTypeDeclaration( type );
+        base_cls_csr = clang_getTypeDeclaration( type );
         // LCOV_EXCL_STOP
       }
-      if ( !tidy_Cursor_isInvalid( base_csr ) )
-        clang_visitChildren( base_csr, &getCursorByName_visitor, data );
+      if ( !tidy_Cursor_isInvalid( base_cls_csr ) )
+        clang_visitChildren( base_cls_csr, &getCursorByName_visitor, data );
       break;
 
     case CXCursor_Namespace:
@@ -332,9 +332,10 @@ static enum CXChildVisitResult isBaseClass_visitor( CXCursor cursor,
     assert( data != NULL );
     isBaseClass_data *const ibcd = data;
 
-    if ( clang_equalCursors( ref_csr, ibcd->base_csr ) ||
-         tidy_Cursor_isInheritedFrom( ref_csr, ibcd->base_csr ) ||
-         tidy_Cursor_isTemplateSpecializationOf( ibcd->base_csr, ref_csr ) ) {
+    if ( clang_equalCursors( ref_csr, ibcd->base_cls_csr ) ||
+         tidy_Cursor_isInheritedFrom( ref_csr, ibcd->base_cls_csr ) ||
+         tidy_Cursor_isTemplateSpecializationOf( ibcd->base_cls_csr,
+                                                 ref_csr ) ) {
       ibcd->is_base = true;
       return CXChildVisit_Break;
     }
@@ -372,9 +373,10 @@ static bool tidy_Cursor_isInheritable( CXCursor cursor ) {
 
 ////////// extern functions ///////////////////////////////////////////////////
 
-bool tidy_Cursor_callsBaseConstructor( CXCursor ctor_csr, CXCursor base_csr ) {
+bool tidy_Cursor_callsBaseConstructor( CXCursor ctor_csr,
+                                       CXCursor base_cls_csr ) {
   callsBaseConstructor_data cbcd = {
-    .base_csr = clang_getCanonicalCursor( base_csr )
+    .base_cls_csr = clang_getCanonicalCursor( base_cls_csr )
   };
   clang_visitChildren( ctor_csr, &callsBaseConstructor_visitor, &cbcd );
   return cbcd.found_explicit_call;
@@ -443,15 +445,17 @@ bool tidy_Cursor_isExternalLinkage( CXCursor cursor ) {
   } // switch
 }
 
-bool tidy_Cursor_isInheritedFrom( CXCursor cursor, CXCursor base_csr ) {
-  if ( tidy_Cursor_isInvalid( cursor ) || tidy_Cursor_isInvalid( base_csr ) )
+bool tidy_Cursor_isInheritedFrom( CXCursor cursor, CXCursor base_cls_csr ) {
+  if ( tidy_Cursor_isInvalid( cursor ) ||
+       tidy_Cursor_isInvalid( base_cls_csr ) ) {
     return false;
+  }
 
-  if ( tidy_Cursor_isInheritable( base_csr ) )
-    base_csr = clang_getCursorSemanticParent( base_csr );
-  if ( !tidy_Cursor_isClassDecl( base_csr ) )
+  if ( tidy_Cursor_isInheritable( base_cls_csr ) )
+    base_cls_csr = clang_getCursorSemanticParent( base_cls_csr );
+  if ( !tidy_Cursor_isClassDecl( base_cls_csr ) )
     return false;
-  base_csr = clang_getCanonicalCursor( base_csr );
+  base_cls_csr = clang_getCanonicalCursor( base_cls_csr );
 
   while ( !tidy_Cursor_isInvalid( cursor ) ) {
     enum CXCursorKind const kind = clang_getCursorKind( cursor );
@@ -459,9 +463,9 @@ bool tidy_Cursor_isInheritedFrom( CXCursor cursor, CXCursor base_csr ) {
       break;
 
     if ( tidy_Cursor_isClassDecl( cursor ) ) {
-      if ( tidy_Cursor_isTemplateSpecializationOf( base_csr, cursor ) )
+      if ( tidy_Cursor_isTemplateSpecializationOf( base_cls_csr, cursor ) )
         return true;
-      isBaseClass_data ibcd = { .base_csr = base_csr };
+      isBaseClass_data ibcd = { .base_cls_csr = base_cls_csr };
       clang_visitChildren( cursor, &isBaseClass_visitor, &ibcd );
       if ( ibcd.is_base )
         return true;

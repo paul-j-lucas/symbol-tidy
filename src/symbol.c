@@ -914,23 +914,23 @@ static enum CXChildVisitResult visit_Constructor_vistor( CXCursor cursor,
   if ( kind != CXCursor_CXXBaseSpecifier )
     goto skip;
 
-  CXCursor base_csr = clang_getCursorReferenced( cursor );
-  if ( tidy_Cursor_isInvalid( base_csr ) ) {
+  CXCursor base_cls_csr = clang_getCursorReferenced( cursor );
+  if ( tidy_Cursor_isInvalid( base_cls_csr ) ) {
     CXType const type = clang_getCursorType( cursor );
-    base_csr = clang_getTypeDeclaration( type );
+    base_cls_csr = clang_getTypeDeclaration( type );
   }
-  base_csr = clang_getCanonicalCursor( base_csr );
+  base_cls_csr = clang_getCanonicalCursor( base_cls_csr );
 
   assert( data != NULL );
   symbols_visit_data *const svd = data;
   if ( tidy_Cursor_callsBaseConstructor( svd->cxx_constructor.ctor_csr,
-                                         base_csr ) ) {
+                                         base_cls_csr ) ) {
     goto skip;
   }
 
-  // If no constructor of base_csr was explicitly invoked, link default
-  // constructor.
-  CXCursor const def_ctor = tidy_Cursor_getDefaultConstructor( base_csr );
+  // If no constructor of base_cls_csr was explicitly called, add a reference
+  // to the default constructor.
+  CXCursor const def_ctor = tidy_Cursor_getDefaultConstructor( base_cls_csr );
   if ( tidy_Cursor_isInvalid( def_ctor ) )
     goto skip;
 
