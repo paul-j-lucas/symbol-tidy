@@ -796,8 +796,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
           break;
 
         default:
-          svd->parent_sym = NULL;
-          break;
+          /* suppress warning */;
       } // switch
     }
   }
