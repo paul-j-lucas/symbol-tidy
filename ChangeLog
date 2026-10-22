@@ -1,5 +1,9 @@
 2026-10-21  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * test/Makefile.am, constructors.cpp, constructors.out, constructors.test:
+     Added constructors test.
+   * test/Makefile.am: Consolidated, part 2.
+   * enum_not_used.c, enum_not_used.out: Consolidated.
    * clang_util.c, clang_util.h, symbol.c: Better default constructor support.
    * test/Makefile.am, enum_not_used.c, enum_not_used.out, enum_not_used.test:
      Enumeration test.
