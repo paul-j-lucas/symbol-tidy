@@ -180,7 +180,6 @@ skip:
  * Adds a symbol to symbol_set.
  *
  * @param sym_csr The cursor for the symbol to add.
- * @param sym_file The file that contains the declaration for \a sym_csr.
  * @param source The tidy_source to use.
  * @return Returns the new tidy_symbol or NULL if it could not be added.
  */
