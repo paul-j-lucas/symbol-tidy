@@ -27,6 +27,9 @@ AUTOMAKE_OPTIONS = 1.12			# needed for TEST_LOG_DRIVER
 
 TESTS=	tests/enum.test
 
+# C++
+TESTS+=	tests/constructors.test
+
 ###############################################################################
 
 ABS_TOP_BUILDDIR =	$(abs_top_builddir)
