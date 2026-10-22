@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 enum E_used_implicitly {
   A
 };
@@ -8,4 +10,5 @@ enum E_not_used {
 
 int main() {
   int i = A;
+  printf( "%d\n", i );
 }
