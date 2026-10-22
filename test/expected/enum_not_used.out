@@ -1,6 +1,0 @@
-$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers enum_not_used.c
-"enum_not_used.c": warning: unused symbols:
-    5, 6 | "E_not_used"
-    6, 3 | "E_not_used::A_NOT_USED"
-symbol-tidy: 2 unused symbols
-

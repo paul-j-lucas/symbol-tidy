@@ -2,6 +2,6 @@ EXPECTED_EXIT=1
 
 test_symbol_tidy $TIDY_TEST_OPTIONS \
   $TIDY_TEST_CONFIG \
-  enum_not_used.c
+  enum.c
 
 # vim:set syntax=bash et sw=2 ts=2:
