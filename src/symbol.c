@@ -793,6 +793,18 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
           visit_MacroDefinition( cursor, parent, svd );
           break;
 
+        case CXCursor_VarDecl:
+          //
+          // If a variable of a class type is declared and the class has a
+          // constructor, mark it as a root (used) since it may have side
+          // effects.
+          //
+          if ( svd->source->lang == CXLanguage_CPlusPlus &&
+               tidy_Cursor_hasConstructor( cursor ) ) {
+            sym->is_root = true;
+          }
+          break;
+
         default:
           /* suppress warning */;
       } // switch

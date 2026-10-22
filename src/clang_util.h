@@ -109,6 +109,16 @@ NODISCARD
 char* tidy_Cursor_getScopedSpelling( CXCursor cursor );
 
 /**
+ * Gets whether \a cursor has a constructor.
+ *
+ * @param cursor The cursor to check.
+ * @return Returns `true` only if \a cursor is either a class type or a
+ * variable of a class type that has a constructor.
+ */
+NODISCARD
+bool tidy_Cursor_hasConstructor( CXCursor cursor );
+
+/**
  * Gets whether \a cursor is a class, class template, structure, or union
  * declaration.
  *
