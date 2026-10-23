@@ -1,5 +1,7 @@
 2026-10-22  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * test/Makefile.am, range-for.cpp, range-for.out, range-for.test: Added
+     range-for.test.
    * constructors-implicit.cpp, constructors-implicit.out,
      constructors-implicit.test: Better test.
    * enum.c, enum.out: Fixed test.
