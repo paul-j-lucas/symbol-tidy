@@ -1,5 +1,18 @@
+2026-10-22  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * constructors-implicit.cpp, constructors-implicit.out,
+     constructors-implicit.test: Better test.
+   * enum.c, enum.out: Fixed test.
+   * clang_util.c, clang_util.h, symbol.c: Now handling objects that have
+     constructors.
+   * symbol.c: No longer called tidy_Cursor_isExternalLinkage().
+   * symbol.c: No longer setting sym to NULL.
+   * symbol.c: Handing C++ range-for statements and begin()/end().
+
 2026-10-21  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * clang_util.c, clang_util.h, symbol.c: Now handling C++ destructors.
+   * symbol.c: Now handling virtual member functions.
    * test/Makefile.am, constructors.cpp, constructors.out, constructors.test:
      Added constructors test.
    * test/Makefile.am: Consolidated, part 2.
