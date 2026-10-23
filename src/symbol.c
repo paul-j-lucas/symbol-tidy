@@ -622,6 +622,24 @@ static void symbols_cleanup( void ) {
 }
 
 /**
+ * Gets whether \a sym is within a scope that is ununsed.
+ *
+ * @param sym The symbol to check.
+ * @return Returns `true` only if \a sym is within an unused scope.
+ */
+NODISCARD
+static bool symbol_in_unused_scope( tidy_symbol const *sym ) {
+  assert( sym != NULL );
+
+  for ( sym = sym->parent_sym; sym != NULL; sym = sym->parent_sym ) {
+    if ( sym->is_scope && !sym->is_used )
+      return true;
+  } // for
+
+  return false;
+}
+
+/**
  * Marks all used symbols as used.
  *
  * @return Returns the number of unused symbols.
@@ -637,9 +655,14 @@ static unsigned symbols_mark_used( void ) {
 
   unsigned unused = 0;
   ht_iterator_init( &iter, &symbol_set );
-  for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
-    if ( !(sym->path == NULL || sym->line == 0 || sym->is_used) )
+  for ( tidy_symbol *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
+    if ( sym->path == NULL || sym->line == 0 ||
+         symbol_in_unused_scope( sym ) ) {
+      sym->is_dead = true;
+    }
+    else if ( !sym->is_used ) {
       ++unused;
+    }
   } // for
 
   return unused;
@@ -713,6 +736,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       break;
 
     case CXCursor_EnumDecl:
+    case CXCursor_Namespace:
     case CXCursor_StructDecl:
     case CXCursor_UnionDecl:
       if ( !clang_Cursor_isAnonymous( cursor ) )
@@ -745,6 +769,11 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
         sym->path = strdup_or_exit( path );
       }
       clang_disposeString( path_cxs );
+
+      if ( sym->parent_sym == NULL )
+        sym->parent_sym = svd->parent_sym;
+      if ( tidy_Cursor_isEnclosingScope( cursor ) )
+        sym->is_scope = true;
 
       svd->parent_sym = sym;
 
@@ -1293,7 +1322,7 @@ unsigned symbols_print_unused( void ) {
   ht_iterator_t iter;
   ht_iterator_init( &iter, &symbol_set );
   for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
-    if ( !(sym->path == NULL || sym->line == 0 || sym->is_used) )
+    if ( !sym->is_used && !sym->is_dead )
       *(tidy_symbol*)array_push_back( &symbol_array ) = *sym;
   } // for
 

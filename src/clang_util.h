@@ -122,14 +122,32 @@ bool tidy_Cursor_hasConstructor( CXCursor cursor );
  * Gets whether \a cursor is a class, class template, structure, or union
  * declaration.
  *
+ * @remarks This function is a subset of tidy_Cursor_isEnclosingScope().
+ *
  * @param cursor The cursor to check.
  * @return Returns `true` only if \a cursor is a class, class template,
  * structure, or union declaration.
  *
+ * @sa tidy_Cursor_isEnclosingScope()
  * @sa tidy_Cursor_isScopeDecl()
  */
 NODISCARD
 bool tidy_Cursor_isClassDecl( CXCursor cursor );
+
+/**
+ * Gets whether \a cursor is anything that is an enclosing scope, i.e., a
+ * namespace or any kind of class or function.
+ *
+ * @remarks This function is a superset of tidy_Cursor_isClassDecl().
+ *
+ * @param cursor The cursor to check.
+ * @return Returns `true` only if \a cursor is an enclosing scope.
+ *
+ * @sa tidy_Cursor_isClassDecl()
+ * @sa tidy_Cursor_isScopeDecl()
+ */
+NODISCARD
+bool tidy_Cursor_isEnclosingScope( CXCursor cursor );
 
 /**
  * Gets whether \a cursor is an external, global function.
@@ -186,6 +204,7 @@ bool tidy_Cursor_isReservedName( CXCursor cursor, enum CXLanguageKind lang );
  * enumeration, namespace, structure, or union.
  *
  * @sa tidy_Cursor_isClassDecl()
+ * @sa tidy_Cursor_isEnclosingScope()
  */
 NODISCARD
 bool tidy_Cursor_isScopeDecl( CXCursor cursor );

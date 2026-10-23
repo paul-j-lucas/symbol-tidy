@@ -67,9 +67,12 @@ struct tidy_symbol {
   char const   *path;                   ///< File defined in.
   unsigned      line;                   ///< Line defined on.
   unsigned      col;                    ///< Column defined at.
-  bool          is_root;    // Is "main" or referenced from global scope?
-  bool          is_used;                ///< Is the symbol used?
+  tidy_symbol  *parent_sym;             ///< Parent symbol, if any.
   tidy_sym_ref *refs;                   ///< Symbol(s) referenced from this.
+  bool          is_root;    // Is "main" or referenced from global scope?
+  bool          is_dead;                ///< Don't count as unused.
+  bool          is_scope;               ///< Is this an enclosing scope?
+  bool          is_used;                ///< Is the symbol used?
 };
 
 ////////// extern functions ///////////////////////////////////////////////////
