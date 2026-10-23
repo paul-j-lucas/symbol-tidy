@@ -150,60 +150,6 @@ NODISCARD
 bool tidy_Cursor_isExternalLinkage( CXCursor cursor );
 
 /**
- * Gets whether a class, data member, or member function given by \a cursor is
- * derived, inherited, or specialized from the class given by \a base_cls_csr.
- *
- * @param cursor The candidate cursor.
- * @param base_cls_csr The candidate base class cursor.
- * @return Returns `true` only if \a cursor is inherited from \a base_cls_csr.
- */
-NODISCARD
-bool tidy_Cursor_isInheritedFrom( CXCursor cursor, CXCursor base_cls_csr );
-
-#ifdef NEED_tidy_Cursor_isInheritedMemberFunctionCall
-// All code guarded by NEED_tidy_Cursor_isInheritedMemberFunctionCall is code
-// was presumably needed, but removing it causes no tests to fail, so it may
-// not be needed.  But I didn't want to delete the code (even though it still
-// would be in the git repo) just in case it turns out to be necessary after
-// all at some point.
-
-/**
- * Gets whether a C++ member function is inherited from a base class.
- *
- * @par Example
- * @parblock
- * Given something like:
- *
- *      struct Base {
- *        void f();
- *      };
- *
- *      struct Derived : Base {
- *        // ...
- *      };
- *
- *      void g() {
- *        Derived d;
- *        d.f();                        // f() is inherited from Base
- *        // ...
- *      }
- *
- * the member function `f()` isn't declared in `Derived`, but declared in and
- * inherited from `Base`.
- *
- * @endparblock
- *
- * @param expr_csr The expression the member function is being called on.
- * @param rv_cls_csr If not NULL and the member function was inherited,
- * receives the cursor for the base class that the function was declared in.
- * @return Returns `true` only if the member function was inherited.
- */
-NODISCARD
-bool tidy_Cursor_isInheritedMemberFunctionCall( CXCursor expr_csr,
-                                                CXCursor *rv_cls_csr );
-#endif /* NEED_tidy_Cursor_isInheritedMemberFunctionCall */
-
-/**
  * Gets whether \a cursor is either null or invalid.
  *
  * @param cursor The cursor to check.
@@ -243,18 +189,6 @@ bool tidy_Cursor_isReservedName( CXCursor cursor, enum CXLanguageKind lang );
  */
 NODISCARD
 bool tidy_Cursor_isScopeDecl( CXCursor cursor );
-
-/**
- * Gets whether \a cursor is a template specialization of \a template_csr.
- *
- * @param cursor The candicate template class specialization cursor.
- * @param template_csr The candidate template class cursor.
- * @return Returns `true` only if \a template_csr is a template class and \a
- * cursor is a specialization of it.
- */
-NODISCARD
-bool tidy_Cursor_isTemplateSpecializationOf( CXCursor cursor,
-                                             CXCursor template_csr );
 
 /**
  * Gets the real path of \a file.
