@@ -1,5 +1,8 @@
 2026-10-23  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * clang_util.c, clang_util.h, symbol.c, symbol.h: If a symbol is within an
+     unused scope, don't report the symbol as unused since the scope itself is
+     unused.
    * clang_util.c, clang_util.h: Eliminated some include-tidy code not needed
      here.
    * src/Makefile.am: Now just passing .c files to symbol-tidy.
