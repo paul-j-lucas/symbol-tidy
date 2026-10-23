@@ -155,9 +155,9 @@ static enum CXChildVisitResult add_begin_end_ref_visitor( CXCursor cursor,
 
   if ( name == NULL )
     goto done;
-  if ( strcmp( name, "begin" ) == 0 )
+  if ( !svd->cxx_for_range.found_begin && strcmp( name, "begin" ) == 0 )
     svd->cxx_for_range.found_begin = true;
-  else if ( strcmp( name, "end" ) == 0 )
+  else if ( !svd->cxx_for_range.found_end && strcmp( name, "end" ) == 0 )
     svd->cxx_for_range.found_end = true;
   else
     goto done;
