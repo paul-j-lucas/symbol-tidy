@@ -606,6 +606,8 @@ static void symbol_mark_used( tidy_symbol *sym ) {
 
   if ( !sym->is_used ) {
     sym->is_used = true;
+    if ( sym->parent_sym != NULL )
+      symbol_mark_used( sym->parent_sym );
     for ( tidy_sym_ref *ref = sym->refs; ref != NULL; ref = ref->next )
       symbol_mark_used( ref->sym );
   }
