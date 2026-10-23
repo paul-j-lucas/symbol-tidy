@@ -1,5 +1,10 @@
+2026-10-23  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * symbol.c, range-for.cpp: Now also look for non-member begin()/end().
+
 2026-10-22  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * symbol.c: Added check of found_begin/found_end.
    * test/Makefile.am, range-for.cpp, range-for.out, range-for.test: Added
      range-for.test.
    * constructors-implicit.cpp, constructors-implicit.out,
