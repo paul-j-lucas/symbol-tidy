@@ -254,23 +254,19 @@ static enum CXChildVisitResult find_begin_end_visitor( CXCursor cursor,
   } // switch
 
   CXString const    name_cxs = clang_getCursorSpelling( cursor );
-  char const *const name = clang_getCString( name_cxs );
+  char const *const name_cs = clang_getCString( name_cxs );
 
-  if ( name == NULL )
-    goto done;
-  if ( clang_Cursor_isNull( svd->cxx_for_range.begin_csr ) &&
-       strcmp( name, "begin" ) == 0 ) {
-    svd->cxx_for_range.begin_csr = cursor;
-  }
-  else if ( clang_Cursor_isNull( svd->cxx_for_range.end_csr ) &&
-            strcmp( name, "end" ) == 0 ) {
-    svd->cxx_for_range.end_csr = cursor;
-  }
-  else {
-    goto done;
+  if ( name_cs != NULL && name_cs[0] != '\0' ) {
+    if ( clang_Cursor_isNull( svd->cxx_for_range.begin_csr ) &&
+         strcmp( name_cs, "begin" ) == 0 ) {
+      svd->cxx_for_range.begin_csr = cursor;
+    }
+    else if ( clang_Cursor_isNull( svd->cxx_for_range.end_csr ) &&
+              strcmp( name_cs, "end" ) == 0 ) {
+      svd->cxx_for_range.end_csr = cursor;
+    }
   }
 
-done:
   clang_disposeString( name_cxs );
 
   if ( !clang_Cursor_isNull( svd->cxx_for_range.begin_csr ) &&
@@ -730,7 +726,6 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
 
   switch ( kind ) {
     case CXCursor_CallExpr:
-
     case CXCursor_CXXNewExpr:
     case CXCursor_CXXDeleteExpr:
     case CXCursor_CXXFunctionalCastExpr:
@@ -738,7 +733,6 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
     case CXCursor_CXXConstCastExpr:
     case CXCursor_CXXReinterpretCastExpr:
     case CXCursor_CXXDynamicCastExpr:
-
     case CXCursor_DeclRefExpr:
     case CXCursor_MacroExpansion:
     case CXCursor_MemberRefExpr:
@@ -807,17 +801,6 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       svd->parent_sym = sym;
 
       switch ( kind ) {
-        case CXCursor_ClassDecl:
-        case CXCursor_ClassTemplate:
-        case CXCursor_ClassTemplatePartialSpecialization:
-        case CXCursor_ConversionFunction:
-        case CXCursor_Destructor:
-        case CXCursor_EnumDecl:
-        case CXCursor_FunctionDecl:
-        case CXCursor_StructDecl:
-        case CXCursor_UnionDecl:
-          break;
-
         case CXCursor_Constructor:
           visit_Constructor( cursor, parent, svd );
           break;
@@ -837,8 +820,8 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
         case CXCursor_VarDecl:
           //
           // If a variable of a class type is declared and the class has a
-          // constructor, mark it as a root (used) since it may have side
-          // effects.
+          // constructor, mark the variable as a root (used) since the
+          // constructor may have side effects.
           //
           if ( svd->source->lang == CXLanguage_CPlusPlus &&
                tidy_Cursor_hasConstructor( cursor ) ) {
@@ -1017,15 +1000,15 @@ static void visit_CXXForRangeStmt( CXCursor range_stmt_csr, CXCursor parent,
   if ( clang_Cursor_isNull( range_expr ) )
     return;
 
-  CXType type = clang_getCursorType( range_expr );
-  bool is_const = clang_isConstQualifiedType( type );
+  CXType range_type = clang_getCursorType( range_expr );
+  bool is_range_const = clang_isConstQualifiedType( range_type );
 
-  type = clang_getCanonicalType( type );
-  type = clang_getNonReferenceType( type );
-  if ( !is_const )
-    is_const = clang_isConstQualifiedType( type );
+  range_type = clang_getCanonicalType( range_type );
+  range_type = clang_getNonReferenceType( range_type );
+  if ( !is_range_const )
+    is_range_const = clang_isConstQualifiedType( range_type );
 
-  CXCursor cls_csr = clang_getTypeDeclaration( type );
+  CXCursor cls_csr = clang_getTypeDeclaration( range_type );
   if ( !tidy_Cursor_isClassDecl( cls_csr ) )
     return;
 
@@ -1035,33 +1018,39 @@ static void visit_CXXForRangeStmt( CXCursor range_stmt_csr, CXCursor parent,
     .cls_csr = cls_csr,
     .begin_csr = clang_getNullCursor(),
     .end_csr = clang_getNullCursor(),
-    .is_const = is_const
+    .is_const = is_range_const
   };
 
-  // Try looking for T::begin()/T::end() member functions first.
+  // Try looking for T::{ begin | end }() [const] member functions first.
   clang_visitChildren( cls_csr, &find_begin_end_visitor, svd );
 
-  // Try looking for begin(T&)/end(T&) non-member functions second.
-  CXCursor scope_csr = clang_getCursorSemanticParent( cls_csr );
-  while ( !tidy_Cursor_isInvalid( scope_csr ) &&
-          (clang_Cursor_isNull( svd->cxx_for_range.begin_csr ) ||
-           clang_Cursor_isNull( svd->cxx_for_range.end_csr )) ) {
-    clang_visitChildren( scope_csr, &find_begin_end_visitor, svd );
-    enum CXCursorKind const kind = clang_getCursorKind( scope_csr );
-    if ( kind == CXCursor_TranslationUnit )
-      break;
-    scope_csr = clang_getCursorSemanticParent( scope_csr );
-  } // while
+  // If either is not found, try looking for { begin | end }([const] T&)
+  // non-member functions second.
+  if ( clang_Cursor_isNull( svd->cxx_for_range.begin_csr ) ||
+       clang_Cursor_isNull( svd->cxx_for_range.end_csr ) ) {
+    svd->cxx_for_range.begin_csr = clang_getNullCursor();
+    svd->cxx_for_range.end_csr = clang_getNullCursor();
+
+    CXCursor scope_csr = clang_getCursorSemanticParent( cls_csr );
+    while ( !tidy_Cursor_isInvalid( scope_csr ) ) {
+      clang_visitChildren( scope_csr, &find_begin_end_visitor, svd );
+      if ( !clang_Cursor_isNull( svd->cxx_for_range.begin_csr ) &&
+           !clang_Cursor_isNull( svd->cxx_for_range.end_csr ) ) {
+        break;
+      }
+      enum CXCursorKind const kind = clang_getCursorKind( scope_csr );
+      if ( kind == CXCursor_TranslationUnit )
+        break;
+      scope_csr = clang_getCursorSemanticParent( scope_csr );
+    } // while
+  }
 
   if ( !clang_Cursor_isNull( svd->cxx_for_range.begin_csr ) ) {
-    tidy_symbol *const sym =
-      add_symbol( svd->cxx_for_range.begin_csr, svd->source );
+    tidy_symbol *sym = add_symbol( svd->cxx_for_range.begin_csr, svd->source );
     if ( sym != NULL )
       symbol_add_ref( svd->parent_sym, sym );
-  }
-  if ( !clang_Cursor_isNull( svd->cxx_for_range.end_csr ) ) {
-    tidy_symbol *const sym =
-      add_symbol( svd->cxx_for_range.end_csr, svd->source );
+    assert( !clang_Cursor_isNull( svd->cxx_for_range.end_csr ) );
+    sym = add_symbol( svd->cxx_for_range.end_csr, svd->source );
     if ( sym != NULL )
       symbol_add_ref( svd->parent_sym, sym );
   }
