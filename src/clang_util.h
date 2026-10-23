@@ -442,6 +442,20 @@ NODISCARD
 bool tidy_isCursorDefinition( CXCursor cursor );
 
 /**
+ * Gets whether \a source_text has an escaped newline between \a tokens \a
+ * token_idx - 1 and \a token_idx.
+ *
+ * @param tu The translation unit to use.
+ * @param source_text The source text to check.
+ * @param tokens The tokens for \a source.
+ * @param token_idx The current index into \a tokens.
+ * @return Returns `true` only if there's an escaped newline.
+ */
+NODISCARD
+bool tidy_isEscapedNewline( CXTranslationUnit tu, char const *source_text,
+                            CXToken const *tokens, unsigned token_idx );
+
+/**
  * Gets a pointer to the next non-comment token in \a tokens, if any.
  *
  * @param tokens The array of tokens.

@@ -304,58 +304,6 @@ static enum CXChildVisitResult get_Expr_visitor( CXCursor cursor,
 }
 
 /**
- * Gets whether \a source has an escaped newline between \a tokens \a token_idx
- * - 1 and \a token_idx.
- *
- * @param source The source to check.
- * @param tokens The tokens for \a source.
- * @param token_idx The current index into \a tokens.
- * @return Returns `true` only if there's an escaped newline.
- */
-NODISCARD
-static bool is_escaped_newline( tidy_source const *source,
-                                CXToken const *tokens, unsigned token_idx ) {
-  assert( source != NULL );
-  assert( tokens != NULL );
-  assert( token_idx > 0 );
-
-  CXSourceRange const prev_range =
-    clang_getTokenExtent( source->tu, tokens[ token_idx - 1 ] );
-  CXSourceRange const curr_range =
-    clang_getTokenExtent( source->tu, tokens[ token_idx ] );
-  CXSourceLocation const prev_loc = clang_getRangeEnd( prev_range );
-  CXSourceLocation const curr_loc = clang_getRangeStart( curr_range );
-
-  CXFile prev_file, curr_file;
-  unsigned prev_offset, curr_offset;
-  clang_getSpellingLocation(
-    prev_loc, &prev_file, /*line=*/NULL, /*column=*/NULL, &prev_offset
-  );
-  clang_getSpellingLocation(
-    curr_loc, &curr_file, /*line=*/NULL, /*column=*/NULL, &curr_offset
-  );
-  if ( prev_file == NULL || prev_file != curr_file )
-    return false;
-
-  bool saw_backslash = false;
-  for ( unsigned i = prev_offset; i < curr_offset; ++i ) {
-    switch ( source->text[i] ) {
-      case '\\':
-        saw_backslash = true;
-        break;
-      case '\n':
-      case '\r':
-        if ( !saw_backslash )
-          return false;
-        saw_backslash = false;
-        break;
-    } // switch
-  } // for
-
-  return true;
-}
-
-/**
  * For a macro, gets the cursor for the identifier given by \a token within \a
  * scope_csr, but only if \a token actually is an identifier, neither
  * `__VA_ARGS__` nor `__VA_OPT__`, nor one of the current macro's parameters.
@@ -1283,7 +1231,7 @@ static void visit_preprocessor_directives( tidy_source const *source ) {
       unsigned const token_line =
         tidy_getTokenLocation_Line( source->tu, tokens[i] );
       if ( token_line > last_line ) {
-        if ( !is_escaped_newline( source, tokens, i ) ) {
+        if ( !tidy_isEscapedNewline( source->tu, source->text, tokens, i ) ) {
           --i;
           break;
         }

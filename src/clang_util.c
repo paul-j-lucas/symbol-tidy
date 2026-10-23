@@ -745,6 +745,48 @@ bool tidy_isCursorDefinition( CXCursor cursor ) {
   return true;
 }
 
+bool tidy_isEscapedNewline( CXTranslationUnit tu, char const *source_text,
+                            CXToken const *tokens, unsigned token_idx ) {
+  assert( source_text != NULL );
+  assert( tokens != NULL );
+  assert( token_idx > 0 );
+
+  CXSourceRange const prev_range =
+    clang_getTokenExtent( tu, tokens[ token_idx - 1 ] );
+  CXSourceRange const curr_range =
+    clang_getTokenExtent( tu, tokens[ token_idx ] );
+  CXSourceLocation const prev_loc = clang_getRangeEnd( prev_range );
+  CXSourceLocation const curr_loc = clang_getRangeStart( curr_range );
+
+  CXFile prev_file, curr_file;
+  unsigned prev_offset, curr_offset;
+  clang_getSpellingLocation(
+    prev_loc, &prev_file, /*line=*/NULL, /*column=*/NULL, &prev_offset
+  );
+  clang_getSpellingLocation(
+    curr_loc, &curr_file, /*line=*/NULL, /*column=*/NULL, &curr_offset
+  );
+  if ( prev_file == NULL || prev_file != curr_file )
+    return false;
+
+  bool saw_backslash = false;
+  for ( unsigned i = prev_offset; i < curr_offset; ++i ) {
+    switch ( source_text[i] ) {
+      case '\\':
+        saw_backslash = true;
+        break;
+      case '\n':
+      case '\r':
+        if ( !saw_backslash )
+          return false;
+        saw_backslash = false;
+        break;
+    } // switch
+  } // for
+
+  return true;
+}
+
 CXToken const* tidy_Token_getNext( CXToken const tokens[], unsigned token_count,
                                    unsigned *ptoken_idx ) {
   assert( ptoken_idx != NULL );
