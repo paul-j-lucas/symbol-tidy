@@ -298,14 +298,31 @@ static enum CXChildVisitResult hasConstructor_visitor( CXCursor cursor,
                                                        CXCursor parent,
                                                        CXClientData data ) {
   (void)parent;
+  assert( data != NULL );
+  bool *const has_ctor = data;
 
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
-  if ( kind == CXCursor_Constructor ) {
-    assert( data != NULL );
-    bool *const has_ctor = data;
-    *has_ctor = true;
-    return CXChildVisit_Break;
-  }
+  switch ( kind ) {
+    case CXCursor_CXXBaseSpecifier:;
+      CXCursor base_cls_csr = clang_getCursorReferenced( cursor );
+      if ( tidy_Cursor_isInvalid( base_cls_csr ) ) {
+        CXType const type = clang_getCursorType( cursor );
+        base_cls_csr = clang_getTypeDeclaration( type );
+      }
+      if ( tidy_Cursor_isInvalid( base_cls_csr ) )
+        break;
+      if ( !tidy_Cursor_hasConstructor( base_cls_csr ) )
+        break;
+      FALLTHROUGH;
+
+    case CXCursor_Constructor:
+      *has_ctor = true;
+      return CXChildVisit_Break;
+
+    default:
+      /* suppress warning */;
+  } // switch
+
   return CXChildVisit_Continue;
 }
 
