@@ -97,6 +97,7 @@ struct symbols_visit_data {
 
 ////////// local functions ////////////////////////////////////////////////////
 
+static void cxx_dtor_add_ref( CXCursor, symbols_visit_data const* );
 static void symbol_add_ref( tidy_symbol*, tidy_symbol* );
 static void symbol_cleanup( tidy_symbol* );
 
@@ -104,6 +105,7 @@ NODISCARD
 static bool symbol_is_excluded( CXCursor, tidy_source const* );
 
 static void visit_Constructor( CXCursor, CXCursor, symbols_visit_data* );
+static void visit_CXXDeleteExpr( CXCursor, CXCursor, symbols_visit_data* );
 static void visit_CXXForRangeStmt( CXCursor, CXCursor, symbols_visit_data* );
 static void visit_CXXMethod( CXCursor, CXCursor, symbols_visit_data* );
 static void visit_FieldDecl( CXCursor, CXCursor, symbols_visit_data* );
@@ -111,9 +113,10 @@ static void visit_MacroDefinition( CXCursor, CXCursor, symbols_visit_data* );
 static void visit_most_Ref( CXCursor, CXCursor, symbols_visit_data* );
 static void visit_OverloadedDeclRef( CXCursor, CXCursor,
                                      symbols_visit_data* );
+static void visit_VarDecl( CXCursor, CXCursor, symbols_visit_data* );
 
-static enum CXChildVisitResult visit_Constructor_vistor( CXCursor, CXCursor,
-                                                         CXClientData );
+static enum CXChildVisitResult
+            visit_Constructor_visitor( CXCursor, CXCursor, CXClientData );
 
 ////////// local variables ////////////////////////////////////////////////////
 
@@ -184,6 +187,104 @@ done:
   free( key );
   free( sym_name );
   return sym;
+}
+
+/**
+ * A helper function for visit_VarDecl() that adds a reference to each base
+ * class's destructor.
+ *
+ * @param cursor The cursor to visit.
+ * @param parent Not used.
+ * @param data The symbols_visit_data to use.
+ * @return Returns either `CXChildVisit_Continue` or `CXChildVisit_Recurse`.
+ */
+static
+enum CXChildVisitResult cxx_base_dtor_add_ref_visitor( CXCursor cursor,
+                                                       CXCursor parent,
+                                                       CXClientData data ) {
+  (void)parent;
+
+  enum CXCursorKind const kind = clang_getCursorKind( cursor );
+  if ( kind != CXCursor_CXXBaseSpecifier )
+    goto skip;
+
+  CXCursor base_cls_csr = clang_getCursorReferenced( cursor );
+  if ( tidy_Cursor_isInvalid( base_cls_csr ) ) {
+    CXType const type = clang_getCursorType( cursor );
+    base_cls_csr = clang_getTypeDeclaration( type );
+  }
+  base_cls_csr = clang_getCanonicalCursor( base_cls_csr );
+  if ( tidy_Cursor_isInvalid( base_cls_csr ) )
+    goto skip;
+
+  assert( data != NULL );
+  symbols_visit_data *const svd = data;
+  cxx_dtor_add_ref( base_cls_csr, svd );
+  return CXChildVisit_Recurse;
+
+skip:
+  return CXChildVisit_Continue;
+}
+
+/**
+ * Helper function for visit_CXXDeleteExpr() that adds a reference to the
+ * destructor of the object's class.
+ *
+ * @param cursor The cursor to visit.
+ * @param parent Not used.
+ * @param data The symbols_visit_data to use.
+ * @return Returns either `CXChildVisit_Break` or `CXChildVisit_Recurse`.
+ */
+static enum CXChildVisitResult cxx_DeleteExpr_visitor( CXCursor cursor,
+                                                       CXCursor parent,
+                                                       CXClientData data ) {
+  (void)parent;
+
+  CXType type = clang_getCursorType( cursor );
+         type = clang_getCanonicalType( type );
+         type = clang_getNonReferenceType( type );
+
+  if ( type.kind != CXType_Pointer )
+    goto skip;
+
+  CXType pointee_type = clang_getPointeeType( type );
+         pointee_type = clang_getCanonicalType( pointee_type );
+         pointee_type = clang_getNonReferenceType( pointee_type );
+
+  CXCursor const cls_csr = clang_getTypeDeclaration( pointee_type );
+
+  if ( tidy_Cursor_isClassDecl( cls_csr ) ) {
+    symbols_visit_data *const svd = data;
+    cxx_dtor_add_ref( cls_csr, svd );
+    return CXChildVisit_Break;
+  }
+
+skip:
+  return CXChildVisit_Recurse;
+}
+
+/**
+ * Adds a reference to the destructor of \a cls_csr if it has one.
+ *
+ * @param cls_csr The cursor for the class.
+ * @param svd The symbols_visit_data to use.
+ */
+static void cxx_dtor_add_ref( CXCursor cls_csr,
+                              symbols_visit_data const *svd ) {
+  assert( svd != NULL );
+
+  CXCursor const dtor_csr = tidy_Cursor_getDestructor( cls_csr );
+  if ( tidy_Cursor_isInvalid( dtor_csr ) )
+    return;
+
+  tidy_symbol *const dtor_sym = add_symbol( dtor_csr, svd->source );
+  if ( dtor_sym == NULL )
+    return;
+
+  if ( svd->parent_sym != NULL )
+    symbol_add_ref( svd->parent_sym, dtor_sym );
+  else
+    dtor_sym->is_root = true;
 }
 
 /**
@@ -699,8 +800,6 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
 
   switch ( kind ) {
     case CXCursor_CallExpr:
-    case CXCursor_CXXNewExpr:
-    case CXCursor_CXXDeleteExpr:
     case CXCursor_CXXFunctionalCastExpr:
     case CXCursor_CXXStaticCastExpr:
     case CXCursor_CXXConstCastExpr:
@@ -724,6 +823,10 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
     case CXCursor_FunctionDecl:
     case CXCursor_VarDecl:
       is_definition = tidy_isCursorDefinition( cursor );
+      break;
+
+    case CXCursor_CXXDeleteExpr:
+      visit_CXXDeleteExpr( cursor, parent, svd );
       break;
 
     case CXCursor_CXXForRangeStmt:
@@ -797,15 +900,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
           break;
 
         case CXCursor_VarDecl:
-          //
-          // If a variable of a class type is declared and the class has a
-          // constructor, mark the variable as a root (used) since the
-          // constructor may have side effects.
-          //
-          if ( svd->source->lang == CXLanguage_CPlusPlus &&
-               tidy_Cursor_hasConstructor( cursor ) ) {
-            sym->is_root = true;
-          }
+          visit_VarDecl( cursor, parent, svd );
           break;
 
         default:
@@ -837,20 +932,8 @@ static void visit_Constructor( CXCursor ctor_csr, CXCursor parent,
     assert( svd != NULL );
     svd_cxx_constructor const prev_svd_cxx_constructor = svd->cxx_constructor;
     svd->cxx_constructor.ctor_csr = ctor_csr;
-    clang_visitChildren( cls_csr, &visit_Constructor_vistor, svd );
+    clang_visitChildren( cls_csr, &visit_Constructor_visitor, svd );
     svd->cxx_constructor = prev_svd_cxx_constructor;
-
-    //
-    // Since destructors are called implicitly, they're not in the AST.
-    // However, since a constructor was called, then its destructor must be
-    // called, so add a reference to it.
-    //
-    CXCursor const dtor_csr = tidy_Cursor_getDestructor( cls_csr );
-    if ( !tidy_Cursor_isInvalid( dtor_csr ) ) {
-      tidy_symbol *const dtor_sym = add_symbol( dtor_csr, svd->source );
-      if ( dtor_sym != NULL )
-        symbol_add_ref( svd->parent_sym, dtor_sym );
-    }
   }
 }
 
@@ -864,9 +947,9 @@ static void visit_Constructor( CXCursor ctor_csr, CXCursor parent,
  * @param parent Not used.
  * @param data The symbols_visit_data to use.
  */
-static enum CXChildVisitResult visit_Constructor_vistor( CXCursor cursor,
-                                                         CXCursor parent,
-                                                         CXClientData data ) {
+static enum CXChildVisitResult visit_Constructor_visitor( CXCursor cursor,
+                                                          CXCursor parent,
+                                                          CXClientData data ) {
   (void)parent;
 
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
@@ -982,6 +1065,19 @@ static void visit_CXXForRangeStmt( CXCursor range_stmt_csr, CXCursor parent,
   }
 
   svd->cxx_for_range = prev_svd_cxx_for_range;
+}
+
+/**
+ * Visits a `CXCursor_CXXDeleteExpr` kind of cursor.
+ *
+ * @param delete_csr The `delete` cursor to visit.
+ * @param parent Not used.
+ * @param svd The symbols_visit_data to use.
+ */
+static void visit_CXXDeleteExpr( CXCursor delete_csr, CXCursor parent,
+                                 symbols_visit_data *svd ) {
+  (void)parent;
+  clang_visitChildren( delete_csr, &cxx_DeleteExpr_visitor, svd );
 }
 
 /**
@@ -1145,7 +1241,7 @@ static void visit_MacroDefinition( CXCursor macro_csr, CXCursor parent,
  *
  * @param cursor The cursor to visit.
  * @param parent Not used.
- * @param svd The symbols_visitor_data to use.
+ * @param svd The symbols_visit_data to use.
  */
 static void visit_most_Ref( CXCursor cursor, CXCursor parent,
                             symbols_visit_data *svd ) {
@@ -1187,7 +1283,7 @@ static void visit_most_Ref( CXCursor cursor, CXCursor parent,
  *
  * @param overloaded_csr The overloaded definition's cursor to visit.
  * @param parent Not used.
- * @param svd The symbols_visitor_data to use.
+ * @param svd The symbols_visit_data to use.
  */
 static void visit_OverloadedDeclRef( CXCursor overloaded_csr, CXCursor parent,
                                      symbols_visit_data *svd ) {
@@ -1289,6 +1385,40 @@ static void visit_preprocessor_directives( tidy_source const *source ) {
   } // for
 
   clang_disposeTokens( source->tu, tokens, token_count );
+}
+
+/**
+ * Visits a `CXCursor_VarDeclRef` kind of cursor.
+ *
+ * @remarks For C++ only, if a variable of a class type is declared and the
+ * class has a constructor, mark the variable as a root (used) since the
+ * constructor may have side effects.
+ *
+ * @param var_decl_csr The variable declaration's cursor to visit.
+ * @param parent Not used.
+ * @param svd The symbols_visit_data to use.
+ */
+static void visit_VarDecl( CXCursor var_decl_csr, CXCursor parent,
+                           symbols_visit_data *svd ) {
+  (void)parent;
+
+  if ( svd->source->lang != CXLanguage_CPlusPlus )
+    return;
+
+  CXCursor  obj_csr = tidy_Cursor_getElementIfArray( var_decl_csr );
+  CXType    type = clang_getCursorType( obj_csr );
+            type = clang_getCanonicalType( type );
+            type = clang_getNonReferenceType( type );
+
+  CXCursor const cls_csr = clang_getTypeDeclaration( type );
+
+  if ( tidy_Cursor_isClassDecl( cls_csr ) ) {
+    if ( tidy_Cursor_hasConstructor( cls_csr ) )
+      svd->parent_sym->is_root = true;
+
+    cxx_dtor_add_ref( cls_csr, svd );
+    clang_visitChildren( cls_csr, &cxx_base_dtor_add_ref_visitor, svd );
+  }
 }
 
 ////////// extern functions ///////////////////////////////////////////////////

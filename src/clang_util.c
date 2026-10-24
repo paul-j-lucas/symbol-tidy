@@ -157,10 +157,8 @@ static enum CXChildVisitResult getCursorByName_visitor( CXCursor cursor,
     case CXCursor_CXXBaseSpecifier:;
       CXCursor base_cls_csr = clang_getCursorReferenced( cursor );
       if ( tidy_Cursor_isInvalid( base_cls_csr ) ) {
-        // LCOV_EXCL_START
         CXType const type = clang_getCursorType( cursor );
         base_cls_csr = clang_getTypeDeclaration( type );
-        // LCOV_EXCL_STOP
       }
       if ( !tidy_Cursor_isInvalid( base_cls_csr ) )
         clang_visitChildren( base_cls_csr, &getCursorByName_visitor, data );
@@ -337,20 +335,55 @@ bool tidy_Cursor_callsBaseConstructor( CXCursor ctor_csr,
   return cbcd.found_explicit_call;
 }
 
-CXCursor tidy_Cursor_getDefaultConstructor( CXCursor class_csr ) {
-  class_csr = clang_getCanonicalCursor( class_csr );
+CXCursor tidy_Cursor_getDefaultConstructor( CXCursor cls_csr ) {
+  cls_csr = clang_getCanonicalCursor( cls_csr );
   CXCursor default_ctor_csr = clang_getNullCursor();
   clang_visitChildren(
-    class_csr, &getDefaultConstructor_visitor, &default_ctor_csr
+    cls_csr, &getDefaultConstructor_visitor, &default_ctor_csr
   );
   return default_ctor_csr;
 }
 
-CXCursor tidy_Cursor_getDestructor( CXCursor class_csr ) {
-  class_csr = clang_getCanonicalCursor( class_csr );
+CXCursor tidy_Cursor_getDestructor( CXCursor cls_csr ) {
+  if ( tidy_Cursor_isInvalid( cls_csr ) )
+    return cls_csr;
+  cls_csr = clang_getCanonicalCursor( cls_csr );
   CXCursor dtor_csr = clang_getNullCursor();
-  clang_visitChildren( class_csr, &getDestructor_visitor, &dtor_csr );
+  clang_visitChildren( cls_csr, &getDestructor_visitor, &dtor_csr );
   return dtor_csr;
+}
+
+CXCursor tidy_Cursor_getElementIfArray( CXCursor cursor ) {
+  if ( tidy_Cursor_isInvalid( cursor ) )
+    return cursor;
+
+  CXType type = clang_getCursorType( cursor );
+         type = clang_getCanonicalType( type );
+
+  bool is_array = false;
+  for ( bool done = false; !done; ) {
+    switch ( type.kind ) {
+      case CXType_ConstantArray:
+      case CXType_DependentSizedArray:
+      case CXType_IncompleteArray:
+      case CXType_VariableArray:
+        type = clang_getElementType( type );
+        type = clang_getCanonicalType( type );
+        is_array = true;
+        break;
+      default:
+        done = true;
+        break;
+    }
+  } // for
+
+  if ( is_array ) {
+    CXCursor const elem_csr = clang_getTypeDeclaration( type );
+    if ( !tidy_Cursor_isInvalid( elem_csr ) )
+      return elem_csr;
+  }
+
+  return cursor;
 }
 
 char* tidy_Cursor_getScopedDisplayName( CXCursor cursor ) {
@@ -365,35 +398,15 @@ bool tidy_Cursor_hasConstructor( CXCursor cursor ) {
   if ( tidy_Cursor_isInvalid( cursor ) )
     return false;
 
-  CXCursor cls_csr;
+  CXType type = clang_getCursorType( cursor );
+         type = clang_getCanonicalType( type );
 
-  if ( tidy_Cursor_isClassDecl( cursor ) ) {
+  CXCursor cls_csr = clang_getTypeDeclaration( type );
+  if ( tidy_Cursor_isInvalid( cls_csr ) )
     cls_csr = cursor;
-  }
-  else {
-    CXType type = clang_getCursorType( cursor );
-    type = clang_getCanonicalType( type );
 
-    // Unwrap array types (e.g. T obj[10];)
-    for ( bool done = false; !done; ) {
-      switch ( type.kind ) {
-        case CXType_ConstantArray:
-        case CXType_DependentSizedArray:
-        case CXType_IncompleteArray:
-        case CXType_VariableArray:
-          type = clang_getElementType( type );
-          type = clang_getCanonicalType( type );
-          break;
-        default:
-          done = true;
-          break;
-      }
-    } // for
-
-    cls_csr = clang_getTypeDeclaration( type );
-    if ( tidy_Cursor_isInvalid( cls_csr ) )
-      return false;
-  }
+  if ( !tidy_Cursor_isClassDecl( cls_csr ) )
+    return false;
 
   bool has_ctor = false;
   clang_visitChildren( cls_csr, &hasConstructor_visitor, &has_ctor );

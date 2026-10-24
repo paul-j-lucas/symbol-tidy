@@ -63,20 +63,30 @@ bool tidy_Cursor_callsBaseConstructor( CXCursor ctor_csr,
 /**
  * Gets the default constructor of a class, if any.
  *
- * @param class_csr The cursor for the class to get the default constructor of.
+ * @param cls_csr The cursor for the class to get the default constructor of.
  * @return Returns the cursor for the default constructor, if any.
  */
 NODISCARD
-CXCursor tidy_Cursor_getDefaultConstructor( CXCursor class_csr );
+CXCursor tidy_Cursor_getDefaultConstructor( CXCursor cls_csr );
 
 /**
  * Gets the destructor of a class, if any.
  *
- * @param class_csr The cursor for the class to get the destructor of.
+ * @param cls_csr The cursor for the class to get the destructor of.
  * @return Returns the cursor for the destructor, if any.
  */
 NODISCARD
-CXCursor tidy_Cursor_getDestructor( CXCursor class_csr );
+CXCursor tidy_Cursor_getDestructor( CXCursor cls_csr );
+
+/**
+ * Gets the element cursor for \a cursor if it's an array.
+ *
+ * @param cursor The cursor for possibly an array.
+ * @return If \a cursor is an array, return the cursor for the element;
+ * otherwise returns \a cursor.
+ */
+NODISCARD
+CXCursor tidy_Cursor_getElementIfArray( CXCursor cursor );
 
 /**
  * Given a cursor at a local name of an enumeration, class, class data member,
@@ -109,7 +119,8 @@ NODISCARD
 char* tidy_Cursor_getScopedSpelling( CXCursor cursor );
 
 /**
- * Gets whether \a cursor has a constructor.
+ * Gets whether \a cursor has a constructor, either directly, or indirectly
+ * inherited from a base class.
  *
  * @param cursor The cursor to check.
  * @return Returns `true` only if \a cursor is either a class type or a
