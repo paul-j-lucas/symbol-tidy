@@ -911,7 +911,10 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
                                                 CXClientData data ) {
   (void)parent;
 
-  if ( IS_VERBOSE( CURSORS ) )
+  CXSourceLocation const sym_loc = clang_getCursorLocation( cursor );
+  bool const is_in_system_header = clang_Location_isInSystemHeader( sym_loc );
+
+  if ( !is_in_system_header && IS_VERBOSE( CURSORS ) )
     verbose_print_cursor( cursor );     // LCOV_EXCL_LINE
 
   assert( data != NULL );
@@ -985,8 +988,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
     //
     tidy_symbol *const sym = add_symbol( cursor, svd->source );
     if ( likely( sym != NULL ) ) {
-      CXSourceLocation const sym_loc = clang_getCursorLocation( cursor );
-      if ( clang_Location_isInSystemHeader( sym_loc ) ) {
+      if ( is_in_system_header ) {
         sym->is_root = true;
       }
       else {
