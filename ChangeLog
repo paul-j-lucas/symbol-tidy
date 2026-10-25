@@ -1,5 +1,8 @@
 2026-10-25  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * symbol-tidy.c: Eliminated blank line between source files in verbose
+     output.
+   * symbol.c: Upped estimated symbol set size to 16384.
    * clang_util.c, clang_util.h, symbol.c: Added
      tidy_Cursor_isSpellingEqualToAny().
    * clang_util.c, clang_util.h, symbol.c: No longer skipping code in system
