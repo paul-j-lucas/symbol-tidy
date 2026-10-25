@@ -206,6 +206,18 @@ inline bool tidy_Cursor_isInvalid( CXCursor cursor ) {
 }
 
 /**
+ * Gets whether the spelling of \a cursor equals \a value.
+ *
+ * @param cursor The cursor to compare.
+ * @param value The value to compare against.
+ * @return Returns `true` only if the spelling of \a cursor equals \a value.
+ *
+ * @sa tidy_Token_isEqualTo()
+ */
+NODISCARD
+bool tidy_Cursor_isNameEqualTo( CXCursor cursor, char const *value );
+
+/**
  * Gets whether \a cursor has a name that is reserved in \a lang.
  *
  * @remarks A name is reserved if it matches any of these patterns:
@@ -475,6 +487,7 @@ CXCursor tidy_Token_getScopedNameCursor( CXTranslationUnit tu,
  * @param value The value to compare against.
  * @return Returns `true` only if the spelling of \a token equals \a value.
  *
+ * @sa tidy_Cursor_isNameEqualTo()
  * @sa #tidy_Token_isEqualToAny()
  * @sa tidy_Token_isScopeQualifier()
  */

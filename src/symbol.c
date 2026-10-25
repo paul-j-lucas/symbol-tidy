@@ -294,9 +294,10 @@ static enum CXChildVisitResult cxx_DeleteExpr_visitor( CXCursor cursor,
   (void)parent;
 
   CXType type = clang_getCursorType( cursor );
-         type = clang_getCanonicalType( type );
-         type = clang_getNonReferenceType( type );
-
+  if ( type.kind == CXType_Invalid )
+    goto skip;
+  type = clang_getCanonicalType( type );
+  type = clang_getNonReferenceType( type );
   if ( type.kind != CXType_Pointer )
     goto skip;
 
@@ -420,10 +421,6 @@ static enum CXChildVisitResult find_begin_end_visitor( CXCursor cursor,
   (void)parent;
   assert( data != NULL );
   symbols_visit_data *const svd = data;
-
-  CXSourceLocation const loc = clang_getCursorLocation( cursor );
-  if ( clang_Location_isInSystemHeader( loc ) )
-    goto skip;
 
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
   int const num_args = clang_Cursor_getNumArguments( cursor );
@@ -918,10 +915,6 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
                                                 CXClientData data ) {
   (void)parent;
 
-  CXSourceLocation const sym_loc = clang_getCursorLocation( cursor );
-  if ( clang_Location_isInSystemHeader( sym_loc ) )
-    goto skip;
-
   if ( IS_VERBOSE( CURSORS ) )
     verbose_print_cursor( cursor );     // LCOV_EXCL_LINE
 
@@ -996,18 +989,24 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
     //
     tidy_symbol *const sym = add_symbol( cursor, svd->source );
     if ( likely( sym != NULL ) ) {
-      CXFile sym_file;
-      clang_getSpellingLocation(
-        sym_loc, &sym_file, &sym->line, &sym->col, /*offset=*/NULL
-      );
-
-      CXString const    path_cxs = clang_getFileName( sym_file );
-      char const *const path = clang_getCString( path_cxs );
-      if ( path != NULL && path[0] != '\0' && is_argv_path( path ) ) {
-        FREE( sym->path );              // just in case
-        sym->path = strdup_or_exit( path );
+      CXSourceLocation const sym_loc = clang_getCursorLocation( cursor );
+      if ( clang_Location_isInSystemHeader( sym_loc ) ) {
+        sym->is_root = true;
       }
-      clang_disposeString( path_cxs );
+      else {
+        CXFile sym_file;
+        clang_getSpellingLocation(
+          sym_loc, &sym_file, &sym->line, &sym->col, /*offset=*/NULL
+        );
+
+        CXString const    path_cxs = clang_getFileName( sym_file );
+        char const *const path = clang_getCString( path_cxs );
+        if ( path != NULL && path[0] != '\0' && is_argv_path( path ) ) {
+          FREE( sym->path );              // just in case
+          sym->path = strdup_or_exit( path );
+        }
+        clang_disposeString( path_cxs );
+      }
 
       if ( sym->parent_sym == NULL )
         sym->parent_sym = svd->parent_sym;
@@ -1047,7 +1046,6 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
   clang_visitChildren( cursor, symbols_visitor, svd );
   svd->parent_sym = prev_parent_sym;
 
-skip:
   return CXChildVisit_Continue;
 }
 
@@ -1181,6 +1179,26 @@ static void visit_CXXMethod( CXCursor method_csr, symbols_visit_data *svd ) {
   clang_disposeOverriddenCursors( overridden_csrs );
 
   cxx_member_add_def_ctor_ref( method_csr, svd->parent_sym, svd );
+
+  enum CXCursorKind const kind = clang_getCursorKind( method_csr );
+  switch ( kind ) {
+    case CXCursor_CXXMethod:
+      if ( tidy_Cursor_isNameEqualTo( method_csr, "operator()" ) ) {
+        //
+        // Libclang's C API doesn't include template instantiations of functors
+        // (such as in STL containers) in the AST, so user-defined operator()
+        // never get marked as used.
+        //
+        // As a hack, mark such operators as roots to ensure they (and any
+        // symbols they reference) are marked as used.
+        //
+        svd->parent_sym->is_root = true;
+      }
+      break;
+
+    default:
+      /* suppress warning */;
+  } // switch
 }
 
 /**
