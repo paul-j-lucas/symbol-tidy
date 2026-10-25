@@ -145,6 +145,9 @@ int main( int argc, char const *argv[] ) {
     POINTER_CAST( ht_hash_fn_t, fnv1a_s )
   );
 
+  if ( IS_VERBOSE( SRC_FILE_ALWAYS ) )
+    verbose_section_begin( /*printed_header=*/NULL );
+
   for ( int i = arg_source1; i < argc; ++i ) {
     if ( config_path_is_ignored( argv[i] ) )
       continue;
@@ -153,10 +156,10 @@ int main( int argc, char const *argv[] ) {
     );
     if ( !hti.inserted )
       continue;
-    if ( IS_VERBOSE( SRC_FILE_ALWAYS ) ) {
-      verbose_section_begin( /*printed_header=*/NULL );
+
+    if ( IS_VERBOSE( SRC_FILE_ALWAYS ) )
       verbose_printf( "source file = \"%s\"\n", argv[i] );
-    }
+
     tidy_source source = {
       .path = argv[i],
       .lang = opt_lang
