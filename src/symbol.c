@@ -115,9 +115,6 @@ static void visit_OverloadedDeclRef( CXCursor, CXCursor,
                                      symbols_visit_data* );
 static void visit_VarDecl( CXCursor, CXCursor, symbols_visit_data* );
 
-static enum CXChildVisitResult
-            visit_Constructor_visitor( CXCursor, CXCursor, CXClientData );
-
 ////////// local variables ////////////////////////////////////////////////////
 
 static hash_table_t symbol_set;         ///< Set of symbols.
@@ -223,6 +220,63 @@ enum CXChildVisitResult cxx_base_dtor_add_ref_visitor( CXCursor cursor,
   return CXChildVisit_Recurse;
 
 skip:
+  return CXChildVisit_Continue;
+}
+
+/**
+ * A helper function for visit_Constructor() that visits all base classes of \a
+ * cursor looking for an explicit call to a base class's constructor: if none
+ * is found, find the base class's default constructor and add a reference to
+ * it.
+ *
+ * @param cursor The cursor to visit.
+ * @param parent Not used.
+ * @param data The symbols_visit_data to use.
+ */
+static
+enum CXChildVisitResult cxx_def_ctor_add_ref_visitor( CXCursor cursor,
+                                                      CXCursor parent,
+                                                      CXClientData data ) {
+  (void)parent;
+
+  enum CXCursorKind const kind = clang_getCursorKind( cursor );
+  if ( kind != CXCursor_CXXBaseSpecifier )
+    goto skip;
+
+  CXCursor base_cls_csr = clang_getCursorReferenced( cursor );
+  if ( tidy_Cursor_isInvalid( base_cls_csr ) ) {
+    CXType const type = clang_getCursorType( cursor );
+    base_cls_csr = clang_getTypeDeclaration( type );
+  }
+  base_cls_csr = clang_getCanonicalCursor( base_cls_csr );
+
+  assert( data != NULL );
+  symbols_visit_data *const svd = data;
+  if ( tidy_Cursor_callsBaseConstructor( svd->cxx_constructor.ctor_csr,
+                                         base_cls_csr ) ) {
+    goto skip;
+  }
+
+  // If no constructor of base_cls_csr was explicitly called, add a reference
+  // to the default constructor.
+  CXCursor const def_ctor = tidy_Cursor_getDefaultConstructor( base_cls_csr );
+  if ( tidy_Cursor_isInvalid( def_ctor ) )
+    goto skip;
+
+  tidy_symbol *const def_ctor_sym = add_symbol( def_ctor, svd->source );
+  if ( def_ctor_sym == NULL )
+    goto skip;
+
+  assert( svd->parent_sym != NULL );
+  symbol_add_ref( svd->parent_sym, def_ctor_sym );
+
+skip:
+  //
+  // We can't return CXChildVisit_Break even if we find either an explicit base
+  // class constructor call or an implicit base class default constructor call
+  // since there may be multiple base classes.  Hance, we always have to return
+  // CXChildVisit_Continue.
+  //
   return CXChildVisit_Continue;
 }
 
@@ -932,65 +986,9 @@ static void visit_Constructor( CXCursor ctor_csr, CXCursor parent,
     assert( svd != NULL );
     svd_cxx_constructor const prev_svd_cxx_constructor = svd->cxx_constructor;
     svd->cxx_constructor.ctor_csr = ctor_csr;
-    clang_visitChildren( cls_csr, &visit_Constructor_visitor, svd );
+    clang_visitChildren( cls_csr, &cxx_def_ctor_add_ref_visitor, svd );
     svd->cxx_constructor = prev_svd_cxx_constructor;
   }
-}
-
-/**
- * A helper function for visit_Constructor() that visits all base classes of \a
- * cursor looking for an explicit call to a base class's constructor: if none
- * is found, find the base class's default constructor and add a reference to
- * it.
- *
- * @param cursor The cursor to visit.
- * @param parent Not used.
- * @param data The symbols_visit_data to use.
- */
-static enum CXChildVisitResult visit_Constructor_visitor( CXCursor cursor,
-                                                          CXCursor parent,
-                                                          CXClientData data ) {
-  (void)parent;
-
-  enum CXCursorKind const kind = clang_getCursorKind( cursor );
-  if ( kind != CXCursor_CXXBaseSpecifier )
-    goto skip;
-
-  CXCursor base_cls_csr = clang_getCursorReferenced( cursor );
-  if ( tidy_Cursor_isInvalid( base_cls_csr ) ) {
-    CXType const type = clang_getCursorType( cursor );
-    base_cls_csr = clang_getTypeDeclaration( type );
-  }
-  base_cls_csr = clang_getCanonicalCursor( base_cls_csr );
-
-  assert( data != NULL );
-  symbols_visit_data *const svd = data;
-  if ( tidy_Cursor_callsBaseConstructor( svd->cxx_constructor.ctor_csr,
-                                         base_cls_csr ) ) {
-    goto skip;
-  }
-
-  // If no constructor of base_cls_csr was explicitly called, add a reference
-  // to the default constructor.
-  CXCursor const def_ctor = tidy_Cursor_getDefaultConstructor( base_cls_csr );
-  if ( tidy_Cursor_isInvalid( def_ctor ) )
-    goto skip;
-
-  tidy_symbol *const def_ctor_sym = add_symbol( def_ctor, svd->source );
-  if ( def_ctor_sym == NULL )
-    goto skip;
-
-  assert( svd->parent_sym != NULL );
-  symbol_add_ref( svd->parent_sym, def_ctor_sym );
-
-skip:
-  //
-  // We can't return CXChildVisit_Break even if we find either an explicit base
-  // class constructor call or an implicit base class default constructor call
-  // since there may be multiple base classes.  Hance, we always have to return
-  // CXChildVisit_Continue.
-  //
-  return CXChildVisit_Continue;
 }
 
 /**
