@@ -1508,7 +1508,7 @@ ht_hash_val_t symbol_hash( tidy_symbol const *sym ) {
 void symbols_init( void ) {
   ASSERT_RUN_ONCE();
   ht_table_init(
-    &symbol_set, HT_DINT, 2.0, 1024,
+    &symbol_set, HT_DINT, 2.0, 16384,
     POINTER_CAST( ht_cmp_fn_t, &symbol_cmp ),
     POINTER_CAST( ht_hash_fn_t, &symbol_hash )
   );
