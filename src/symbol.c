@@ -104,16 +104,15 @@ static void symbol_cleanup( tidy_symbol* );
 NODISCARD
 static bool symbol_is_excluded( CXCursor, tidy_source const* );
 
-static void visit_Constructor( CXCursor, CXCursor, symbols_visit_data* );
-static void visit_CXXDeleteExpr( CXCursor, CXCursor, symbols_visit_data* );
-static void visit_CXXForRangeStmt( CXCursor, CXCursor, symbols_visit_data* );
-static void visit_CXXMethod( CXCursor, CXCursor, symbols_visit_data* );
-static void visit_FieldDecl( CXCursor, CXCursor, symbols_visit_data* );
-static void visit_MacroDefinition( CXCursor, CXCursor, symbols_visit_data* );
-static void visit_most_Ref( CXCursor, CXCursor, symbols_visit_data* );
-static void visit_OverloadedDeclRef( CXCursor, CXCursor,
-                                     symbols_visit_data* );
-static void visit_VarDecl( CXCursor, CXCursor, symbols_visit_data* );
+static void visit_Constructor( CXCursor, symbols_visit_data* );
+static void visit_CXXDeleteExpr( CXCursor, symbols_visit_data* );
+static void visit_CXXForRangeStmt( CXCursor, symbols_visit_data* );
+static void visit_CXXMethod( CXCursor, symbols_visit_data* );
+static void visit_FieldDecl( CXCursor, symbols_visit_data* );
+static void visit_MacroDefinition( CXCursor, symbols_visit_data* );
+static void visit_most_Ref( CXCursor, symbols_visit_data* );
+static void visit_OverloadedDeclRef( CXCursor, symbols_visit_data* );
+static void visit_VarDecl( CXCursor, symbols_visit_data* );
 
 ////////// local variables ////////////////////////////////////////////////////
 
@@ -934,7 +933,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
     case CXCursor_MemberRefExpr:
     case CXCursor_TemplateRef:
     case CXCursor_TypeRef:
-      visit_most_Ref( cursor, parent, svd );
+      visit_most_Ref( cursor, svd );
       break;
 
     case CXCursor_ClassDecl:
@@ -950,11 +949,11 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       break;
 
     case CXCursor_CXXDeleteExpr:
-      visit_CXXDeleteExpr( cursor, parent, svd );
+      visit_CXXDeleteExpr( cursor, svd );
       break;
 
     case CXCursor_CXXForRangeStmt:
-      visit_CXXForRangeStmt( cursor, parent, svd );
+      visit_CXXForRangeStmt( cursor, svd );
       break;
 
     case CXCursor_EnumConstantDecl:
@@ -973,7 +972,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       break;
 
     case CXCursor_OverloadedDeclRef:
-      visit_OverloadedDeclRef( cursor, parent, svd );
+      visit_OverloadedDeclRef( cursor, svd );
       break;
 
     default:
@@ -1008,24 +1007,24 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
 
       switch ( kind ) {
         case CXCursor_Constructor:
-          visit_Constructor( cursor, parent, svd );
+          visit_Constructor( cursor, svd );
           break;
 
         case CXCursor_CXXMethod:
         case CXCursor_Destructor:
-          visit_CXXMethod( cursor, parent, svd );
+          visit_CXXMethod( cursor, svd );
           break;
 
         case CXCursor_FieldDecl:
-          visit_FieldDecl( cursor, parent, svd );
+          visit_FieldDecl( cursor, svd );
           break;
 
         case CXCursor_MacroDefinition:
-          visit_MacroDefinition( cursor, parent, svd );
+          visit_MacroDefinition( cursor, svd );
           break;
 
         case CXCursor_VarDecl:
-          visit_VarDecl( cursor, parent, svd );
+          visit_VarDecl( cursor, svd );
           break;
 
         default:
@@ -1045,13 +1044,9 @@ skip:
  * Visits a `CXCursor_Constructor` kind of cursor.
  *
  * @param ctor_csr The constructor's cursor to visit.
- * @param parent The parent cursor of \a ctor_csr.
  * @param svd The symbols_visit_data to use.
  */
-static void visit_Constructor( CXCursor ctor_csr, CXCursor parent,
-                               symbols_visit_data *svd ) {
-  (void)parent;
-
+static void visit_Constructor( CXCursor ctor_csr, symbols_visit_data *svd ) {
   CXCursor const cls_csr = clang_getCursorSemanticParent( ctor_csr );
   if ( tidy_Cursor_isClassDecl( cls_csr ) ) {
     assert( svd != NULL );
@@ -1066,13 +1061,10 @@ static void visit_Constructor( CXCursor ctor_csr, CXCursor parent,
  * Visits a `CXCursor_CXXForRangeStmt` kind of cursor.
  *
  * @param range_stmt_csr The range-for statement's cursor.
- * @param parent Not used.
  * @param svd The symbols_visit_data to use.
  */
-static void visit_CXXForRangeStmt( CXCursor range_stmt_csr, CXCursor parent,
+static void visit_CXXForRangeStmt( CXCursor range_stmt_csr,
                                    symbols_visit_data *svd ) {
-  (void)parent;
-
   CXCursor range_expr = clang_getNullCursor();
   clang_visitChildren( range_stmt_csr, &get_Expr_visitor, &range_expr );
   if ( clang_Cursor_isNull( range_expr ) )
@@ -1140,12 +1132,10 @@ static void visit_CXXForRangeStmt( CXCursor range_stmt_csr, CXCursor parent,
  * Visits a `CXCursor_CXXDeleteExpr` kind of cursor.
  *
  * @param delete_csr The `delete` cursor to visit.
- * @param parent Not used.
  * @param svd The symbols_visit_data to use.
  */
-static void visit_CXXDeleteExpr( CXCursor delete_csr, CXCursor parent,
+static void visit_CXXDeleteExpr( CXCursor delete_csr,
                                  symbols_visit_data *svd ) {
-  (void)parent;
   clang_visitChildren( delete_csr, &cxx_DeleteExpr_visitor, svd );
 }
 
@@ -1160,12 +1150,10 @@ static void visit_CXXDeleteExpr( CXCursor delete_csr, CXCursor parent,
  * unused, add references from the base one to all the overridden ones.
  *
  * @param method_csr The method's cursor to visit.
- * @param parent The parent cursor of \a method_csr.
  * @param svd The symbols_visit_data to use.
  */
-static void visit_CXXMethod( CXCursor method_csr, CXCursor parent,
-                             symbols_visit_data *svd ) {
-  (void)parent;
+static void visit_CXXMethod( CXCursor method_csr, symbols_visit_data *svd ) {
+  assert( svd != NULL );
 
   CXCursor *overridden_csrs;
   unsigned  overridden_csrs_count;
@@ -1207,12 +1195,9 @@ static void visit_CXXMethod( CXCursor method_csr, CXCursor parent,
  * @endparblock
  *
  * @param field_csr The field declaration's cursor to visit.
- * @param parent The parent cursor of \a field_csr.
  * @param svd The symbols_visit_data to use.
  */
-static void visit_FieldDecl( CXCursor field_csr, CXCursor parent,
-                             symbols_visit_data *svd ) {
-  (void)parent;
+static void visit_FieldDecl( CXCursor field_csr, symbols_visit_data *svd ) {
   assert( svd != NULL );
 
   CXSourceRange const field_range = tidy_getCursorExtent( field_csr );
@@ -1261,12 +1246,10 @@ static void visit_FieldDecl( CXCursor field_csr, CXCursor parent,
  * @endparblock
  *
  * @param macro_csr The macro definition's cursor to visit.
- * @param parent The parent cursor of \a macro_csr.
  * @param svd The symbols_visit_data to use.
  */
-static void visit_MacroDefinition( CXCursor macro_csr, CXCursor parent,
+static void visit_MacroDefinition( CXCursor macro_csr, 
                                    symbols_visit_data *svd ) {
-  (void)parent;
   assert( svd != NULL );
 
   CXSourceRange const macro_range = clang_getCursorExtent( macro_csr );
@@ -1313,12 +1296,9 @@ static void visit_MacroDefinition( CXCursor macro_csr, CXCursor parent,
  * Visits most kinds of reference cursor since they are handled the same way.
  *
  * @param cursor The cursor to visit.
- * @param parent Not used.
  * @param svd The symbols_visit_data to use.
  */
-static void visit_most_Ref( CXCursor cursor, CXCursor parent,
-                            symbols_visit_data *svd ) {
-  (void)parent;
+static void visit_most_Ref( CXCursor cursor, symbols_visit_data *svd ) {
   assert( svd != NULL );
 
   CXCursor const ref_csr = clang_getCursorReferenced( cursor );
@@ -1360,12 +1340,11 @@ static void visit_most_Ref( CXCursor cursor, CXCursor parent,
  * invalid or null cursor.
  *
  * @param overloaded_csr The overloaded definition's cursor to visit.
- * @param parent Not used.
  * @param svd The symbols_visit_data to use.
  */
-static void visit_OverloadedDeclRef( CXCursor overloaded_csr, CXCursor parent,
+static void visit_OverloadedDeclRef( CXCursor overloaded_csr,
                                      symbols_visit_data *svd ) {
-  (void)parent;
+  assert( svd != NULL );
 
   unsigned const num_decls = clang_getNumOverloadedDecls( overloaded_csr );
   for ( unsigned i = 0; i < num_decls; ++i ) {
@@ -1473,13 +1452,9 @@ static void visit_preprocessor_directives( tidy_source const *source ) {
  * constructor may have side effects.
  *
  * @param var_decl_csr The variable declaration's cursor to visit.
- * @param parent Not used.
  * @param svd The symbols_visit_data to use.
  */
-static void visit_VarDecl( CXCursor var_decl_csr, CXCursor parent,
-                           symbols_visit_data *svd ) {
-  (void)parent;
-
+static void visit_VarDecl( CXCursor var_decl_csr, symbols_visit_data *svd ) {
   if ( svd->source->lang != CXLanguage_CPlusPlus )
     return;
 
