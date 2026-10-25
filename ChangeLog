@@ -1,5 +1,22 @@
+2026-10-25  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * clang_util.c, clang_util.h, symbol.c: Added
+     tidy_Cursor_isSpellingEqualToAny().
+   * clang_util.c, clang_util.h, symbol.c: No longer skipping code in system
+     headers so it can be marked as roots so user-code it references is marked
+     as used; also operator() hack.
+   * symbol.c, test/Makefile.am, std-exclude.cpp, std-exclude.out,
+     std-exclude.test: Now excluding namespaces declared in system headers.
+   * test/Makefile.am, destructors.cpp, destructors.out, destructors.test:
+     Added destructors test.
+   * symbol.c: symbol_add_ref() now allows NULL from_sym.
+   * symbol.c: Eliminated "parent" parameter.
+   * clang_util.c, clang_util.h, symbol.c: Now adding a reference to a default
+     constructor if either a field or member function is called.
+
 2026-10-24  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * symbol.c: Better handling of virtual destructors.
    * clang_util.c, clang_util.h, symbol.c: Handling destructors better
      including being called via `delete`.
 
