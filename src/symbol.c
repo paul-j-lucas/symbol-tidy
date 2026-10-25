@@ -778,6 +778,24 @@ static int symbol_cmp_by_path( tidy_symbol const *i_sym,
 }
 
 /**
+ * Gets whether \a sym is within a scope that is ununsed.
+ *
+ * @param sym The symbol to check.
+ * @return Returns `true` only if \a sym is within an unused scope.
+ */
+NODISCARD
+static bool symbol_in_unused_scope( tidy_symbol const *sym ) {
+  assert( sym != NULL );
+
+  for ( sym = sym->parent_sym; sym != NULL; sym = sym->parent_sym ) {
+    if ( sym->is_scope && !sym->is_used )
+      return true;
+  } // for
+
+  return false;
+}
+
+/**
  * Gets whether \a sym_csr should be excluded from the global set.
  *
  * @param sym_csr The symbol's cursor to check.
@@ -856,24 +874,6 @@ static void symbols_cleanup( void ) {
   ht_table_cleanup(
     &symbol_set, POINTER_CAST( ht_free_fn_t, &symbol_cleanup )
   );
-}
-
-/**
- * Gets whether \a sym is within a scope that is ununsed.
- *
- * @param sym The symbol to check.
- * @return Returns `true` only if \a sym is within an unused scope.
- */
-NODISCARD
-static bool symbol_in_unused_scope( tidy_symbol const *sym ) {
-  assert( sym != NULL );
-
-  for ( sym = sym->parent_sym; sym != NULL; sym = sym->parent_sym ) {
-    if ( sym->is_scope && !sym->is_used )
-      return true;
-  } // for
-
-  return false;
 }
 
 /**
