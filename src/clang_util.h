@@ -505,7 +505,7 @@ bool tidy_Token_isScopeQualifier( CXTranslationUnit tu, CXToken token );
  */
 NODISCARD
 bool tidy_Token_isSpellingEqualTo( CXTranslationUnit tu, CXToken token,
-                               char const *value );
+                                   char const *value );
 
 /**
  * Gets whether the spelling of \a token equals any one of \a values.
@@ -520,7 +520,7 @@ bool tidy_Token_isSpellingEqualTo( CXTranslationUnit tu, CXToken token,
  */
 #define tidy_Token_isSpellingEqualToAny(TU,TOKEN,...)   \
   tidy_Token_isSpellingEqualToAny_impl( (TU), (TOKEN),  \
-                                    (char const*[]){ __VA_ARGS__, NULL } )
+                                        (char const*[]){ __VA_ARGS__, NULL } )
 
 /**
  * Gets whether the spelling of \a token equals any one of \a values.
@@ -537,7 +537,7 @@ bool tidy_Token_isSpellingEqualTo( CXTranslationUnit tu, CXToken token,
  */
 NODISCARD
 int tidy_Token_isSpellingEqualToAny_impl( CXTranslationUnit tu, CXToken token,
-                                      char const *values[] );
+                                          char const *values[] );
 
 ///////////////////////////////////////////////////////////////////////////////
 
