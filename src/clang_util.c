@@ -203,20 +203,6 @@ static enum CXChildVisitResult getCursorByName_visitor( CXCursor cursor,
     goto skip;
 
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
-
-  if ( clang_isDeclaration( kind ) || kind == CXCursor_MacroDefinition ) {
-    CXString const    name_cxs = clang_getCursorSpelling( cursor );
-    char const *const name_cs = clang_getCString( name_cxs );
-    bool const        is_found = strcmp( name_cs, gcbnd->find_name ) == 0;
-
-    clang_disposeString( name_cxs );
-
-    if ( is_found ) {
-      gcbnd->found_csr = cursor;
-      return CXChildVisit_Break;
-    }
-  }
-
   switch ( kind ) {
     case CXCursor_CXXBaseSpecifier:;
       CXCursor base_cls_csr = clang_getCursorReferenced( cursor );
@@ -228,13 +214,23 @@ static enum CXChildVisitResult getCursorByName_visitor( CXCursor cursor,
         clang_visitChildren( base_cls_csr, &getCursorByName_visitor, data );
       break;
 
+    default:
+      if ( !clang_isDeclaration( kind ) )
+        break;
+      FALLTHROUGH;
+
+    case CXCursor_MacroDefinition:
+      if ( tidy_Cursor_isSpellingEqualTo( cursor, gcbnd->find_name) ) {
+        gcbnd->found_csr = cursor;
+        return CXChildVisit_Break;
+      }
+      break;
+
     case CXCursor_Namespace:
       if ( gcbnd->cxx_recurse_into_scope )
         return CXChildVisit_Recurse;
       break;
-
-    default:
-      /* suppress warning */;
+        
   } // switch
 
 skip:
