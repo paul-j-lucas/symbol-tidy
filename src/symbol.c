@@ -942,6 +942,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
           break;
 
         case CXCursor_CXXMethod:
+        case CXCursor_Destructor:
           visit_CXXMethod( cursor, parent, svd );
           break;
 
@@ -1079,7 +1080,9 @@ static void visit_CXXDeleteExpr( CXCursor delete_csr, CXCursor parent,
 }
 
 /**
- * Visits a `CXCursor_CXXMethod` kind of cursor.
+ * Visits a `CXCursor_CXXMethod` or `CXCursor_Destructor` kind of cursor.
+ *
+ * @note In what follows, "function" includes destructor.
  *
  * @remarks When a C++ virtual member function is called, libclang generates an
  * AST containing only the base class's member function since it can't know
