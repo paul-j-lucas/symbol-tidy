@@ -1183,7 +1183,7 @@ static void visit_CXXMethod( CXCursor method_csr, symbols_visit_data *svd ) {
   enum CXCursorKind const kind = clang_getCursorKind( method_csr );
   switch ( kind ) {
     case CXCursor_CXXMethod:
-      if ( tidy_Cursor_isNameEqualTo( method_csr, "operator()" ) ) {
+      if ( tidy_Cursor_isSpellingEqualTo( method_csr, "operator()" ) ) {
         //
         // Libclang's C API doesn't include template instantiations of functors
         // (such as in STL containers) in the AST, so user-defined operator()
@@ -1245,7 +1245,7 @@ static void visit_FieldDecl( CXCursor field_csr, symbols_visit_data *svd ) {
   for ( unsigned i = 0; i < token_count; ++i ) {
     if ( clang_getTokenKind( tokens[i] ) != CXToken_Identifier )
       continue;
-    if ( tidy_Token_isEqualTo( tu, tokens[i], field_name_cs ) )
+    if ( tidy_Token_isSpellingEqualTo( tu, tokens[i], field_name_cs ) )
       continue;
 
     CXCursor const sym_csr = tidy_Token_getScopedNameCursor(
@@ -1417,7 +1417,7 @@ static void visit_preprocessor_directives( tidy_source const *source ) {
     CXTokenKind token_kind = clang_getTokenKind( tokens[i] );
     if ( token_kind != CXToken_Punctuation )
       continue;
-    if ( !tidy_Token_isEqualTo( source->tu, tokens[i], "#" ) )
+    if ( !tidy_Token_isSpellingEqualTo( source->tu, tokens[i], "#" ) )
       continue;
     if ( ++i == token_count )
       break;
@@ -1425,7 +1425,8 @@ static void visit_preprocessor_directives( tidy_source const *source ) {
     token_kind = clang_getTokenKind( tokens[i] );
     if ( token_kind != CXToken_Identifier )
       continue;
-    int const directive_idx = tidy_Token_isEqualToAny( source->tu, tokens[i],
+    int const directive_idx = tidy_Token_isSpellingEqualToAny(
+      source->tu, tokens[i],
       "if", "ifdef", "ifndef", "elif", "elifdef", "elifndef"
     );
     if ( directive_idx == -1 )
