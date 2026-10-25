@@ -29,6 +29,7 @@ TESTS=	tests/enum.test
 
 # C++
 TESTS+=	tests/constructors-implicit.test \
+	tests/destructors.test \
 	tests/range-for.test
 
 ###############################################################################
