@@ -118,6 +118,70 @@ skip:
 }
 
 /**
+ * A helper function for tidy_Cursor_getConstructorInfo().
+ *
+ * @param cursor The cursor being visited.
+ * @param parent Not used.
+ * @param data A pointer to receive that the class has a constuctor.
+ * @return Returns `CXChildVisit_Break` only if a base class is found;
+ * otherwise returns `CXChildVisit_Continue`.
+ */
+static enum CXChildVisitResult getConstructorInfo_visitor( CXCursor cursor,
+                                                           CXCursor parent,
+                                                           CXClientData data ) {
+  (void)parent;
+  assert( data != NULL );
+  tidy_ConstructorInfo *const ctor_info = data;
+
+  enum CXCursorKind const kind = clang_getCursorKind( cursor );
+  switch ( kind ) {
+    case CXCursor_CXXBaseSpecifier:;
+      CXCursor base_cls_csr = clang_getCursorReferenced( cursor );
+      if ( tidy_Cursor_isInvalid( base_cls_csr ) ) {
+        CXType const type = clang_getCursorType( cursor );
+        base_cls_csr = clang_getTypeDeclaration( type );
+      }
+      if ( tidy_Cursor_isInvalid( base_cls_csr ) )
+        break;
+      if ( !tidy_Cursor_getConstructorInfo( base_cls_csr, ctor_info ) )
+        break;
+      FALLTHROUGH;
+
+    case CXCursor_Constructor:
+      if ( clang_CXXConstructor_isDefaultConstructor( cursor ) ) {
+        if ( clang_Cursor_isNull( ctor_info->default_ctor_csr ) )
+          ctor_info->default_ctor_csr = cursor;
+      }
+      else if ( !clang_CXXConstructor_isCopyConstructor( cursor ) &&
+                !clang_CXXConstructor_isMoveConstructor( cursor ) ) {
+        ctor_info->has_other_ctors = true;
+        return CXChildVisit_Break;
+      }
+      break;
+
+    case CXCursor_UsingDeclaration:;
+      CXCursor const ref_csr = clang_getCursorReferenced( cursor );
+      if ( tidy_Cursor_isInvalid( ref_csr ) )
+        break;
+      enum CXCursorKind const ref_kind = clang_getCursorKind( ref_csr );
+      if ( ref_kind != CXCursor_Constructor )
+        break;
+      if ( !clang_CXXConstructor_isDefaultConstructor( ref_csr ) &&
+           !clang_CXXConstructor_isCopyConstructor( ref_csr ) &&
+           !clang_CXXConstructor_isMoveConstructor( ref_csr ) ) {
+        ctor_info->has_other_ctors = true;
+        return CXChildVisit_Break;
+      }
+      break;
+
+    default:
+      /* suppress warning */;
+  } // switch
+
+  return CXChildVisit_Continue;
+}
+
+/**
  * A helper function for tidy_getCursorByName() that visits each symbol within
  * a scope attempting to find one having \ref getCursorByName_data::find_name
  * "find_name".
@@ -283,47 +347,6 @@ static char* getScopedName_thunk( CXCursor cursor, getCursorName_fn name_fn ) {
   return strbuf_take( &sbuf );
 }
 
-/**
- * A helper function for tidy_Cursor_hasConstructor().
- *
- * @param cursor The cursor being visited.
- * @param parent Not used.
- * @param data A pointer to receive that the class has a constuctor.
- * @return Returns `CXChildVisit_Break` only if a base class is found;
- * otherwise returns `CXChildVisit_Continue`.
- */
-static enum CXChildVisitResult hasConstructor_visitor( CXCursor cursor,
-                                                       CXCursor parent,
-                                                       CXClientData data ) {
-  (void)parent;
-  assert( data != NULL );
-  bool *const has_ctor = data;
-
-  enum CXCursorKind const kind = clang_getCursorKind( cursor );
-  switch ( kind ) {
-    case CXCursor_CXXBaseSpecifier:;
-      CXCursor base_cls_csr = clang_getCursorReferenced( cursor );
-      if ( tidy_Cursor_isInvalid( base_cls_csr ) ) {
-        CXType const type = clang_getCursorType( cursor );
-        base_cls_csr = clang_getTypeDeclaration( type );
-      }
-      if ( tidy_Cursor_isInvalid( base_cls_csr ) )
-        break;
-      if ( !tidy_Cursor_hasConstructor( base_cls_csr ) )
-        break;
-      FALLTHROUGH;
-
-    case CXCursor_Constructor:
-      *has_ctor = true;
-      return CXChildVisit_Break;
-
-    default:
-      /* suppress warning */;
-  } // switch
-
-  return CXChildVisit_Continue;
-}
-
 ////////// extern functions ///////////////////////////////////////////////////
 
 bool tidy_Cursor_callsBaseConstructor( CXCursor ctor_csr,
@@ -333,6 +356,47 @@ bool tidy_Cursor_callsBaseConstructor( CXCursor ctor_csr,
   };
   clang_visitChildren( ctor_csr, &callsBaseConstructor_visitor, &cbcd );
   return cbcd.found_explicit_call;
+}
+
+bool tidy_Cursor_getConstructorInfo( CXCursor cursor,
+                                     tidy_ConstructorInfo *ctor_info ) {
+  if ( tidy_Cursor_isInvalid( cursor ) )
+    return false;
+
+  CXType type = clang_getCursorType( cursor );
+         type = clang_getCanonicalType( type );
+
+  CXCursor cls_csr = clang_getTypeDeclaration( type );
+  if ( tidy_Cursor_isInvalid( cls_csr ) )
+    cls_csr = cursor;
+
+  if ( !tidy_Cursor_isClassDecl( cls_csr ) )
+    return false;
+
+  tidy_ConstructorInfo local_info;
+  if ( ctor_info == NULL )
+    ctor_info = &local_info;
+
+  *ctor_info = (tidy_ConstructorInfo){
+    .default_ctor_csr = clang_getNullCursor()
+  };
+  clang_visitChildren( cls_csr, &getConstructorInfo_visitor, ctor_info );
+
+  bool has_ctor =
+    !clang_Cursor_isNull( ctor_info->default_ctor_csr ) ||
+    ctor_info->has_other_ctors;
+
+  // Fall back to template declaration if cls_csr is a template specialization.
+  if ( !has_ctor ) {
+    CXCursor const tmpl_csr = clang_getSpecializedCursorTemplate( cls_csr );
+    if ( !tidy_Cursor_isInvalid( tmpl_csr ) )
+      clang_visitChildren( tmpl_csr, &getConstructorInfo_visitor, ctor_info );
+  }
+
+  has_ctor =
+    !clang_Cursor_isNull( ctor_info->default_ctor_csr ) ||
+    ctor_info->has_other_ctors;
+  return has_ctor;
 }
 
 CXCursor tidy_Cursor_getDefaultConstructor( CXCursor cls_csr ) {
@@ -392,33 +456,6 @@ char* tidy_Cursor_getScopedDisplayName( CXCursor cursor ) {
 
 char* tidy_Cursor_getScopedSpelling( CXCursor cursor ) {
   return getScopedName_thunk( cursor, &clang_getCursorSpelling );
-}
-
-bool tidy_Cursor_hasConstructor( CXCursor cursor ) {
-  if ( tidy_Cursor_isInvalid( cursor ) )
-    return false;
-
-  CXType type = clang_getCursorType( cursor );
-         type = clang_getCanonicalType( type );
-
-  CXCursor cls_csr = clang_getTypeDeclaration( type );
-  if ( tidy_Cursor_isInvalid( cls_csr ) )
-    cls_csr = cursor;
-
-  if ( !tidy_Cursor_isClassDecl( cls_csr ) )
-    return false;
-
-  bool has_ctor = false;
-  clang_visitChildren( cls_csr, &hasConstructor_visitor, &has_ctor );
-
-  // Fall back to template declaration if cls_csr is a template specialization.
-  if ( !has_ctor ) {
-    CXCursor const tmpl_csr = clang_getSpecializedCursorTemplate( cls_csr );
-    if ( !tidy_Cursor_isInvalid( tmpl_csr ) )
-      clang_visitChildren( tmpl_csr, &hasConstructor_visitor, &has_ctor );
-  }
-
-  return has_ctor;
 }
 
 bool tidy_Cursor_isClassDecl( CXCursor cursor ) {

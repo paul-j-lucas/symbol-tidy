@@ -46,6 +46,20 @@
  * @{
  */
 
+////////// typedefs ///////////////////////////////////////////////////////////
+
+typedef struct tidy_ConstructorInfo tidy_ConstructorInfo;
+
+////////// structs ////////////////////////////////////////////////////////////
+
+/**
+ * Information returned by tidy_Cursor_getConstructorInfo().
+ */
+struct tidy_ConstructorInfo {
+  CXCursor  default_ctor_csr;           ///< The default constructor, if any.
+  bool      has_other_ctors;            ///< True if other constructors exist.
+};
+
 ////////// extern functions ///////////////////////////////////////////////////
 
 /**
@@ -59,6 +73,19 @@
 NODISCARD
 bool tidy_Cursor_callsBaseConstructor( CXCursor ctor_csr,
                                        CXCursor base_cls_csr );
+
+/**
+ * Gets whether \a cursor has a constructor, either directly, or indirectly
+ * inherited from a base class.
+ *
+ * @param cursor The cursor to check.
+ * @param ctor_info The tidy_ConstructorInfo to receive information about
+ * constructors, if any.
+ * @return Returns `true` only if \a cursor has at least one constructor.
+ */
+NODISCARD
+bool tidy_Cursor_getConstructorInfo( CXCursor cursor,
+                                     tidy_ConstructorInfo *ctor_info );
 
 /**
  * Gets the default constructor of a class, if any.
@@ -117,17 +144,6 @@ char* tidy_Cursor_getScopedDisplayName( CXCursor cursor );
  */
 NODISCARD
 char* tidy_Cursor_getScopedSpelling( CXCursor cursor );
-
-/**
- * Gets whether \a cursor has a constructor, either directly, or indirectly
- * inherited from a base class.
- *
- * @param cursor The cursor to check.
- * @return Returns `true` only if \a cursor is either a class type or a
- * variable of a class type that has a constructor.
- */
-NODISCARD
-bool tidy_Cursor_hasConstructor( CXCursor cursor );
 
 /**
  * Gets whether \a cursor is a class, class template, structure, or union
