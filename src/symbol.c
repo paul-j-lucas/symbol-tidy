@@ -801,6 +801,15 @@ static bool symbol_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
 
   enum CXCursorKind const sym_kind = clang_getCursorKind( sym_csr );
   switch ( sym_kind ) {
+    case CXCursor_Namespace:
+      //
+      // Namespaces first declared in system headers (e.g., "std") should be
+      // excluded even if re-opened in user code.
+      //
+      sym_csr = clang_getCanonicalCursor( sym_csr );
+      CXSourceLocation const loc = clang_getCursorLocation( sym_csr );
+      return clang_Location_isInSystemHeader( loc );
+
     case CXCursor_NonTypeTemplateParameter:
     case CXCursor_TemplateTemplateParameter:
     case CXCursor_TemplateTypeParameter:
