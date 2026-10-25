@@ -331,13 +331,8 @@ static void cxx_dtor_add_ref( CXCursor cls_csr,
     return;
 
   tidy_symbol *const dtor_sym = add_symbol( dtor_csr, svd->source );
-  if ( dtor_sym == NULL )
-    return;
-
-  if ( svd->parent_sym != NULL )
+  if ( dtor_sym != NULL )
     symbol_add_ref( svd->parent_sym, dtor_sym );
-  else
-    dtor_sym->is_root = true;
 }
 
 /**
@@ -708,14 +703,21 @@ static void print_statistics( void ) {
 }
 
 /**
- * Adds a reference from \a from_sym to \a to_sym.
+ * Adds a reference from \a from_sym to \a to_sym, or mark \a to_sym as a \ref
+ * tidy_symbol::is_root "root".
  *
- * @param from_sym The symbol to adda reference from.
- * @param to_sym The symbol to adda reference to.
+ * @param from_sym The symbol to add a reference from. If NULL, \a to_sym is
+ * marked as a \ref tidy_symbol::is_root "root".
+ * @param to_sym The symbol to add a reference to or be marked as a \ref
+ * tidy_symbol::is_root "root".
  */
 static void symbol_add_ref( tidy_symbol *from_sym, tidy_symbol *to_sym ) {
-  assert( from_sym != NULL );
   assert( to_sym != NULL );
+
+  if ( from_sym == NULL ) {
+    to_sym->is_root = true;
+    return;
+  }
 
   for ( tidy_sym_ref const *ref = from_sym->refs; ref != NULL;
         ref = ref->next ) {
@@ -1307,10 +1309,7 @@ static void visit_most_Ref( CXCursor cursor, symbols_visit_data *svd ) {
 
   tidy_symbol *const ref_sym = add_symbol( ref_csr, svd->source );
   if ( ref_sym != NULL ) {
-    if ( svd->parent_sym != NULL )
-      symbol_add_ref( svd->parent_sym, ref_sym );
-    else
-      ref_sym->is_root = true;
+    symbol_add_ref( svd->parent_sym, ref_sym );
     if ( svd->source->lang == CXLanguage_CPlusPlus )
       cxx_member_add_def_ctor_ref( ref_csr, ref_sym, svd );
   }
@@ -1353,12 +1352,8 @@ static void visit_OverloadedDeclRef( CXCursor overloaded_csr,
       continue;                         // LCOV_EXCL_LINE
     dec_csr = clang_getCanonicalCursor( dec_csr );
     tidy_symbol *const dec_sym = add_symbol( dec_csr, svd->source );
-    if ( dec_sym != NULL ) {
-      if ( svd->parent_sym != NULL )
-        symbol_add_ref( svd->parent_sym, dec_sym );
-      else
-        dec_sym->is_root = true;
-    }
+    if ( dec_sym != NULL )
+      symbol_add_ref( svd->parent_sym, dec_sym );
   } // for
 }
 
