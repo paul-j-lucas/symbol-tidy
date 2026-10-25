@@ -243,18 +243,48 @@ bool tidy_Cursor_isScopeDecl( CXCursor cursor );
  * @param value The value to compare against.
  * @return Returns `true` only if the spelling of \a cursor equals \a value.
  *
+ * @sa #tidy_Cursor_isSpellingEqualToAny()
  * @sa tidy_Token_isSpellingEqualTo()
  */
 NODISCARD
 bool tidy_Cursor_isSpellingEqualTo( CXCursor cursor, char const *value );
 
 /**
+ * Gets whether the spelling of \a CURSOR equals any one of a set of values.
+ *
+ * @param CURSOR The cursor to compare.
+ * @param ... A comma separated list of values to compare against.  It is
+ * implicitly NULL terminated.
+ * @return Returns the index of the matched value or -1 for none.
+ *
+ * @sa tidy_Cursor_isSpellingEqualTo()
+ * @sa #tidy_Token_isSpellingEqualToAny()
+ */
+#define tidy_Cursor_isSpellingEqualToAny(CURSOR,...)  \
+  tidy_Cursor_isSpellingEqualToAny_impl( (CURSOR),    \
+                                         (char const*[]){ __VA_ARGS__, NULL } )
+
+/**
+ * Gets whether the spelling of \a cursor equals any one of \a values.
+ *
+ * @note This function isn't normally called directly; use the
+ * #tidy_Cursor_isSpellingEqualToAny() macro instead.
+ *
+ * @param cursor The cursor to compare.
+ * @param values The NULL terminated array of values to compare against.
+ * @return Returns the index of the matched value or -1 for none.
+ *
+ * @sa tidy_Cursor_isSpellingEqualTo()
+ */
+NODISCARD
+int tidy_Cursor_isSpellingEqualToAny_impl( CXCursor cursor,
+                                           char const *values[] );
+/**
  * Gets the real path of \a file.
  *
  * @param file The file to get the real path of.
  * @return Returns the string containing the real path of \a file.  The caller
  * _must_ call `clang_disposeString()` on it.
- *
  */
 NODISCARD
 CXString tidy_File_getRealPathName( CXFile file );
@@ -508,7 +538,7 @@ bool tidy_Token_isSpellingEqualTo( CXTranslationUnit tu, CXToken token,
                                    char const *value );
 
 /**
- * Gets whether the spelling of \a token equals any one of \a values.
+ * Gets whether the spelling of \a token equals any one of a set of values.
  *
  * @param TU The translation unit to use.
  * @param TOKEN The token to compare.

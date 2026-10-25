@@ -578,12 +578,32 @@ bool tidy_Cursor_isScopeDecl( CXCursor cursor ) {
 bool tidy_Cursor_isSpellingEqualTo( CXCursor cursor, char const *value ) {
   assert( value != NULL );
 
-  CXString const    name_cxs = clang_getCursorSpelling( cursor );
-  char const *const name_cs = clang_getCString( name_cxs );
-  int const         cmp = name_cs == NULL ? 1 : strcmp( name_cs, value );
+  CXString const    cxs = clang_getCursorSpelling( cursor );
+  char const *const cs = clang_getCString( cxs );
+  int const         cmp = cs == NULL ? 1 : strcmp( cs, value );
 
-  clang_disposeString( name_cxs );
+  clang_disposeString( cxs );
   return cmp == 0;
+}
+
+int tidy_Cursor_isSpellingEqualToAny_impl( CXCursor cursor,
+                                           char const *values[] ) {
+  assert( values != NULL );
+
+  CXString const    cxs = clang_getCursorSpelling( cursor );
+  char const *const cs = clang_getCString( cxs );
+
+  int equal_idx = -1;
+
+  for ( int i = 0; values[i] != NULL; ++i ) {
+    if ( strcmp( cs, values[i] ) == 0 ) {
+      equal_idx = i;
+      break;
+    }
+  } // for
+
+  clang_disposeString( cxs );
+  return equal_idx;
 }
 
 CXString tidy_File_getRealPathName( CXFile file ) {
@@ -819,11 +839,11 @@ bool tidy_Token_isSpellingEqualTo( CXTranslationUnit tu, CXToken token,
                                    char const *value ) {
   assert( value != NULL );
 
-  CXString const    token_cxs = clang_getTokenSpelling( tu, token );
-  char const *const token_cs = clang_getCString( token_cxs );
-  int const         cmp = strcmp( token_cs, value );
+  CXString const    cxs = clang_getTokenSpelling( tu, token );
+  char const *const cs = clang_getCString( cxs );
+  int const         cmp = strcmp( cs, value );
 
-  clang_disposeString( token_cxs );
+  clang_disposeString( cxs );
   return cmp == 0;
 }
 
@@ -831,19 +851,19 @@ int tidy_Token_isSpellingEqualToAny_impl( CXTranslationUnit tu, CXToken token,
                                           char const *values[] ) {
   assert( values != NULL );
 
-  CXString const    token_cxs = clang_getTokenSpelling( tu, token );
-  char const *const token_cs = clang_getCString( token_cxs );
+  CXString const    cxs = clang_getTokenSpelling( tu, token );
+  char const *const cs = clang_getCString( cxs );
 
   int equal_idx = -1;
 
   for ( int i = 0; values[i] != NULL; ++i ) {
-    if ( strcmp( token_cs, values[i] ) == 0 ) {
+    if ( strcmp( cs, values[i] ) == 0 ) {
       equal_idx = i;
       break;
     }
   } // for
 
-  clang_disposeString( token_cxs );
+  clang_disposeString( cxs );
   return equal_idx;
 }
 

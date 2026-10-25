@@ -469,21 +469,17 @@ static enum CXChildVisitResult find_begin_end_visitor( CXCursor cursor,
       goto skip;
   } // switch
 
-  CXString const    name_cxs = clang_getCursorSpelling( cursor );
-  char const *const name_cs = clang_getCString( name_cxs );
-
-  if ( name_cs != NULL && name_cs[0] != '\0' ) {
-    if ( clang_Cursor_isNull( svd->cxx_for_range.begin_csr ) &&
-         strcmp( name_cs, "begin" ) == 0 ) {
-      svd->cxx_for_range.begin_csr = cursor;
-    }
-    else if ( clang_Cursor_isNull( svd->cxx_for_range.end_csr ) &&
-              strcmp( name_cs, "end" ) == 0 ) {
-      svd->cxx_for_range.end_csr = cursor;
-    }
-  }
-
-  clang_disposeString( name_cxs );
+  int const match = tidy_Cursor_isSpellingEqualToAny( cursor, "begin", "end" );
+  switch ( match ) {
+    case 0:
+      if ( clang_Cursor_isNull( svd->cxx_for_range.begin_csr ) )
+        svd->cxx_for_range.begin_csr = cursor;
+      break;
+    case 1:
+      if ( clang_Cursor_isNull( svd->cxx_for_range.end_csr ) )
+        svd->cxx_for_range.end_csr = cursor;
+      break;
+  } // switch
 
   if ( !clang_Cursor_isNull( svd->cxx_for_range.begin_csr ) &&
        !clang_Cursor_isNull( svd->cxx_for_range.end_csr ) ) {
