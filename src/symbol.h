@@ -89,9 +89,46 @@ struct tidy_symbol {
    */
   bool          is_root;
 
-  bool          is_dead;                ///< Don't count as unused.
-  bool          is_scope;               ///< Is this an enclosing scope?
-  bool          is_used;                ///< Is the symbol used?
+  /**
+   * Is this symbol "dead"?
+   *
+   * @remarks
+   * @parblock
+   * A "dead" symbol is one that is excluded from being considered unused (even
+   * if it is unused).  A symbol becomes dead if any of the following are true:
+   *
+   *  1. Its \ref path is NULL or its \ref line is 0 (as they would be for
+   *     symbols in system headers).
+   *
+   *  2. It's within an unused scope.
+   * @endparblock
+   *
+   * @sa symbol_in_unused_scope()
+   */
+  bool          is_dead;
+
+  /**
+   * Is this symbol a scope?
+   *
+   * @remarks
+   * Consider a class:
+   *
+   *      struct point {
+   *        point() : x{ 0 }, y{ 0 } { }
+   *        int x, y;
+   *      };
+   *
+   * It has the symbols `point`, `point::point()`, `point::x`, and `point::y`.
+   * If all are unused (meaning the entire `struct` is unused), it's much less
+   * verbose and necessary to report only that `point` (the `struct`) is unused
+   * rather than reporting that every symbol "in" `point` is unused also.
+   *
+   * @sa symbol_in_unused_scope()
+   * @sa tidy_Cursor_isEnclosingScope()
+   */
+  bool          is_scope;
+
+  bool          is_used;                ///< Is this symbol used?
 };
 
 ////////// extern functions ///////////////////////////////////////////////////

@@ -146,8 +146,7 @@ NODISCARD
 char* tidy_Cursor_getScopedSpelling( CXCursor cursor );
 
 /**
- * Gets whether \a cursor is a class, class template, structure, or union
- * declaration.
+ * Gets whether \a cursor is a class, class template, structure, or union.
  *
  * @remarks This function is a subset of tidy_Cursor_isEnclosingScope().
  *
@@ -162,8 +161,10 @@ NODISCARD
 bool tidy_Cursor_isClassDecl( CXCursor cursor );
 
 /**
- * Gets whether \a cursor is anything that is an enclosing scope, i.e., a
- * namespace or any kind of class or function.
+ * Gets whether \a cursor is something that provides an enclosing scope for
+ * other symbols, i.e., a class, class template, structure, union, constructor,
+ * conversion operator, destructor, function, function template, member
+ * function, or namespace.
  *
  * @remarks This function is a superset of tidy_Cursor_isClassDecl().
  *

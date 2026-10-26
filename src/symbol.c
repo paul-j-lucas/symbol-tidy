@@ -940,9 +940,10 @@ static void symbols_cleanup( void ) {
 }
 
 /**
- * Marks all used symbols as used.
+ * Marks all \ref tidy_symbol::is_used "used" symbols as used and \ref
+ * tidy_symbol::is_dead "dead" symbols as dead.
  *
- * @return Returns the number of unused symbols.
+ * @return Returns the number of unused, alive symbols.
  */
 static unsigned symbols_mark_used( void ) {
   ht_iterator_t iter;
