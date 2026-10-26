@@ -706,6 +706,30 @@ char* tidy_getCursorUSR( CXCursor cursor ) {
   if ( usr_cs != NULL && usr_cs[0] != '\0' )
     usr = strdup_or_exit( usr_cs );
   clang_disposeString( usr_cxs );
+
+  if ( usr != NULL )
+    return usr;
+
+  //
+  // For some cursor kinds, libclang returns an empty string for its USR.  But
+  // we _really_ want a USR, so sythesize our own using the cursor's location.
+  //
+  CXSourceLocation const loc = clang_getCursorLocation( cursor );
+  CXFile file;
+  unsigned line, col;
+  clang_getSpellingLocation( loc, &file, &line, &col, /*offset=*/NULL );
+  if ( unlikely( file == NULL ) )
+    return NULL;
+
+  CXString const    path_cxs = clang_getFileName( file );
+  char const *const path_cs = clang_getCString( path_cxs );
+  CXString const    label_cxs = clang_getCursorSpelling( cursor );
+  char const *const label_cs = clang_getCString( label_cxs );
+
+  asprintf_or_exit( &usr, "tidy:%s@%u@%u@%s", path_cs, line, col, label_cs );
+
+  clang_disposeString( label_cxs );
+  clang_disposeString( path_cxs );
   return usr;
 }
 
