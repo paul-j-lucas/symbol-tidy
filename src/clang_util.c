@@ -231,7 +231,6 @@ static enum CXChildVisitResult getCursorByName_visitor( CXCursor cursor,
       if ( gcbnd->cxx_recurse_into_scope )
         return CXChildVisit_Recurse;
       break;
-        
   } // switch
 
 skip:
