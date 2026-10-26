@@ -369,7 +369,8 @@ static void cxx_dtor_add_ref( CXCursor cls_csr,
  * called.
  * @endparblock
  *
- * @parem member_sym The symbol to add a reference from.
+ * @param member_csr The cursor for the member.
+ * @param member_sym The member symbol to add a reference from.
  * @param svd The symbols_visit_data to use.
  */
 static void cxx_member_add_def_ctor_ref( CXCursor member_csr,

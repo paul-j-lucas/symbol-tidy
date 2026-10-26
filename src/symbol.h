@@ -69,7 +69,34 @@ struct tidy_symbol {
   unsigned      col;                    ///< Column defined at.
   tidy_symbol  *parent_sym;             ///< Parent symbol, if any.
   tidy_sym_ref *refs;                   ///< Symbol(s) referenced from this.
-  bool          is_root;    // Is "main" or referenced from global scope?
+
+  /**
+   * Is this a "root" symbol?
+   *
+   * @remarks
+   * @parblock
+   * To mark symbols as \ref is_used "used", we have to iterate over
+   * all symbols collected from a program looking for "root" symbols.  For each
+   * root symbol, mark it as used and also mark every symbol on its \ref refs
+   * list as used.  All symbols not reachable from a root symbol are unused.
+   *
+   * In addition to the obvious of `main()` being a root symbol, the following
+   * are also roots, all only for C++:
+   *
+   *  + All symbols in system headers since template code calls back into user
+   *    code, so it should be marked used.
+   *
+   *  + All variables of types that have constructors.  Even if such variables
+   *    are apparently unused, their constructors might have side effects
+   *    (e.g., locking a mutex), so they (and any symbols they reference) have
+   *    to be marked as used.
+   *
+   *  + All user-defined `operator()` functions due to limitations of
+   *    libclang's C API.
+   * @endparblock
+   */
+  bool          is_root;
+
   bool          is_dead;                ///< Don't count as unused.
   bool          is_scope;               ///< Is this an enclosing scope?
   bool          is_used;                ///< Is the symbol used?
