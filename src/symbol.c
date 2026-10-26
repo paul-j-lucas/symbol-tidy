@@ -179,6 +179,8 @@ static tidy_symbol* add_symbol( CXCursor sym_csr, tidy_source const *source ) {
     sym->is_root = true;
   }
 
+  sym->refs = ARRAY_INIT( sizeof(tidy_symbol*) );
+
 done:
   free( key );
   free( sym_name );
@@ -713,15 +715,15 @@ static void symbol_add_ref( tidy_symbol *from_sym, tidy_symbol *to_sym ) {
     return;
   }
 
-  for ( tidy_sym_ref const *ref = from_sym->refs; ref != NULL;
-        ref = ref->next ) {
-    if ( ref->sym == to_sym )
+  for ( unsigned i = 0; i < from_sym->refs.len; ++i ) {
+    tidy_symbol const *const ref_sym =
+      *(tidy_symbol const* const*)array_at_nc( &from_sym->refs, i );
+    if ( ref_sym == to_sym )
       return;
   } // for
 
-  tidy_sym_ref *const ref = MALLOC( tidy_sym_ref, 1 );
-  *ref = (tidy_sym_ref){ .sym = to_sym, .next = from_sym->refs };
-  from_sym->refs = ref;
+  tidy_symbol const **const pref_sym = array_push_back( &from_sym->refs );
+  *pref_sym = to_sym;
 }
 
 /**
@@ -735,11 +737,7 @@ static void symbol_cleanup( tidy_symbol *sym ) {
     FREE( sym->name );
     FREE( sym->display_name );
     FREE( sym->path );
-
-    for ( tidy_sym_ref *ref = sym->refs, *next; ref != NULL; ref = next ) {
-      next = ref->next;
-      free( ref );
-    } // for
+    array_cleanup( &sym->refs, /*free_fn=*/NULL );
   }
 }
 
@@ -886,8 +884,10 @@ static void symbol_mark_used( tidy_symbol *sym ) {
     sym->is_used = true;
     if ( sym->parent_sym != NULL )
       symbol_mark_used( sym->parent_sym );
-    for ( tidy_sym_ref *ref = sym->refs; ref != NULL; ref = ref->next )
-      symbol_mark_used( ref->sym );
+    for ( unsigned i = 0; i < sym->refs.len; ++i ) {
+      tidy_symbol *const ref_sym = *(tidy_symbol**)array_at_nc( &sym->refs, i );
+      symbol_mark_used( ref_sym );
+    } // for
   }
 }
 

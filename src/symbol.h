@@ -29,6 +29,7 @@
 
 // local
 #include "pjl_config.h"
+#include "array.h"
 #include "source.h"
 
 // standard
@@ -43,18 +44,9 @@
 
 ////////// typedefs ///////////////////////////////////////////////////////////
 
-typedef struct tidy_symbol  tidy_symbol;
-typedef struct tidy_sym_ref tidy_sym_ref;
+typedef struct tidy_symbol tidy_symbol;
 
 ////////// structs ////////////////////////////////////////////////////////////
-
-/**
- * A referenced symbol.
- */
-struct tidy_sym_ref {
-  tidy_symbol   *sym;                   ///< Symbol being referenced.
-  tidy_sym_ref  *next;                  ///< Next symbol, if any.
-};
 
 /**
  * A symbol referenced in a translation unit.
@@ -67,7 +59,7 @@ struct tidy_symbol {
   unsigned      line;                   ///< Line defined on.
   unsigned      col;                    ///< Column defined at.
   tidy_symbol  *parent_sym;             ///< Parent symbol, if any.
-  tidy_sym_ref *refs;                   ///< Symbol(s) referenced from this.
+  array_t       refs;                   ///< Symbol(s) referenced from this.
 
   /**
    * Is this a "root" symbol?
