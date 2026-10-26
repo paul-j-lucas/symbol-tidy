@@ -92,7 +92,7 @@ enum config_table_kind {
 };
 
 /// @cond DOXYGEN_IGNORE
-#define TABLE_TIDY_SOURCE         (TABLE_SYMBOL_TIDY | TABLE_SOURCE)
+#define TABLE_TIDY_OR_SOURCE      (TABLE_SYMBOL_TIDY | TABLE_SOURCE)
 /// @endcond
 
 ////////// typedefs ///////////////////////////////////////////////////////////
@@ -172,10 +172,10 @@ static void         toml_value_print( toml_value const*, FILE* );
  * Configuration keys.
  */
 static config_key const CONFIG_KEYS[] = {
-  { "color",          TABLE_SYMBOL_TIDY,  &color_parse          },
-  { "error",          TABLE_SYMBOL_TIDY,  &error_parse          },
-  { "ignore-paths",   TABLE_SYMBOL_TIDY,  &ignore_paths_parse   },
-  { "ignore-symbols", TABLE_TIDY_SOURCE,  &ignore_symbols_parse },
+  { "color",                  TABLE_SYMBOL_TIDY,    &color_parse          },
+  { "error",                  TABLE_SYMBOL_TIDY,    &error_parse          },
+  { "ignore-paths",           TABLE_SYMBOL_TIDY,    &ignore_paths_parse   },
+  { "ignore-symbols",         TABLE_TIDY_OR_SOURCE, &ignore_symbols_parse },
 };
 
 /**
@@ -184,7 +184,7 @@ static config_key const CONFIG_KEYS[] = {
 static char const *const TABLE_KINDS[] = {
   [ TABLE_NONE ] = "none",
   [ TABLE_SYMBOL_TIDY ] = TABLE_SYMBOL_TIDY_NAME,
-  [ TABLE_TIDY_SOURCE ] = TABLE_SYMBOL_TIDY_NAME " or source",
+  [ TABLE_TIDY_OR_SOURCE ] = TABLE_SYMBOL_TIDY_NAME " or source",
   [ TABLE_SOURCE ] = "source",
   [ TABLE_SYMBOL ] = "symbol"
 };
