@@ -29,7 +29,7 @@
 
 // local
 #include "pjl_config.h"
-#include "array.h"
+#include "hash_table.h"
 #include "source.h"
 
 // standard
@@ -59,7 +59,7 @@ struct tidy_symbol {
   unsigned      line;                   ///< Line defined on.
   unsigned      col;                    ///< Column defined at.
   tidy_symbol  *parent_sym;             ///< Parent symbol, if any.
-  array_t       refs;                   ///< Symbol(s) referenced from this.
+  hash_table_t  ref_sym_set;            ///< Symbol(s) referenced from this.
 
   /**
    * Is this a "root" symbol?
@@ -68,8 +68,9 @@ struct tidy_symbol {
    * @parblock
    * To mark symbols as \ref is_used "used", we have to iterate over
    * all symbols collected from a program looking for "root" symbols.  For each
-   * root symbol, mark it as used and also mark every symbol on its \ref refs
-   * list as used.  All symbols not reachable from a root symbol are unused.
+   * root symbol, mark it as used and also mark every symbol on its \ref
+   * ref_sym_set as used.  All symbols not reachable from a root symbol are
+   * unused.
    *
    * In C, the only root symbol is `main()`; in C++, the following are also
    * roots:

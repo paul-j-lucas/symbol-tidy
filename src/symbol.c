@@ -99,6 +99,8 @@ struct symbols_visit_data {
 
 static void cxx_dtor_add_ref( CXCursor, symbols_visit_data const* );
 static void symbol_add_ref( tidy_symbol*, tidy_symbol* );
+NODISCARD
+static int  symbol_cmp( tidy_symbol const*, tidy_symbol const* );
 static void symbol_cleanup( tidy_symbol* );
 
 NODISCARD
@@ -179,7 +181,11 @@ static tidy_symbol* add_symbol( CXCursor sym_csr, tidy_source const *source ) {
     sym->is_root = true;
   }
 
-  sym->refs = ARRAY_INIT( sizeof(tidy_symbol*) );
+  ht_table_init(
+    &sym->ref_sym_set, HT_DPTR, 2.0, 128,
+    POINTER_CAST( ht_cmp_fn_t, &symbol_cmp ),
+    POINTER_CAST( ht_hash_fn_t, &fnv1a_s )
+  );
 
 done:
   free( key );
@@ -696,6 +702,46 @@ static void print_statistics( void ) {
   verbose_printf(
     "    ss-size = %u\n", symbol_set.size
   );
+
+  tidy_symbol const *max_sym = NULL;
+  double max_lf = -1.0;
+
+  // Find the symbol having the ref_sym_set with the largest load factor.
+  ht_iterator_t iter;
+  ht_iterator_init( &iter, &symbol_set );
+  for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
+    if ( sym->is_dead )
+      continue;
+    double const lf = ht_table_load_factor( &sym->ref_sym_set );
+    if ( lf > max_lf ) {
+      max_sym = sym;
+      max_lf = lf;
+    }
+  } // for
+
+  if ( max_sym != NULL ) {
+    verbose_printf(
+      "    ss-max-load-factor:\n"
+    );
+    verbose_printf(
+      "      ss-name = \"%s\"\n",
+      max_sym->display_name ? max_sym->display_name : max_sym->name
+    );
+    if ( max_sym->path != NULL ) {
+      verbose_printf(
+        "      ss-path = \"%s\"\n", max_sym->path
+      );
+    }
+    verbose_printf(
+      "      ref. symbol set:\n"
+    );
+    verbose_printf(
+      "        rss-load-factor = " TIDY_STAT_LF_FMT "\n", max_lf
+    );
+    verbose_printf(
+      "        rss-size = %u\n", max_sym->ref_sym_set.size
+    );
+  }
 }
 
 /**
@@ -710,20 +756,10 @@ static void print_statistics( void ) {
 static void symbol_add_ref( tidy_symbol *from_sym, tidy_symbol *to_sym ) {
   assert( to_sym != NULL );
 
-  if ( from_sym == NULL ) {
+  if ( from_sym == NULL )
     to_sym->is_root = true;
-    return;
-  }
-
-  for ( unsigned i = 0; i < from_sym->refs.len; ++i ) {
-    tidy_symbol const *const ref_sym =
-      *(tidy_symbol const* const*)array_at_nc( &from_sym->refs, i );
-    if ( ref_sym == to_sym )
-      return;
-  } // for
-
-  tidy_symbol const **const pref_sym = array_push_back( &from_sym->refs );
-  *pref_sym = to_sym;
+  else
+    ht_table_insert( &from_sym->ref_sym_set, to_sym, 0 );
 }
 
 /**
@@ -737,7 +773,7 @@ static void symbol_cleanup( tidy_symbol *sym ) {
     FREE( sym->name );
     FREE( sym->display_name );
     FREE( sym->path );
-    array_cleanup( &sym->refs, /*free_fn=*/NULL );
+    ht_table_cleanup( &sym->ref_sym_set, /*free_fn=*/NULL );
   }
 }
 
@@ -884,8 +920,10 @@ static void symbol_mark_used( tidy_symbol *sym ) {
     sym->is_used = true;
     if ( sym->parent_sym != NULL )
       symbol_mark_used( sym->parent_sym );
-    for ( unsigned i = 0; i < sym->refs.len; ++i ) {
-      tidy_symbol *const ref_sym = *(tidy_symbol**)array_at_nc( &sym->refs, i );
+    ht_iterator_t iter;
+    ht_iterator_init( &iter, &sym->ref_sym_set );
+    for ( tidy_symbol *ref_sym;
+          (ref_sym = ht_iterator_next( &iter )) != NULL; ) {
       symbol_mark_used( ref_sym );
     } // for
   }
@@ -1066,7 +1104,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
         case CXCursor_LabelStmt:
           //
           // Never set curr_sym to a labeled statement since it can break a
-          // refs list.  Consider:
+          // ref_sym_set.  Consider:
           //
           //      void g() { }
           //
@@ -1079,12 +1117,12 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
           //      }
           //
           // If we set curr_sym to unused_label here, we'd get the following
-          // symbols and refs:
+          // symbols and what they reference:
           //
-          //      f()
-          //      g()
-          //      main() [root] -> f()
-          //      unused_label -> g()
+          //      f() -> {}
+          //      g() -> {}
+          //      main() [root] -> { f() }
+          //      unused_label -> { g() }
           //
           // Note that f() does _not_ reference unused_label.  (If it did, then
           // ununsed label would incorrectly be considered used.  A actual goto
@@ -1095,12 +1133,12 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
           // to g(), so g() would be left as unused also --- incorrectly.
           //
           // By _not_ setting curr_sym to unused_label, we'd get the following
-          // symbols and refs:
+          // symbols and what they reference:
           //
-          //      f()
-          //      g()
-          //      main() [root] -> f()
-          //      f() -> g()
+          //      f() -> { g() }
+          //      g() -> {}
+          //      main() [root] -> { f() }
+          //      unused_label -> {}
           //
           // Now, f() references g(), so it would be marked used --- correctly.
           //
