@@ -751,6 +751,8 @@ static void symbol_cleanup( tidy_symbol *sym ) {
  * @return Returns a number less than 0, 0, or greater than 0 if the name of \a
  * i_sym is less than, equal to, or greater than the name of \a j_sym,
  * respectively.
+ *
+ * @sa symbol_cmp_by_path()
  */
 NODISCARD
 int symbol_cmp( tidy_symbol const *i_sym, tidy_symbol const *j_sym ) {
@@ -768,6 +770,8 @@ int symbol_cmp( tidy_symbol const *i_sym, tidy_symbol const *j_sym ) {
  * @return Returns a number less than 0, 0, or greater than 0 if the first
  * symbol's path is less than, equal to, or greater than the second symbol's
  * path, respectively.
+ *
+ * @sa symbol_cmp()
  */
 NODISCARD
 static int symbol_cmp_by_path( tidy_symbol const *i_sym,
