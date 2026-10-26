@@ -1,3 +1,11 @@
+2026-10-26  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * symbol.c, symbol.h: Now using hash_table for refs.
+   * symbol.c: Added static.
+   * symbol.c, symbol.h: Now using array for refs.
+   * symbol.h: #include fix.
+   * symbol.c, symbol.h: Made some functions static.
+
 2026-10-25  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
    * symbol.c: Reverted to skipping symbols in system headers, but only for C
