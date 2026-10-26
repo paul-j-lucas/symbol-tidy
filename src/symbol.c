@@ -997,18 +997,22 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
   } // switch
 
   if ( is_definition ) {
-    //
-    // For a definition, look-up the symbol to update its definition location.
-    //
     tidy_symbol *const sym = add_symbol( cursor, svd->source );
     if ( likely( sym != NULL ) ) {
       if ( tidy_Cursor_isEnclosingScope( cursor ) )
         sym->is_scope = true;
 
       if ( is_in_system_header ) {
+        //
+        // As mentioned above, in C++, template code in system headers calls
+        // back into user code, so mark all symbols in system headers as roots.
+        //
         sym->is_root = true;
       }
       else {
+        //
+        // For definitions, set the symbol's path, line, and column.
+        //
         CXFile sym_file;
         clang_getSpellingLocation(
           sym_loc, &sym_file, &sym->line, &sym->col, /*offset=*/NULL
@@ -1028,7 +1032,48 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
 
       switch ( kind ) {
         case CXCursor_LabelStmt:
+          //
+          // Never set curr_sym to a labeled statement since it can break a
+          // refs list.  Consider:
+          //
+          //      void g() { }
+          //
+          //      void f() {
+          //        unused_label: g();
+          //      }
+          //
+          //      int main() {
+          //        f();
+          //      }
+          //
+          // If we set curr_sym to unused_label here, we'd get the following
+          // symbols and refs:
+          //
+          //      f()
+          //      g()
+          //      main() [root] -> f()
+          //      unused_label -> g()
+          //
+          // Note that f() does _not_ reference unused_label.  (If it did, then
+          // ununsed label would incorrectly be considered used.  A actual goto
+          // statement is needed to reference it.)
+          //
+          // Since nothing references unused_label, it's correctly left as
+          // unused.  But unused_label is the only symbol that has a reference
+          // to g(), so g() would be left as unused also --- incorrectly.
+          //
+          // By _not_ setting curr_sym to unused_label, we'd get the following
+          // symbols and refs:
+          //
+          //      f()
+          //      g()
+          //      main() [root] -> f()
+          //      f() -> g()
+          //
+          // Now, f() references g(), so it would be marked used --- correctly.
+          //
           break;
+
         default:
           svd->curr_sym = sym;
       } // switch
