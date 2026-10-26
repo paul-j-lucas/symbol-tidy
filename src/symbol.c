@@ -932,6 +932,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
     case CXCursor_CXXReinterpretCastExpr:
     case CXCursor_CXXDynamicCastExpr:
     case CXCursor_DeclRefExpr:
+    case CXCursor_LabelRef:
     case CXCursor_MacroExpansion:
     case CXCursor_MemberRefExpr:
     case CXCursor_TemplateRef:
@@ -960,6 +961,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       break;
 
     case CXCursor_EnumConstantDecl:
+    case CXCursor_LabelStmt:
     case CXCursor_MacroDefinition:
     case CXCursor_TypeAliasDecl:
     case CXCursor_TypedefDecl:
@@ -1011,7 +1013,8 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       if ( tidy_Cursor_isEnclosingScope( cursor ) )
         sym->is_scope = true;
 
-      svd->parent_sym = sym;
+      if ( kind != CXCursor_LabelStmt )
+        svd->parent_sym = sym;
 
       switch ( kind ) {
         case CXCursor_Constructor:

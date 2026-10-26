@@ -219,6 +219,7 @@ static enum CXChildVisitResult getCursorByName_visitor( CXCursor cursor,
         break;
       FALLTHROUGH;
 
+    case CXCursor_LabelStmt:
     case CXCursor_MacroDefinition:
       if ( tidy_Cursor_isSpellingEqualTo( cursor, gcbnd->find_name) ) {
         gcbnd->found_csr = cursor;
