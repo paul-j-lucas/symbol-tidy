@@ -1,5 +1,12 @@
 2026-10-25  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * symbol.c: Reverted to skipping symbols in system headers, but only for C
+     code.
+   * clang_util.c, symbol.c: Now reporting unused labels.
+   * clang_util.c: tidy_getCursorUSR() will now synthesize a URS if libclang
+     returns an empty one.
+   * symbol.c: Now printing verbose cursors not in system headers.
+   * clang_util.c: getCursorByName_visitor code re-org.
    * symbol-tidy.c: Eliminated blank line between source files in verbose
      output.
    * symbol.c: Upped estimated symbol set size to 16384.
