@@ -75,7 +75,7 @@ typedef struct symbols_visit_data   symbols_visit_data;
  */
 struct symbols_visit_data {
   tidy_source const  *source;           ///< Source file being tidied.
-  tidy_symbol        *parent_sym;       ///< Current parent symbol.
+  tidy_symbol        *curr_sym;         ///< Current symbol, if any.
 
   /**
    * Additional data for visit_Constructor().
@@ -266,8 +266,8 @@ enum CXChildVisitResult cxx_def_ctor_add_ref_visitor( CXCursor cursor,
   if ( def_ctor_sym == NULL )
     goto skip;
 
-  assert( svd->parent_sym != NULL );
-  symbol_add_ref( svd->parent_sym, def_ctor_sym );
+  assert( svd->curr_sym != NULL );
+  symbol_add_ref( svd->curr_sym, def_ctor_sym );
 
 skip:
   //
@@ -333,7 +333,7 @@ static void cxx_dtor_add_ref( CXCursor cls_csr,
 
   tidy_symbol *const dtor_sym = add_symbol( dtor_csr, svd->source );
   if ( dtor_sym != NULL )
-    symbol_add_ref( svd->parent_sym, dtor_sym );
+    symbol_add_ref( svd->curr_sym, dtor_sym );
 }
 
 /**
@@ -919,7 +919,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
 
   assert( data != NULL );
   symbols_visit_data *const svd = data;
-  tidy_symbol *const prev_parent_sym = svd->parent_sym;
+  tidy_symbol *const prev_parent_sym = svd->curr_sym;
 
   bool is_definition = false;
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
@@ -1009,12 +1009,12 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       }
 
       if ( sym->parent_sym == NULL )
-        sym->parent_sym = svd->parent_sym;
+        sym->parent_sym = svd->curr_sym;
       if ( tidy_Cursor_isEnclosingScope( cursor ) )
         sym->is_scope = true;
 
       if ( kind != CXCursor_LabelStmt )
-        svd->parent_sym = sym;
+        svd->curr_sym = sym;
 
       switch ( kind ) {
         case CXCursor_Constructor:
@@ -1045,7 +1045,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
   }
 
   clang_visitChildren( cursor, symbols_visitor, svd );
-  svd->parent_sym = prev_parent_sym;
+  svd->curr_sym = prev_parent_sym;
 
   return CXChildVisit_Continue;
 }
@@ -1128,11 +1128,11 @@ static void visit_CXXForRangeStmt( CXCursor range_stmt_csr,
   if ( !clang_Cursor_isNull( svd->cxx_for_range.begin_csr ) ) {
     tidy_symbol *sym = add_symbol( svd->cxx_for_range.begin_csr, svd->source );
     if ( sym != NULL )
-      symbol_add_ref( svd->parent_sym, sym );
+      symbol_add_ref( svd->curr_sym, sym );
     assert( !clang_Cursor_isNull( svd->cxx_for_range.end_csr ) );
     sym = add_symbol( svd->cxx_for_range.end_csr, svd->source );
     if ( sym != NULL )
-      symbol_add_ref( svd->parent_sym, sym );
+      symbol_add_ref( svd->curr_sym, sym );
   }
 
   svd->cxx_for_range = prev_svd_cxx_for_range;
@@ -1174,12 +1174,12 @@ static void visit_CXXMethod( CXCursor method_csr, symbols_visit_data *svd ) {
   for ( unsigned i = 0; i < overridden_csrs_count; ++i ) {
     tidy_symbol *const base_sym = add_symbol( overridden_csrs[i], svd->source );
     if ( base_sym != NULL )
-      symbol_add_ref( base_sym, svd->parent_sym );
+      symbol_add_ref( base_sym, svd->curr_sym );
   } // for
 
   clang_disposeOverriddenCursors( overridden_csrs );
 
-  cxx_member_add_def_ctor_ref( method_csr, svd->parent_sym, svd );
+  cxx_member_add_def_ctor_ref( method_csr, svd->curr_sym, svd );
 
   enum CXCursorKind const kind = clang_getCursorKind( method_csr );
   switch ( kind ) {
@@ -1193,7 +1193,7 @@ static void visit_CXXMethod( CXCursor method_csr, symbols_visit_data *svd ) {
         // As a hack, mark such operators as roots to ensure they (and any
         // symbols they reference) are marked as used.
         //
-        svd->parent_sym->is_root = true;
+        svd->curr_sym->is_root = true;
       }
       break;
 
@@ -1254,7 +1254,7 @@ static void visit_FieldDecl( CXCursor field_csr, symbols_visit_data *svd ) {
     );
     tidy_symbol *const sym = add_symbol( sym_csr, svd->source );
     if ( sym != NULL )
-      symbol_add_ref( svd->parent_sym, sym );
+      symbol_add_ref( svd->curr_sym, sym );
   } // for
 
   clang_disposeTokens( tu, tokens, token_count );
@@ -1314,7 +1314,7 @@ static void visit_MacroDefinition( CXCursor macro_csr,
     if ( !tidy_Cursor_isInvalid( sym_csr ) ) {
       tidy_symbol *const sym = add_symbol( sym_csr, svd->source );
       if ( sym != NULL )
-        symbol_add_ref( svd->parent_sym, sym );
+        symbol_add_ref( svd->curr_sym, sym );
     }
   } // for
 
@@ -1337,12 +1337,12 @@ static void visit_most_Ref( CXCursor cursor, symbols_visit_data *svd ) {
 
   tidy_symbol *const ref_sym = add_symbol( ref_csr, svd->source );
   if ( ref_sym != NULL ) {
-    symbol_add_ref( svd->parent_sym, ref_sym );
+    symbol_add_ref( svd->curr_sym, ref_sym );
     if ( svd->source->lang == CXLanguage_CPlusPlus )
       cxx_member_add_def_ctor_ref( ref_csr, ref_sym, svd );
   }
 
-  if ( svd->parent_sym == NULL )
+  if ( svd->curr_sym == NULL )
     return;
 
   CXCursor const sem_parent = clang_getCursorSemanticParent( ref_csr );
@@ -1355,7 +1355,7 @@ static void visit_most_Ref( CXCursor cursor, symbols_visit_data *svd ) {
     //
     tidy_symbol *const enum_decl_sym = add_symbol( sem_parent, svd->source );
     if ( enum_decl_sym != NULL )
-      symbol_add_ref( svd->parent_sym, enum_decl_sym );
+      symbol_add_ref( svd->curr_sym, enum_decl_sym );
   }
 }
 
@@ -1381,7 +1381,7 @@ static void visit_OverloadedDeclRef( CXCursor overloaded_csr,
     dec_csr = clang_getCanonicalCursor( dec_csr );
     tidy_symbol *const dec_sym = add_symbol( dec_csr, svd->source );
     if ( dec_sym != NULL )
-      symbol_add_ref( svd->parent_sym, dec_sym );
+      symbol_add_ref( svd->curr_sym, dec_sym );
   } // for
 }
 
@@ -1491,7 +1491,7 @@ static void visit_VarDecl( CXCursor var_decl_csr, symbols_visit_data *svd ) {
 
   if ( tidy_Cursor_isClassDecl( cls_csr ) ) {
     if ( tidy_Cursor_getConstructorInfo( cls_csr, /*ctor_info=*/NULL ) )
-      svd->parent_sym->is_root = true;
+      svd->curr_sym->is_root = true;
 
     cxx_dtor_add_ref( cls_csr, svd );
     clang_visitChildren( cls_csr, &cxx_base_dtor_add_ref_visitor, svd );
