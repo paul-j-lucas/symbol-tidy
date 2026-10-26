@@ -910,15 +910,27 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
                                                 CXCursor parent,
                                                 CXClientData data ) {
   (void)parent;
+  assert( data != NULL );
+  symbols_visit_data *const svd = data;
 
   CXSourceLocation const sym_loc = clang_getCursorLocation( cursor );
   bool const is_in_system_header = clang_Location_isInSystemHeader( sym_loc );
 
-  if ( !is_in_system_header && IS_VERBOSE( CURSORS ) )
+  if ( is_in_system_header ) {
+    //
+    // Symbols in system headers can be skipped entirely in C.
+    //
+    if ( svd->source->lang == CXLanguage_C )
+      goto skip;
+    //
+    // In C++, they can't be skipped because template code in system headers
+    // calls back into user code, so we need it to mark the user code as used.
+    //
+  }
+  else if ( IS_VERBOSE( CURSORS ) ) {
     verbose_print_cursor( cursor );     // LCOV_EXCL_LINE
+  }
 
-  assert( data != NULL );
-  symbols_visit_data *const svd = data;
   tidy_symbol *const prev_parent_sym = svd->curr_sym;
 
   bool is_definition = false;
@@ -990,6 +1002,9 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
     //
     tidy_symbol *const sym = add_symbol( cursor, svd->source );
     if ( likely( sym != NULL ) ) {
+      if ( tidy_Cursor_isEnclosingScope( cursor ) )
+        sym->is_scope = true;
+
       if ( is_in_system_header ) {
         sym->is_root = true;
       }
@@ -1010,11 +1025,13 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
 
       if ( sym->parent_sym == NULL )
         sym->parent_sym = svd->curr_sym;
-      if ( tidy_Cursor_isEnclosingScope( cursor ) )
-        sym->is_scope = true;
 
-      if ( kind != CXCursor_LabelStmt )
-        svd->curr_sym = sym;
+      switch ( kind ) {
+        case CXCursor_LabelStmt:
+          break;
+        default:
+          svd->curr_sym = sym;
+      } // switch
 
       switch ( kind ) {
         case CXCursor_Constructor:
@@ -1047,6 +1064,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
   clang_visitChildren( cursor, symbols_visitor, svd );
   svd->curr_sym = prev_parent_sym;
 
+skip:
   return CXChildVisit_Continue;
 }
 
