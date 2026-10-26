@@ -105,27 +105,6 @@ struct tidy_symbol {
 ////////// extern functions ///////////////////////////////////////////////////
 
 /**
- * Compares two \ref tidy_symbol objects.
- *
- * @param i_sym The first symbol.
- * @param j_sym The second symbol.
- * @return Returns a number less than 0, 0, or greater than 0 if the name of \a
- * i_sym is less than, equal to, or greater than the name of \a j_sym,
- * respectively.
- */
-NODISCARD
-int symbol_cmp( tidy_symbol const *i_sym, tidy_symbol const *j_sym );
-
-/**
- * Calculates the hash of \a sym.
- *
- * @param sym The tidy_symbol to calculate the hash for.
- * @return Returns said hash.
- */
-NODISCARD
-ht_hash_val_t symbol_hash( tidy_symbol const *sym );
-
-/**
  * Initializes the internal set of all symbols in the translation unit.
  *
  * @note This function must be called exactly once.

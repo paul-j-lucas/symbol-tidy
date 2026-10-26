@@ -744,6 +744,22 @@ static void symbol_cleanup( tidy_symbol *sym ) {
 }
 
 /**
+ * Compares two \ref tidy_symbol objects.
+ *
+ * @param i_sym The first symbol.
+ * @param j_sym The second symbol.
+ * @return Returns a number less than 0, 0, or greater than 0 if the name of \a
+ * i_sym is less than, equal to, or greater than the name of \a j_sym,
+ * respectively.
+ */
+NODISCARD
+int symbol_cmp( tidy_symbol const *i_sym, tidy_symbol const *j_sym ) {
+  assert( i_sym != NULL );
+  assert( j_sym != NULL );
+  return strcmp( i_sym->key, j_sym->key );
+}
+
+/**
  * Compares two \ref tidy_symbol objects by their source path, then by line,
  * then by column.
  *
@@ -769,6 +785,17 @@ static int symbol_cmp_by_path( tidy_symbol const *i_sym,
   if ( i_sym->col  < j_sym->col  ) return -1;
   if ( i_sym->col  > j_sym->col  ) return  1;
   return 0;
+}
+
+/**
+ * Calculates the hash of \a sym.
+ *
+ * @param sym The tidy_symbol to calculate the hash for.
+ * @return Returns said hash.
+ */
+NODISCARD
+static ht_hash_val_t symbol_hash( tidy_symbol const *sym ) {
+  return fnv1a_s( sym->key );
 }
 
 /**
@@ -1563,16 +1590,6 @@ static void visit_VarDecl( CXCursor var_decl_csr, symbols_visit_data *svd ) {
 }
 
 ////////// extern functions ///////////////////////////////////////////////////
-
-int symbol_cmp( tidy_symbol const *i_sym, tidy_symbol const *j_sym ) {
-  assert( i_sym != NULL );
-  assert( j_sym != NULL );
-  return strcmp( i_sym->key, j_sym->key );
-}
-
-ht_hash_val_t symbol_hash( tidy_symbol const *sym ) {
-  return fnv1a_s( sym->key );
-}
 
 void symbols_init( void ) {
   ASSERT_RUN_ONCE();
