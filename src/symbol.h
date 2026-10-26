@@ -80,8 +80,8 @@ struct tidy_symbol {
    * root symbol, mark it as used and also mark every symbol on its \ref refs
    * list as used.  All symbols not reachable from a root symbol are unused.
    *
-   * In addition to the obvious of `main()` being a root symbol, the following
-   * are also roots, all only for C++:
+   * In C, the only root symbol is `main()`; in C++, the following are also
+   * roots:
    *
    *  + All symbols in system headers since template code calls back into user
    *    code, so it should be marked used.
