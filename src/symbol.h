@@ -29,7 +29,6 @@
 
 // local
 #include "pjl_config.h"
-#include "hash_table.h"
 #include "source.h"
 
 // standard
