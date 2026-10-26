@@ -753,7 +753,7 @@ static void symbol_cleanup( tidy_symbol *sym ) {
  * @sa symbol_cmp_by_path()
  */
 NODISCARD
-int symbol_cmp( tidy_symbol const *i_sym, tidy_symbol const *j_sym ) {
+static int symbol_cmp( tidy_symbol const *i_sym, tidy_symbol const *j_sym ) {
   assert( i_sym != NULL );
   assert( j_sym != NULL );
   return strcmp( i_sym->key, j_sym->key );
