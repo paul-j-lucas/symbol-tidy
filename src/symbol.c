@@ -88,10 +88,10 @@ struct symbols_visit_data {
    * Additional data for visit_CXXForRangeStmt().
    */
   struct svd_cxx_for_range {
-    CXCursor  cls_csr;                  ///< Class being iterated over.
-    CXCursor  begin_csr;                ///< Found `begin()` cursor, if any.
-    CXCursor  end_csr;                  ///< Found `end()` cursor, if any.
-    bool      is_const;                 ///< Is the range-for `const`?
+    CXCursor          cls_csr;          ///< Class being iterated over.
+    CXCursor          begin_csr;        ///< Found `begin()` cursor, if any.
+    CXCursor          end_csr;          ///< Found `end()` cursor, if any.
+    bool              is_const;         ///< Is the range-for `const`?
   } cxx_for_range;
 };
 
