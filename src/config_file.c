@@ -320,6 +320,8 @@ static void error_parse( config_parse_fn_args const *config ) {
  * Parses the value of an `"ignore-paths"` key.
  *
  * @param config The config_parse_fn_args to use.
+ *
+ * @sa ignore_paths_parse_string()
  */
 static void ignore_paths_parse( config_parse_fn_args const *config ) {
   toml_string_or_string_array_parse( config, &ignore_paths_parse_string );
@@ -330,7 +332,7 @@ static void ignore_paths_parse( config_parse_fn_args const *config ) {
  *
  * @param config The config_parse_fn_args to use.
  *
- * @sa ignore_symbols_parse()
+ * @sa ignore_paths_parse()
  */
 static void ignore_paths_parse_string( config_parse_fn_args const *config ) {
   assert( config != NULL );
