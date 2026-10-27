@@ -1,0 +1,5 @@
+$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers labels.c
+"labels.c": warning: unused symbols:
+    8, 3 | "unused_label"
+symbol-tidy: 1 unused symbol
+
