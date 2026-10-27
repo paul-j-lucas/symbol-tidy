@@ -125,15 +125,6 @@ extern tidy_verbose   opt_verbose;        ///< Print verbose output?
 ////////// extern functions ///////////////////////////////////////////////////
 
 /**
- * Parses the alignment column number for comments.
- *
- * @param s The string to parse.
- * @return Returns `true` only if \a s was parsed successfully.
- */
-NODISCARD
-bool opt_align_column_parse( char const *s );
-
-/**
  * Parses when to colorize.
  *
  * @param s The string to parse.
@@ -143,24 +134,6 @@ NODISCARD
 bool opt_color_parse( char const *s );
 
 /**
- * Parses the comment style.
- *
- * @param s The comment style to parse.
- * @return Returns `true` only if \a s parsed successfully.
- */
-NODISCARD
-bool opt_comment_style_parse( char const *s );
-
-/**
- * Parses the comment symbols.
- *
- * @param s The comment symbols to parse.
- * @return Returns `true` only if \a s parsed successfully.
- */
-NODISCARD
-bool opt_comment_symbols_parse( char const *s );
-
-/**
  * Parses when to exit with a non-zero exit status.
  *
  * @param s The error to parse.
@@ -168,15 +141,6 @@ bool opt_comment_symbols_parse( char const *s );
  */
 NODISCARD
 bool opt_error_parse( char const *s );
-
-/**
- * Parses the line length.
- *
- * @param s The string to parse.
- * @return Returns `true` only if \a s parsed successfully.
- */
-NODISCARD
-bool opt_line_length_parse( char const *s );
 
 /**
  * Parses the value of the test environment variable.
@@ -216,14 +180,10 @@ bool opt_test_parse( char const *test_format );
  * `d`    | Directory changing to from the `--directory` or `-d` option.
  * `f`    | Name of source-file only if in violation.
  * `F`    | Name of source-file.
- * `i`    | Files included.
- * `p`    | Implicit include proxies.
- * `P`    | Explicit include proxies.
- * `s`    | Symbols referenced and the include files declaring them.
  * `S`    | Configuration file symbols.
  * `z`    | Statistics.
  *
- * Multiple formats may be given, one immediately after the other, e.g., `ai`.
+ * Multiple formats may be given, one immediately after the other, e.g., `ac`.
  * Alternatively, `*` may be given to mean "all" or either the empty string or
  * `-` may be given to mean "none."
  * @endparblock
