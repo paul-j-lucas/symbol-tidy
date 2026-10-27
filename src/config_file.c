@@ -317,7 +317,7 @@ static void error_parse( config_parse_fn_args const *config ) {
 }
 
 /**
- * Parses the value of an `"ignore-files"` key.
+ * Parses the value of an `"ignore-paths"` key.
  *
  * @param config The config_parse_fn_args to use.
  */
@@ -326,7 +326,7 @@ static void ignore_paths_parse( config_parse_fn_args const *config ) {
 };
 
 /**
- * Parses a single string value of an `"ignore-symbols"` key.
+ * Parses a single string value of an `"ignore-paths"` key.
  *
  * @param config The config_parse_fn_args to use.
  *
