@@ -94,10 +94,10 @@ static void source_check_for_errors( tidy_source const *source ) {
         clang_getSpellingLocation(
           diag_loc, &diag_file, &diag_line, &diag_col, &diag_offset
         );
-        CXString const    diag_path_cxs = clang_getFileName( diag_file );
-        char const *const diag_path_cs = clang_getCString( diag_path_cxs );
         CXString const    diag_msg_cxs = clang_getDiagnosticSpelling( diag );
         char const *const diag_msg_cs = clang_getCString( diag_msg_cxs );
+        CXString const    diag_path_cxs = clang_getFileName( diag_file );
+        char const *const diag_path_cs = clang_getCString( diag_path_cxs );
 
         if ( diag_path_cs != NULL && diag_path_cs[0] != '\0' ) {
           print_file_error(
