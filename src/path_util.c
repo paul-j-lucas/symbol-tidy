@@ -60,7 +60,7 @@ char const* path_basename( char const *path ) {
 }
 
 char const* path_cwd( size_t *rv_len ) {
-  static char   cwd_path_buf[ PATH_MAX + 1 ];
+  static char   cwd_path_buf[ PATH_MAX ];
   static size_t cwd_path_len;
 
   if ( cwd_path_len == 0 ) {
