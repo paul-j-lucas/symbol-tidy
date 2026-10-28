@@ -98,7 +98,7 @@ enum config_table_kind {
 
 ////////// typedefs ///////////////////////////////////////////////////////////
 
-typedef struct  bool_path             bool_path;
+typedef struct  bool_str              bool_str;
 typedef enum    config_opts           config_opts;
 typedef struct  config_key            config_key;
 typedef struct  config_parse_fn_args  config_parse_fn_args;
@@ -118,11 +118,10 @@ typedef void (*config_parse_fn)( config_parse_fn_args const *config );
 ////////// structs ////////////////////////////////////////////////////////////
 
 /**
- * A "bool path" is a path plus an additional Boolean value to store a path-
- * specific flag.
+ * A "bool string" is a Boolean value plus a string to make it string-specific.
  */
-struct bool_path {
-  char const *path;                     ///< The path.
+struct bool_str {
+  char const *s;                        ///< The string.
   bool        value;                    ///< The Boolean value.
 };
 
@@ -157,7 +156,7 @@ struct ignore_symbol {
 ////////// local functions ////////////////////////////////////////////////////
 
 static void   color_parse( config_parse_fn_args const* );
-static void   config_bool_set( config_bool*, bool, char const* );
+static void   config_str_set( config_bool*, bool, char const* );
 
 NODISCARD
 static FILE*  config_open( char const*, config_opts );
@@ -335,9 +334,9 @@ static void config_bool_parse( config_parse_fn_args const *config,
   if ( !toml_bool_parse( config, &value ) )
     return;
 
-  char const *const path = config->table_kind == TABLE_SYMBOL_TIDY ?
+  char const *const s = config->table_kind == TABLE_SYMBOL_TIDY ?
     NULL : config->table->key.name;
-  config_bool_set( rv_cb, value, path );
+  config_str_set( rv_cb, value, s );
 }
 
 /**
@@ -497,62 +496,58 @@ static void ignore_symbols_parse_string( config_parse_fn_args const *config ) {
 ////////// local functions ////////////////////////////////////////////////////
 
 /**
- * Cleans-up a bool_path.
+ * Cleans-up a bool_str.
 
- * @param bp The bool_path to clean-up.  If NULL, does nothing.
+ * @param bs The bool_str to clean-up.  If NULL, does nothing.
  */
-void bool_path_cleanup( bool_path *bp ) {
-  if ( bp != NULL )
-    FREE( bp->path );
+void bool_str_cleanup( bool_str *bs ) {
+  if ( bs != NULL )
+    FREE( bs->s );
 }
 
 /**
- * Compares two "bool path" objects.
+ * Compares two "bool string" objects.
  *
- * @param i_bp The first bool path.
- * @param j_bp The second bool path.
- * @return Returns a number less than 0, 0, or greater than 0 if \a i_bp is
- * less than, equal to, or greater than \a j_bp, respectively.
+ * @param i_bs The first bool string.
+ * @param j_bs The second bool string.
+ * @return Returns a number less than 0, 0, or greater than 0 if \a i_bs is
+ * less than, equal to, or greater than \a j_bs, respectively.
  */
-static int bool_path_cmp( bool_path const *i_bp, bool_path const *j_bp ) {
-  assert( i_bp != NULL );
-  assert( j_bp != NULL );
-  return strcmp( i_bp->path, j_bp->path );
+static int bool_str_cmp( bool_str const *i_bs, bool_str const *j_bs ) {
+  assert( i_bs != NULL );
+  assert( j_bs != NULL );
+  return strcmp( i_bs->s, j_bs->s );
 }
 
 /**
- * Calculates the hash of a "bool path" object.
+ * Calculates the hash of a "bool string" object.
  *
- * @param bp The bool path to calculate the hash for.
+ * @param bs The bool string to calculate the hash for.
  * @return Returns said hash.
  */
-static fnv1a_t bool_path_hash( bool_path const *bp ) {
-  return fnv1a_s( bp->path );
+static fnv1a_t bool_str_hash( bool_str const *bs ) {
+  return fnv1a_s( bs->s );
 }
 
 /**
- * Sets the Boolean value for \a cb, either globally or only for \a path.
+ * Sets the Boolean value for \a cb, either globally or only for \a s.
  *
- * @param cb The config_bool to set or insert \a path into.
+ * @param cb The config_bool to set or insert \a s into.
  * @param value The Boolean value.
- * @param path The source path this config_bool applies to, if any.
+ * @param s The string this config_bool applies to, if any.
  */
-static void config_bool_set( config_bool *cb, bool value, char const *path ) {
+static void config_str_set( config_bool *cb, bool value, char const *s ) {
   assert( cb != NULL );
-  if ( path == NULL ) {
+  if ( s == NULL ) {
     cb->global_value = value;
   }
   else {
-    char path_buf[ PATH_MAX ];
-    if ( realpath( path, path_buf ) != NULL )
-      path = path_buf;
-
-    bool_path new_bp = { .path = path, .value = value };
+    bool_str new_bs = { .s = s, .value = value };
     ht_insert_rv_t const hti =
-      ht_table_insert( &cb->bool_path_set, &new_bp, sizeof new_bp );
+      ht_table_insert( &cb->bool_str_set, &new_bs, sizeof new_bs );
     if ( hti.inserted ) {
-      bool_path *const bp = HT_DINT( hti.entry );
-      bp->path = strdup_or_exit( path );
+      bool_str *const bs = HT_DINT( hti.entry );
+      bs->s = strdup_or_exit( s );
     }
   }
 }
@@ -1028,7 +1023,7 @@ static void toml_value_print( toml_value const *value, FILE *fout ) {
 void config_bool_cleanup( config_bool *cb ) {
   if ( cb != NULL ) {
     ht_table_cleanup(
-      &cb->bool_path_set, POINTER_CAST( ht_free_fn_t, &bool_path_cleanup )
+      &cb->bool_str_set, POINTER_CAST( ht_free_fn_t, &bool_str_cleanup )
     );
   }
 }
@@ -1036,22 +1031,22 @@ void config_bool_cleanup( config_bool *cb ) {
 void config_bool_init( config_bool *cb ) {
   assert( cb != NULL );
   ht_table_init(
-    &cb->bool_path_set, HT_DINT, 2.0, 10,
-    POINTER_CAST( ht_cmp_fn_t, &bool_path_cmp ),
-    POINTER_CAST( ht_hash_fn_t, &bool_path_hash )
+    &cb->bool_str_set, HT_DINT, 2.0, 10,
+    POINTER_CAST( ht_cmp_fn_t, &bool_str_cmp ),
+    POINTER_CAST( ht_hash_fn_t, &bool_str_hash )
   );
 }
 
-bool config_bool_value( config_bool *cb, char const *path ) {
+bool config_bool_value( config_bool *cb, char const *s ) {
   assert( cb != NULL );
 
-  if ( path != NULL ) {
-    bool_path find_bp = { .path = path };
+  if ( s != NULL ) {
+    bool_str find_bs = { .s = s };
     ht_entry_t const *const entry
-      = ht_table_find( &cb->bool_path_set, &find_bp );
+      = ht_table_find( &cb->bool_str_set, &find_bs );
     if ( entry != NULL ) {
-      bool_path const *const found_bp = HT_DINT( entry );
-      return found_bp->value;
+      bool_str const *const found_bs = HT_DINT( entry );
+      return found_bs->value;
     }
   }
   return cb->global_value;

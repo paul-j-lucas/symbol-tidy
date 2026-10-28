@@ -56,22 +56,22 @@ typedef struct config_bool config_bool;
  *
  * @remarks
  * @parblock
- * A `config_bool` is like a built-in `bool` except it can have per-path
- * overrides.  For example, a configuration file that contains:
+ * A `config_bool` is like a built-in `bool` except it can have per-string
+ * (symbol) overrides.  For example, a configuration file that contains:
  *
  *      [symbol-tidy]
  *      ignore-cxx-copy-assigns = true
  *
- *      [foo.c]
+ *      [my_class]
  *      ignore-cxx-copy-assign = false
  *
  * says that the global value for `ignore-cxx-copy-assigns` is `true`, but for
- * `foo.c`, it's `false`.
+ * `my_class`, it's `false`.
  * @endparblock
  */
 struct config_bool {
   bool          global_value;           // The global value.
-  hash_table_t  bool_path_set;          // Path-specific value(s).
+  hash_table_t  bool_str_set;           // String-specific value(s).
 };
 
 ////////// extern functions ///////////////////////////////////////////////////
