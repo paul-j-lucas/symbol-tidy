@@ -59,20 +59,18 @@ program or library
 by reporting
 unused symbols,
 specifically unused
+labels,
 macros,
 functions,
-variables,
+types,
 and
-types.
+variables.
 .SS General Use
 .B symbol-tidy
 should be run
-only on valid C or C++ files,
+only on valid C (\f(CW.c\fP) or C++ (\f(CW.cpp) source files,
 i.e., files should compile successfully
 with a C or C++ compiler first.
-.PP
-.B symbol-tidy
-should be used on source (\f(CW.c\fP or \f(CW.cpp) files.
 (See the
 .B \-\-language
 or
@@ -81,7 +79,7 @@ options for additional filename extensions.)
 .SS Use with Make
 While
 .B symbol-tidy
-can be run on a per-file basis,
+can be run stand-alone,
 it can alternatively be used with
 .BR make (1)
 in place of either your C
@@ -95,10 +93,10 @@ TIDY_FLAGS  = -Xtidy --verbose=f -Xtidy --error=never
 TIDY_CFLAGS = $(CFLAGS) $(AM_CFLAGS) $(CPPFLAGS) $(AM_CPPFLAGS)
 
 stidy:
-        symbol-tidy $(TIDY_FLAGS) $(TIDY_CFLAGS) $(SOURCES)
+        symbol-tidy $(TIDY_FLAGS) $(TIDY_CFLAGS) *.c
 .cE
 then simply
-.B make tidy
+.B make stidy
 to analyze all your source files
 at once.
 (For C++,
@@ -186,7 +184,7 @@ C or C++ compiler options.
 .IP \n+[step].
 Other options.
 .PD
-.SS Include-Tidy-Specific Options
+.SS Symbol-Tidy-Specific Options
 Every
 .BR symbol-tidy -specific
 option
@@ -197,7 +195,7 @@ option to distinguish it from a C or C++ compiler option.
 For example,
 in:
 .cS
-symbol-tidy -Xtidy --error=never \-I../lib *.[hc]
+symbol-tidy -Xtidy --error=never \-I../lib *.c
 .cE
 the
 .BR \-\-error
@@ -546,31 +544,6 @@ Same as the
 .B \-\-error
 command-line option.
 .TP
-.BI ignore-as-argument " \f1=\fP b"
-If true,
-the file given for the table name
-is not checked for unused symbols
-when given as
-.IR source-file .
-.IP
-This allows there to be files
-you don't control
-(third-party or generated)
-present and not check them for unused symbols
-yet still use \f(CW*.c\fP.
-(See
-.B Use with Make
-above.)
-For example,
-the Autotools generated \f(CWconfig.h\fP
-should be ignored:
-.RS 5
-.cS
-[parser.c]
-ignore-as-argument = true
-.cE 0
-.RE
-.TP
 .BI ignore-cxx-copy-assigns " \f1=\fP b"
 For C++ only,
 if true,
@@ -596,8 +569,7 @@ Like
 but for move constructors.
 .TP
 .BI ignore-symbols " \f1=\fP s" "\f1 | \fP[" s " \f1[,\fP " s "\f1]*\fP ]"
-When referenced by the file given for the table name,
-the symbol names
+The symbol names
 (that can be specified as a single string)
 or one or more symbol names
 (that are specified as a bracket-enclosed,
@@ -605,69 +577,42 @@ comma-separated
 array of strings)
 are ignored,
 that is,
-even if the symbols are referenced from the file
-and so are apparently necessary,
-the include file declaring them,
-if omitted,
-will not be reported as a violation.
+even if the symbols are unused,
+they will not be reported as such.
 .SS Source Tables
 This type of table specifies a source file,
 either a \f(CW.c\fP or \f(CW.cpp\fP
 file.
 .TP 6
 .BI ignore-as-argument " \f1=\fP b"
-Same as in
-.BR "Header Tables" ,
-but for a source file.
+If true,
+the file given for the table name
+is not checked for unused symbols
+when given as
+.IR source-file .
+.IP
+This allows there to be files
+you don't control
+(third-party or generated)
+present and not check them for unused symbols
+yet still use \f(CW*.c\fP.
+(See
+.B Use with Make
+above.)
+For example,
+the Autotools generated \f(CWconfig.h\fP
+should be ignored:
+.RS 5
+.cS
+[parser.c]
+ignore-as-argument = true
+.cE 0
+.RE
 .TP
 .BI ignore-symbols " \f1=\fP s" "\f1 | \fP[" s " \f1[,\fP " s "\f1]*\fP ]"
 Same as in
-.BR "Header Tables" ,
-but for a source file.
-.SS Symbol Tables
-This type of table specifies a symbol name,
-e.g.,
-\f(CWNULL\fP
-or
-\f(CWsize_t\fP,
-is declared in multiple include files
-so including any one of them
-meets the
-.I include-what-you-use
-requirement
-thus averting a violation.
-.TP 6
-.BI ignore " \f1=\fP b"
-If true,
-the symbol name is to be ignored,
-that is,
-even if it's referenced from a file,
-the include file declaring it,
-if omitted,
-will not be reported as a violation.
-Note that:
-.RS 5
-.cS
-[\f2symbol\fP]
-ignore = true
-.cE 0
-.RE
-.IP
-ignores
-.I symbol
-in all files
-whereas:
-.RS 5
-.cS
-[\f2header.h\fP]
-ignore-symbols = "\f2symbol\fP"
-.cE 0
-.RE
-.IP
-ignores
-.I symbol
-only in
-.IR header.h .
+.BR "symbol-tidy Table" ,
+but for only for the source file given for the table name.
 .SS Locations and Search Order
 One or more configuration files
 can be used to configure
