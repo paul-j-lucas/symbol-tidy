@@ -1,3 +1,10 @@
+2026-10-28  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * man/man1/symbol-tidy.1, config_file.c, source.c, symbol.c: ignore-cxx-*
+     can now be class-based rather that file-based.
+   * config_file.c: #include fix.
+   * config_file.c, config_file.h: s/bool_path/bool_str/
+
 2026-10-27  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
    * man/man1/symbol-tidy.1, config_file.c, config_file.h, options.c,
