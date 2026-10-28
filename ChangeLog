@@ -1,5 +1,13 @@
+2026-10-27  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * path_util.c: s/PATH_MAX + 1/PATH_MAX/
+
 2026-10-26  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * options.h: Removed left-over include-tidy opt_*_parse functions.
+   * test/Makefile.am, labels.c, labels.out, labels.test: Added labels.test.
+   * test/Makefile.am, functor.cpp, functor.out, functor.test: Added
+     functor.test.
    * symbol.c, symbol.h: Now using hash_table for refs.
    * symbol.c: Added static.
    * symbol.c, symbol.h: Now using array for refs.
