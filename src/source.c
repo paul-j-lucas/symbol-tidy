@@ -130,7 +130,6 @@ static void source_check_for_errors( tidy_source const *source ) {
 void source_cleanup( tidy_source *source ) {
   if ( source != NULL ) {
     // source->argv_path points to an argv so it doesn't need freeing
-    FREE( source->abs_path );
     if ( source->tu != NULL )
       clang_disposeTranslationUnit( source->tu );
     // source->text is owned by tu so it doesn't need freeing
@@ -207,11 +206,6 @@ void source_init( tidy_source *source, int argc, char const *const argv[] ) {
   source_check_for_errors( source );
 
   source->file = clang_getFile( source->tu, source->argv_path );
-
-  char path_buf[ PATH_MAX ];
-  PERROR_EXIT_IF( realpath( source->argv_path, path_buf ) == NULL, EX_NOINPUT );
-  source->abs_path = strdup_or_exit( path_buf );
-
   source->text =
     clang_getFileContents( source->tu, source->file, &source->text_size );
 }
