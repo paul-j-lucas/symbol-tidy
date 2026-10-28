@@ -35,7 +35,7 @@
 .if !'\\$1'0' .sp
 ..
 .\" ---------------------------------------------------------------------------
-.TH \f3symbol-tidy\fP 1 "October 27, 2026" "PJL TOOLS"
+.TH \f3symbol-tidy\fP 1 "October 28, 2026" "PJL TOOLS"
 .SH NAME
 symbol-tidy \(em Symbol tidier
 .SH SYNOPSIS
@@ -600,7 +600,9 @@ yet still use \f(CW*.c\fP.
 .B Use with Make
 above.)
 For example,
-the Autotools generated \f(CWconfig.h\fP
+the
+.BR bison (1)
+generated \f(CWparser.c\fP
 should be ignored:
 .RS 5
 .cS
@@ -610,9 +612,35 @@ ignore-as-argument = true
 .RE
 .TP
 .BI ignore-symbols " \f1=\fP s" "\f1 | \fP[" s " \f1[,\fP " s "\f1]*\fP ]"
-Same as in
+Same as in the
 .BR "symbol-tidy Table" ,
 but for only for the source file given for the table name.
+.SS Symbol Tables
+This type of table specifies a symbol name.
+.TP 6
+.BI ignore-cxx-copy-assigns " \f1=\fP b"
+Same as in the
+.BR "symbol-tidy Table" ,
+but only for the class
+given by the table name.
+.TP
+.BI ignore-cxx-copy-ctors " \f1=\fP b"
+Same as in the
+.BR "symbol-tidy Table" ,
+but only for the class
+given by the table name.
+.TP
+.BI ignore-cxx-move-assigns " \f1=\fP b"
+Same as in the
+.BR "symbol-tidy Table" ,
+but only for the class
+given by the table name.
+.TP
+.BI ignore-cxx-move-ctors " \f1=\fP b"
+Same as in the
+.BR "symbol-tidy Table" ,
+but only for the class
+given by the table name.
 .SS Locations and Search Order
 One or more configuration files
 can be used to configure
@@ -662,18 +690,18 @@ it's an error.
 Every configuration file found is read.
 Settings in files earier in order
 take precedence over the same settings
-in files later in order
-with the only exception of the
-.B add-c-includes
-option.
+in files later in order.
 For example,
 if in \f(CW./symbol-tidy.toml\fP,
-.B align-colum
-is set to 35,
+.B error
+is set to
+.BR always ,
 but in \f(CWconfig.toml\fP
 in \f(CW/etc/xdg/symbol-tidy\fP,
-it's set to 41,
-then 35
+it's set to
+.BR never ,
+then
+.B error
 (the value in the first file found in order)
 will be used.
 .PP

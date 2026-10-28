@@ -876,31 +876,41 @@ static bool symbol_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
   if ( tidy_Cursor_isReservedName( sym_csr, source->lang ) )
     return true;
 
+  CXCursor                cls_csr;
+  char                   *cls_name = NULL;
+  bool                    is_excluded = false;
   enum CXCursorKind const sym_kind = clang_getCursorKind( sym_csr );
+
+  switch ( sym_kind ) {
+    case CXCursor_Constructor:
+    case CXCursor_CXXMethod:
+      cls_csr = clang_getCursorSemanticParent( sym_csr );
+      cls_name = tidy_Cursor_getScopedSpelling( cls_csr );
+      break;
+    default:
+      /* suppress warning */;
+  } // switch
+
   switch ( sym_kind ) {
     case CXCursor_Constructor:
       if ( clang_CXXConstructor_isCopyConstructor( sym_csr ) &&
-           config_bool_value( &opt_ignore_cxx_copy_ctors,
-                              source->abs_path ) ) {
-        return true;
+           config_bool_value( &opt_ignore_cxx_copy_ctors, cls_name ) ) {
+        is_excluded = true;
       }
       if ( clang_CXXConstructor_isMoveConstructor( sym_csr ) &&
-           config_bool_value( &opt_ignore_cxx_move_ctors,
-                              source->abs_path ) ) {
-        return true;
+           config_bool_value( &opt_ignore_cxx_move_ctors, cls_name ) ) {
+        is_excluded = true;
       }
       break;
 
     case CXCursor_CXXMethod:
       if ( clang_CXXMethod_isCopyAssignmentOperator( sym_csr ) &&
-           config_bool_value( &opt_ignore_cxx_copy_assigns,
-                              source->abs_path ) ) {
-        return true;
+           config_bool_value( &opt_ignore_cxx_copy_assigns, cls_name ) ) {
+        is_excluded = true;
       }
       if ( clang_CXXMethod_isMoveAssignmentOperator( sym_csr ) &&
-           config_bool_value( &opt_ignore_cxx_move_assigns,
-                              source->abs_path ) ) {
-        return true;
+           config_bool_value( &opt_ignore_cxx_move_assigns, cls_name ) ) {
+        is_excluded = true;
       }
       break;
 
@@ -933,7 +943,8 @@ static bool symbol_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
       /* suppress warning */;
   } // switch
 
-  return false;
+  free( cls_name );
+  return is_excluded;
 }
 
 /**

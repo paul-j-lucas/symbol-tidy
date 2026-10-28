@@ -93,6 +93,7 @@ enum config_table_kind {
 
 /// @cond DOXYGEN_IGNORE
 #define TABLE_TIDY_OR_SOURCE      (TABLE_SYMBOL_TIDY | TABLE_SOURCE)
+#define TABLE_TIDY_OR_SYMBOL      (TABLE_SYMBOL_TIDY | TABLE_SYMBOL)
 /// @endcond
 
 ////////// typedefs ///////////////////////////////////////////////////////////
@@ -188,13 +189,13 @@ static void   toml_value_print( toml_value const*, FILE* );
 static config_key const CONFIG_KEYS[] = {
   { "color",                    TABLE_SYMBOL_TIDY,    &color_parse          },
   { "error",                    TABLE_SYMBOL_TIDY,    &error_parse          },
-  { "ignore-cxx-copy-assigns",  TABLE_TIDY_OR_SOURCE,
+  { "ignore-cxx-copy-assigns",  TABLE_TIDY_OR_SYMBOL,
                                 &ignore_cxx_copy_assigns_parse              },
-  { "ignore-cxx-copy-ctors",    TABLE_TIDY_OR_SOURCE,
+  { "ignore-cxx-copy-ctors",    TABLE_TIDY_OR_SYMBOL,
                                 &ignore_cxx_copy_ctors_parse                },
-  { "ignore-cxx-move-assigns",  TABLE_TIDY_OR_SOURCE,
+  { "ignore-cxx-move-assigns",  TABLE_TIDY_OR_SYMBOL,
                                 &ignore_cxx_move_assigns_parse              },
-  { "ignore-cxx-move-ctors",    TABLE_TIDY_OR_SOURCE,
+  { "ignore-cxx-move-ctors",    TABLE_TIDY_OR_SYMBOL,
                                 &ignore_cxx_move_ctors_parse                },
   { "ignore-paths",             TABLE_SYMBOL_TIDY,    &ignore_paths_parse   },
   { "ignore-symbols",           TABLE_TIDY_OR_SOURCE, &ignore_symbols_parse },
@@ -206,9 +207,10 @@ static config_key const CONFIG_KEYS[] = {
 static char const *const TABLE_KINDS[] = {
   [ TABLE_NONE ] = "none",
   [ TABLE_SYMBOL_TIDY ] = TABLE_SYMBOL_TIDY_NAME,
-  [ TABLE_TIDY_OR_SOURCE ] = TABLE_SYMBOL_TIDY_NAME " or source",
   [ TABLE_SOURCE ] = "source",
-  [ TABLE_SYMBOL ] = "symbol"
+  [ TABLE_SYMBOL ] = "symbol",
+  [ TABLE_TIDY_OR_SOURCE ] = TABLE_SYMBOL_TIDY_NAME " or source",
+  [ TABLE_TIDY_OR_SYMBOL ] = TABLE_SYMBOL_TIDY_NAME " or symbol",
 };
 
 ////////// local variables ////////////////////////////////////////////////////
@@ -384,7 +386,8 @@ static void error_parse( config_parse_fn_args const *config ) {
  *
  * @param config The config_parse_fn_args to use.
  */
-static void ignore_cxx_copy_assigns_parse( config_parse_fn_args const *config ) {
+static
+void ignore_cxx_copy_assigns_parse( config_parse_fn_args const *config ) {
   config_bool_parse( config, &opt_ignore_cxx_copy_assigns );
 }
 
@@ -402,7 +405,8 @@ static void ignore_cxx_copy_ctors_parse( config_parse_fn_args const *config ) {
  *
  * @param config The config_parse_fn_args to use.
  */
-static void ignore_cxx_move_assigns_parse( config_parse_fn_args const *config ) {
+static
+void ignore_cxx_move_assigns_parse( config_parse_fn_args const *config ) {
   config_bool_parse( config, &opt_ignore_cxx_move_assigns );
 }
 
