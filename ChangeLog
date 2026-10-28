@@ -1,5 +1,8 @@
 2026-10-27  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * man/man1/symbol-tidy.1, config_file.c, config_file.h, options.c,
+     options.h, source.c, source.h, symbol-tidy.c, symbol.c: Added ignore-cxx-*
+     config keys.
    * path_util.c: s/PATH_MAX + 1/PATH_MAX/
 
 2026-10-26  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
