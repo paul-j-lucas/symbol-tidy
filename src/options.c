@@ -28,6 +28,7 @@
 #include "pjl_config.h"                 /* must go first */
 #include "options.h"
 #include "color.h"
+#include "config_file.h"
 #include "type_traits.h"
 #include "util.h"
 
@@ -60,6 +61,10 @@ bool                opt_config_layers = true;
 char const         *opt_config_path;
 bool                opt_debug;
 tidy_error          opt_error;
+config_bool         opt_ignore_cxx_copy_assigns;
+config_bool         opt_ignore_cxx_copy_ctors;
+config_bool         opt_ignore_cxx_move_assigns;
+config_bool         opt_ignore_cxx_move_ctors;
 enum CXLanguageKind opt_lang = CXLanguage_Invalid;
 tidy_test           opt_test;
 tidy_verbose        opt_verbose;
@@ -213,6 +218,24 @@ void option_str_set_all_or_none( char const **pformat, char const *all_value ) {
     *pformat = all_value;               // LCOV_EXCL_LINE
   else if ( strcmp( *pformat, "-" ) == 0 )
     *pformat = "";
+}
+
+static void options_cleanup( void ) {
+  config_bool_cleanup( &opt_ignore_cxx_copy_assigns );
+  config_bool_cleanup( &opt_ignore_cxx_copy_ctors );
+  config_bool_cleanup( &opt_ignore_cxx_move_assigns );
+  config_bool_cleanup( &opt_ignore_cxx_move_ctors );
+}
+
+void options_init( void ) {
+  ASSERT_RUN_ONCE();
+
+  config_bool_init( &opt_ignore_cxx_copy_assigns );
+  config_bool_init( &opt_ignore_cxx_copy_ctors );
+  config_bool_init( &opt_ignore_cxx_move_assigns );
+  config_bool_init( &opt_ignore_cxx_move_ctors );
+
+  ATEXIT( &options_cleanup );
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -52,7 +52,8 @@ typedef struct tidy_source tidy_source;
  * A source file being tidied.
  */
 struct tidy_source {
-  char const         *path;             ///< Source file's path.
+  char const         *argv_path;        ///< Source file's path from `argv`.
+  char const         *abs_path;         ///< Source file's absolute path.
   CXTranslationUnit   tu;               ///< Translation unit for \ref path.
   CXFile              file;             ///< File for \ref path.
   char const         *text;             ///< Text of \ref path.

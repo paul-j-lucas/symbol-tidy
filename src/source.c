@@ -26,7 +26,9 @@
 // local
 #include "pjl_config.h"
 #include "source.h"
+#include "clang_util.h"
 #include "print.h"
+#include "str_util.h"
 #include "symbol-tidy.h"
 #include "util.h"
 
@@ -35,6 +37,7 @@
 
 // standard
 #include <assert.h>
+#include <limits.h>                     /* PATH_MAX */
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>                     /* for exit(3) */
@@ -127,7 +130,8 @@ static void source_check_for_errors( tidy_source const *source ) {
 
 void source_cleanup( tidy_source *source ) {
   if ( source != NULL ) {
-    // source->path points to an argv so it doesn't need freeing
+    // source->argv_path points to an argv so it doesn't need freeing
+    FREE( source->abs_path );
     if ( source->tu != NULL )
       clang_disposeTranslationUnit( source->tu );
     // source->text is owned by tu so it doesn't need freeing
@@ -152,7 +156,7 @@ void source_init( tidy_source *source, int argc, char const *const argv[] ) {
 
   enum CXErrorCode const error_code = clang_parseTranslationUnit2(
     tidy_index,
-    source->path,
+    source->argv_path,
     argv + 1, argc - 1,                 // skip argv[0] (program name)
     /*unsaved_files=*/NULL,
     /*num_unsaved_files=*/0,
@@ -163,10 +167,10 @@ void source_init( tidy_source *source, int argc, char const *const argv[] ) {
   switch ( error_code ) {
     // LCOV_EXCL_START
     case CXError_ASTReadError:
-      print_file_error( source->path, 0, 0, "libclang AST error\n" );
+      print_file_error( source->argv_path, 0, 0, "libclang AST error\n" );
       exit( EX_UNAVAILABLE );
     case CXError_Crashed:
-      print_file_error( source->path, 0, 0, "libclang crashed\n" );
+      print_file_error( source->argv_path, 0, 0, "libclang crashed\n" );
       exit( EX_UNAVAILABLE );
     case CXError_InvalidArguments:
       print_error( "invalid arguments given to libclang\n" );
@@ -180,12 +184,12 @@ void source_init( tidy_source *source, int argc, char const *const argv[] ) {
       // Yes, this is TOCTAU (well, TAUTOC since we're checking after the
       // fact), but it's better than nothing.
       //
-      if ( access( source->path, R_OK ) == -1 ) {
-        print_file_error( source->path, 0, 0, "%s\n", STRERROR() );
+      if ( access( source->argv_path, R_OK ) == -1 ) {
+        print_file_error( source->argv_path, 0, 0, "%s\n", STRERROR() );
         exit( EX_NOINPUT );
       }
       // LCOV_EXCL_START
-      print_file_error( source->path, 0, 0, "libclang failed\n" );
+      print_file_error( source->argv_path, 0, 0, "libclang failed\n" );
       exit( EX_DATAERR );
       // LCOV_EXCL_STOP
     case CXError_Success:
@@ -203,7 +207,12 @@ void source_init( tidy_source *source, int argc, char const *const argv[] ) {
 
   source_check_for_errors( source );
 
-  source->file = clang_getFile( source->tu, source->path );
+  source->file = clang_getFile( source->tu, source->argv_path );
+
+  char path_buf[ PATH_MAX ];
+  PERROR_EXIT_IF( realpath( source->argv_path, path_buf ) == NULL, EX_NOINPUT );
+  source->abs_path = strdup_or_exit( path_buf );
+
   source->text =
     clang_getFileContents( source->tu, source->file, &source->text_size );
 }

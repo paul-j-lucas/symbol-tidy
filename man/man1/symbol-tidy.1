@@ -35,7 +35,7 @@
 .if !'\\$1'0' .sp
 ..
 .\" ---------------------------------------------------------------------------
-.TH \f3symbol-tidy\fP 1 "October 21, 2026" "PJL TOOLS"
+.TH \f3symbol-tidy\fP 1 "October 27, 2026" "PJL TOOLS"
 .SH NAME
 symbol-tidy \(em Symbol tidier
 .SH SYNOPSIS
@@ -72,10 +72,7 @@ i.e., files should compile successfully
 with a C or C++ compiler first.
 .PP
 .B symbol-tidy
-should be used on both header (\f(CW.h\fP)
-and source (\f(CW.c\fP or \f(CW.cpp)
-files
-since both should include what they use.
+should be used on source (\f(CW.c\fP or \f(CW.cpp) files.
 (See the
 .B \-\-language
 or
@@ -427,7 +424,7 @@ options
 and are passed to it verbatim.
 Important C or C++ compiler options:
 .TP 6
-+.BI \-\-language \f1=\fPs "\f1 | \fP" "" \-x " s"
+.BI \-\-language \f1=\fPs "\f1 | \fP" "" \-x " s"
 Specifies the langauge
 .I s
 of
@@ -437,14 +434,9 @@ overriding the language indicated
 by its filename extension,
 if any.
 .IP
-The extensions of \f(CW.h\fP and \f(CW.c\fP
+The extension of \f(CW.c\fP
 indicate a C source file;
 the extensions of
-\f(CW.h++\fP,
-\f(CW.hh\fP,
-\f(CW.hp\fP,
-\f(CW.hpp\fP,
-\f(CW.hxx\fP,
 \f(CW.c++\fP,
 \f(CW.cc\fP,
 \f(CW.cp\fP,
@@ -460,16 +452,6 @@ you
 .I must
 use this option to specify the language.
 .IP
-Additionally,
-unlike with a C or C++ compiler,
-\f(CW.h\fP files are given directly as arguments to
-.BR symbol-tidy .
-If you use \f(CW.h\fP for C++ headers,
-you'll need to specify
-.BR \-\-language = c++
-or
-.B \-xc++
-explicitly.
 .SS Other Options
 These options are given directly as-is
 since they would never be ambiguous
@@ -575,9 +557,7 @@ This allows there to be files
 you don't control
 (third-party or generated)
 present and not check them for unused symbols
-yet still use \f(CW*.h\fP with a shell
-.B for
-loop.
+yet still use \f(CW*.c\fP.
 (See
 .B Use with Make
 above.)
@@ -586,20 +566,44 @@ the Autotools generated \f(CWconfig.h\fP
 should be ignored:
 .RS 5
 .cS
-[config.h]
+[parser.c]
 ignore-as-argument = true
-.cE
+.cE 0
 .RE
+.TP
+.BI ignore-cxx-copy-assigns " \f1=\fP b"
+For C++ only,
+if true,
+copy assignment operators are ignored.
+Copy assigments,
+copy constructors,
+move assignments,
+and move constructors
+often exist as part of a typical class's boilerplate.
+.TP
+.BI ignore-cxx-copy-ctors " \f1=\fP b"
+Like
+.BR ignore-cxx-copy-assigns ,
+but for copy constructors.
+.TP
+.BI ignore-cxx-move-assigns " \f1=\fP b"
+.BR ignore-cxx-copy-assigns ,
+but move move assignment operators.
+.TP
+.BI ignore-cxx-move-ctors " \f1=\fP b"
+Like
+.BR ignore-cxx-move-assigns ,
+but for move constructors.
 .TP
 .BI ignore-symbols " \f1=\fP s" "\f1 | \fP[" s " \f1[,\fP " s "\f1]*\fP ]"
 When referenced by the file given for the table name,
-the symbol name
+the symbol names
 (that can be specified as a single string)
 or one or more symbol names
 (that are specified as a bracket-enclosed,
 comma-separated
 array of strings)
-are to be ignored,
+are ignored,
 that is,
 even if the symbols are referenced from the file
 and so are apparently necessary,
@@ -611,11 +615,6 @@ This type of table specifies a source file,
 either a \f(CW.c\fP or \f(CW.cpp\fP
 file.
 .TP 6
-.BI elide-includes " \f1=\fP s" "\f1 | \fP[" s " \f1[,\fP " s "\f1]*\fP ]"
-Same as in
-.BR "Header Tables" ,
-but for a source file.
-.TP
 .BI ignore-as-argument " \f1=\fP b"
 Same as in
 .BR "Header Tables" ,

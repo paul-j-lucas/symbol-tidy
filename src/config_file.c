@@ -47,6 +47,7 @@
 // standard
 #include <assert.h>
 #include <errno.h>
+#include <limits.h>                     /* PATH_MAX */
 #if HAVE_PWD_H
 # include <pwd.h>                       /* for getpwuid() */
 #endif /* HAVE_PWD_H */
@@ -97,6 +98,7 @@ enum config_table_kind {
 
 ////////// typedefs ///////////////////////////////////////////////////////////
 
+typedef struct  bool_path             bool_path;
 typedef enum    config_opts           config_opts;
 typedef struct  config_key            config_key;
 typedef struct  config_parse_fn_args  config_parse_fn_args;
@@ -114,6 +116,15 @@ typedef struct  ignore_symbol         ignore_symbol;
 typedef void (*config_parse_fn)( config_parse_fn_args const *config );
 
 ////////// structs ////////////////////////////////////////////////////////////
+
+/**
+ * A "bool path" is a path plus an additional Boolean value to store a path-
+ * specific flag.
+ */
+struct bool_path {
+  char const *path;                     ///< The path.
+  bool        value;                    ///< The Boolean value.
+};
 
 /**
  * Configuration key (in a table).
@@ -145,26 +156,31 @@ struct ignore_symbol {
 
 ////////// local functions ////////////////////////////////////////////////////
 
-static void         color_parse( config_parse_fn_args const* );
+static void   color_parse( config_parse_fn_args const* );
+static void   config_bool_set( config_bool*, bool, char const* );
 
 NODISCARD
-static FILE*        config_open( char const*, config_opts );
+static FILE*  config_open( char const*, config_opts );
 
-static void         error_parse( config_parse_fn_args const* );
+static void   error_parse( config_parse_fn_args const* );
 
 NODISCARD
 static char const*  home_dir( void );
 
-static void         ignore_paths_parse( config_parse_fn_args const* );
-static void         ignore_paths_parse_string( config_parse_fn_args const* );
-static void         ignore_symbol_cleanup( ignore_symbol* );
-static void         ignore_symbols_parse( config_parse_fn_args const* );
-static void         ignore_symbols_parse_string( config_parse_fn_args const* );
-static void         print_statistics( void );
-static void         print_invalid_value( config_parse_fn_args const*,
-                                         toml_value const*, toml_type );
+static void   ignore_cxx_copy_assigns_parse( config_parse_fn_args const* );
+static void   ignore_cxx_copy_ctors_parse( config_parse_fn_args const* );
+static void   ignore_cxx_move_assigns_parse( config_parse_fn_args const* );
+static void   ignore_cxx_move_ctors_parse( config_parse_fn_args const* );
+static void   ignore_paths_parse( config_parse_fn_args const* );
+static void   ignore_paths_parse_string( config_parse_fn_args const* );
+static void   ignore_symbol_cleanup( ignore_symbol* );
+static void   ignore_symbols_parse( config_parse_fn_args const* );
+static void   ignore_symbols_parse_string( config_parse_fn_args const* );
+static void   print_statistics( void );
+static void   print_invalid_value( config_parse_fn_args const*,
+                                   toml_value const*, toml_type );
 
-static void         toml_value_print( toml_value const*, FILE* );
+static void   toml_value_print( toml_value const*, FILE* );
 
 ////////// local constants ////////////////////////////////////////////////////
 
@@ -172,10 +188,18 @@ static void         toml_value_print( toml_value const*, FILE* );
  * Configuration keys.
  */
 static config_key const CONFIG_KEYS[] = {
-  { "color",                  TABLE_SYMBOL_TIDY,    &color_parse          },
-  { "error",                  TABLE_SYMBOL_TIDY,    &error_parse          },
-  { "ignore-paths",           TABLE_SYMBOL_TIDY,    &ignore_paths_parse   },
-  { "ignore-symbols",         TABLE_TIDY_OR_SOURCE, &ignore_symbols_parse },
+  { "color",                    TABLE_SYMBOL_TIDY,    &color_parse          },
+  { "error",                    TABLE_SYMBOL_TIDY,    &error_parse          },
+  { "ignore-cxx-copy-assigns",  TABLE_TIDY_OR_SOURCE,
+                                &ignore_cxx_copy_assigns_parse              },
+  { "ignore-cxx-copy-ctors",    TABLE_TIDY_OR_SOURCE,
+                                &ignore_cxx_copy_ctors_parse                },
+  { "ignore-cxx-move-assigns",  TABLE_TIDY_OR_SOURCE,
+                                &ignore_cxx_move_assigns_parse              },
+  { "ignore-cxx-move-ctors",    TABLE_TIDY_OR_SOURCE,
+                                &ignore_cxx_move_ctors_parse                },
+  { "ignore-paths",             TABLE_SYMBOL_TIDY,    &ignore_paths_parse   },
+  { "ignore-symbols",           TABLE_TIDY_OR_SOURCE, &ignore_symbols_parse },
 };
 
 /**
@@ -197,6 +221,28 @@ static hash_table_t ignore_symbol_set;    ///< Set of symbols to ignore.
 static unsigned     warning_count;        ///< Configuration file warning count.
 
 ////////// local TOML type parsing functions //////////////////////////////////
+
+/**
+ * Parses a TOML bool value.
+ *
+ * @param config The config_parse_fn_args to use.
+ * @param rv_bool Receives the bool value.
+ * @return Returns `true` only if a bool was parsed successfully.
+ */
+NODISCARD
+static bool toml_bool_parse( config_parse_fn_args const *config,
+                             bool *rv_bool ) {
+  assert( config != NULL );
+  assert( rv_bool != NULL );
+
+  if ( config->value->type != TOML_BOOL ) {
+    print_invalid_value( config, /*value=*/NULL, TOML_BOOL );
+    return false;
+  }
+
+  *rv_bool = config->value->b;
+  return true;
+}
 
 /**
  * Parses either a TOML string value or an array of string values.
@@ -276,6 +322,25 @@ static bool toml_string_parse( config_parse_fn_args const *config,
 ////////// local configutation key parsing functions //////////////////////////
 
 /**
+ * Parses a config_bool value.
+ *
+ * @param config The config_parse_fn_args to use.
+ * @param rv_cb Receives the config_bool value.
+ */
+static void config_bool_parse( config_parse_fn_args const *config,
+                               config_bool *rv_cb ) {
+  assert( rv_cb != NULL );
+
+  bool value;
+  if ( !toml_bool_parse( config, &value ) )
+    return;
+
+  char const *const path = config->table_kind == TABLE_SYMBOL_TIDY ?
+    NULL : config->table->key.name;
+  config_bool_set( rv_cb, value, path );
+}
+
+/**
  * Parses the value of an `"color"` key.
  *
  * @param config The config_parse_fn_args to use.
@@ -314,6 +379,42 @@ static void error_parse( config_parse_fn_args const *config ) {
     EPUTS( "; must be one of \"always\", \"never\", or \"violations\"\n" );
   }
   option_mark_set( COPT(ERROR) );
+}
+
+/**
+ * Parses the value of an `"ignore-cxx-copy-assign"` key.
+ *
+ * @param config The config_parse_fn_args to use.
+ */
+static void ignore_cxx_copy_assigns_parse( config_parse_fn_args const *config ) {
+  config_bool_parse( config, &opt_ignore_cxx_copy_assigns );
+}
+
+/**
+ * Parses the value of an `"ignore-cxx-copy-ctors"` key.
+ *
+ * @param config The config_parse_fn_args to use.
+ */
+static void ignore_cxx_copy_ctors_parse( config_parse_fn_args const *config ) {
+  config_bool_parse( config, &opt_ignore_cxx_copy_ctors );
+}
+
+/**
+ * Parses the value of an `"ignore-cxx-move-assign"` key.
+ *
+ * @param config The config_parse_fn_args to use.
+ */
+static void ignore_cxx_move_assigns_parse( config_parse_fn_args const *config ) {
+  config_bool_parse( config, &opt_ignore_cxx_move_assigns );
+}
+
+/**
+ * Parses the value of an `"ignore-cxx-move-ctors"` key.
+ *
+ * @param config The config_parse_fn_args to use.
+ */
+static void ignore_cxx_move_ctors_parse( config_parse_fn_args const *config ) {
+  config_bool_parse( config, &opt_ignore_cxx_move_ctors );
 }
 
 /**
@@ -394,6 +495,67 @@ static void ignore_symbols_parse_string( config_parse_fn_args const *config ) {
 }
 
 ////////// local functions ////////////////////////////////////////////////////
+
+/**
+ * Cleans-up a bool_path.
+
+ * @param bp The bool_path to clean-up.  If NULL, does nothing.
+ */
+void bool_path_cleanup( bool_path *bp ) {
+  if ( bp != NULL )
+    FREE( bp->path );
+}
+
+/**
+ * Compares two "bool path" objects.
+ *
+ * @param i_bp The first bool path.
+ * @param j_bp The second bool path.
+ * @return Returns a number less than 0, 0, or greater than 0 if \a i_bp is
+ * less than, equal to, or greater than \a j_bp, respectively.
+ */
+static int bool_path_cmp( bool_path const *i_bp, bool_path const *j_bp ) {
+  assert( i_bp != NULL );
+  assert( j_bp != NULL );
+  return strcmp( i_bp->path, j_bp->path );
+}
+
+/**
+ * Calculates the hash of a "bool path" object.
+ *
+ * @param bp The bool path to calculate the hash for.
+ * @return Returns said hash.
+ */
+static fnv1a_t bool_path_hash( bool_path const *bp ) {
+  return fnv1a_s( bp->path );
+}
+
+/**
+ * Sets the Boolean value for \a cb, either globally or only for \a path.
+ *
+ * @param cb The config_bool to set or insert \a path into.
+ * @param value The Boolean value.
+ * @param path The source path this config_bool applies to, if any.
+ */
+static void config_bool_set( config_bool *cb, bool value, char const *path ) {
+  assert( cb != NULL );
+  if ( path == NULL ) {
+    cb->global_value = value;
+  }
+  else {
+    char path_buf[ PATH_MAX ];
+    if ( realpath( path, path_buf ) != NULL )
+      path = path_buf;
+
+    bool_path new_bp = { .path = path, .value = value };
+    ht_insert_rv_t const hti =
+      ht_table_insert( &cb->bool_path_set, &new_bp, sizeof new_bp );
+    if ( hti.inserted ) {
+      bool_path *const bp = HT_DINT( hti.entry );
+      bp->path = strdup_or_exit( path );
+    }
+  }
+}
 
 /**
  * Cleans-up all configuration data.
@@ -862,6 +1024,38 @@ static void toml_value_print( toml_value const *value, FILE *fout ) {
 }
 
 ////////// extern functions ///////////////////////////////////////////////////
+
+void config_bool_cleanup( config_bool *cb ) {
+  if ( cb != NULL ) {
+    ht_table_cleanup(
+      &cb->bool_path_set, POINTER_CAST( ht_free_fn_t, &bool_path_cleanup )
+    );
+  }
+}
+
+void config_bool_init( config_bool *cb ) {
+  assert( cb != NULL );
+  ht_table_init(
+    &cb->bool_path_set, HT_DINT, 2.0, 10,
+    POINTER_CAST( ht_cmp_fn_t, &bool_path_cmp ),
+    POINTER_CAST( ht_hash_fn_t, &bool_path_hash )
+  );
+}
+
+bool config_bool_value( config_bool *cb, char const *path ) {
+  assert( cb != NULL );
+
+  if ( path != NULL ) {
+    bool_path find_bp = { .path = path };
+    ht_entry_t const *const entry
+      = ht_table_find( &cb->bool_path_set, &find_bp );
+    if ( entry != NULL ) {
+      bool_path const *const found_bp = HT_DINT( entry );
+      return found_bp->value;
+    }
+  }
+  return cb->global_value;
+}
 
 void config_init( void ) {
   ASSERT_RUN_ONCE();

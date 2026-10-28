@@ -29,6 +29,7 @@
 
 // local
 #include "pjl_config.h"
+#include "hash_table.h"
 
 /// @cond DOXYGEN_IGNORE
 
@@ -44,7 +45,65 @@
  * @{
  */
 
+////////// typedefs ///////////////////////////////////////////////////////////
+
+typedef struct config_bool config_bool;
+
+////////// structs ////////////////////////////////////////////////////////////
+
+/**
+ * A configuration file Boolean value.
+ *
+ * @remarks
+ * @parblock
+ * A `config_bool` is like a built-in `bool` except it can have per-path
+ * overrides.  For example, a configuration file that contains:
+ *
+ *      [symbol-tidy]
+ *      ignore-cxx-copy-assigns = true
+ *
+ *      [foo.c]
+ *      ignore-cxx-copy-assign = false
+ *
+ * says that the global value for `ignore-cxx-copy-assigns` is `true`, but for
+ * `foo.c`, it's `false`.
+ * @endparblock
+ */
+struct config_bool {
+  bool          global_value;           // The global value.
+  hash_table_t  bool_path_set;          // Path-specific value(s).
+};
+
 ////////// extern functions ///////////////////////////////////////////////////
+
+/**
+ * Cleans-up a config_bool.
+ *
+ * @param cb The config_bool to clean-up.  If NULL, does nothing.
+ *
+ * @sa config_bool_init()
+ */
+void config_bool_cleanup( config_bool *cb );
+
+/**
+ * Initializes a config_bool.
+ *
+ * @param cb The config_bool to initialize.
+ *
+ * @sa config_bool_cleanup()
+ */
+void config_bool_init( config_bool *cb );
+
+/**
+ * Gets the value of a config_bool.
+ *
+ * @param cb The config_bool to get the value of.
+ * @param abs_path The source absolute path, if any, to get the value for.
+ * @return Returns the Boolean value for \a abs_path, if any, or the global
+ * value, if not.
+ */
+NODISCARD
+bool config_bool_value( config_bool *cb, char const *abs_path );
 
 /**
  * Reads an **symbol-tidy** configuration file, if any.

@@ -30,6 +30,7 @@
 // local
 #include "pjl_config.h"                 /* must go first */
 #include "color.h"
+#include "config_file.h"
 
 // libclang
 #include <clang-c/Index.h>
@@ -104,23 +105,27 @@ enum tidy_verbose {
 
 ////////// typedefs ///////////////////////////////////////////////////////////
 
-typedef enum tidy_error   tidy_error;
-typedef enum tidy_test    tidy_test;
-typedef enum tidy_verbose tidy_verbose;
+typedef enum    tidy_error    tidy_error;
+typedef enum    tidy_test     tidy_test;
+typedef enum    tidy_verbose  tidy_verbose;
 
 ////////// extern option variables ////////////////////////////////////////////
 
-extern color_when     opt_color_when;     ///< When to colorize.
-extern bool           opt_config_layers;  ///< Do configuration file layering?
-extern char const    *opt_config_path;    ///< Configuration file path.
-extern bool           opt_debug;          ///< Print debugging output?
-extern tidy_error     opt_error;          ///< When to exit with non-zero.
+extern color_when   opt_color_when;     ///< When to colorize.
+extern bool         opt_config_layers;  ///< Do configuration file layering?
+extern char const  *opt_config_path;    ///< Configuration file path.
+extern bool         opt_debug;          ///< Print debugging output?
+extern tidy_error   opt_error;          ///< When to exit with non-zero.
+extern config_bool  opt_ignore_cxx_copy_assigns; ///< Ignore copy assignments?
+extern config_bool  opt_ignore_cxx_copy_ctors;   ///< Ignore copy constructors?
+extern config_bool  opt_ignore_cxx_move_assigns; ///< Ignore move assignments?
+extern config_bool  opt_ignore_cxx_move_ctors;   ///< Ignore move constructors?
 
 extern
-enum CXLanguageKind   opt_lang;           ///< Explicitly specified language.
+enum CXLanguageKind opt_lang;           ///< Explicitly specified language.
 
-extern tidy_test      opt_test;           ///< Is **symbol-tidy** under test?
-extern tidy_verbose   opt_verbose;        ///< Print verbose output?
+extern tidy_test    opt_test;           ///< Is **symbol-tidy** under test?
+extern tidy_verbose opt_verbose;        ///< Print verbose output?
 
 ////////// extern functions ///////////////////////////////////////////////////
 
@@ -204,6 +209,13 @@ bool opt_verbose_parse( char const *verbose_format );
  * @param all_value The "all" value for when \a *pformat is `"*"`.
  */
 void option_str_set_all_or_none( char const **pformat, char const *all_value );
+
+/**
+ * Initializes options.
+ *
+ * @note This function must be called exactly once.
+ */
+void options_init( void );
 
 ///////////////////////////////////////////////////////////////////////////////
 

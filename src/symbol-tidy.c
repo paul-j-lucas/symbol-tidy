@@ -134,6 +134,7 @@ int main( int argc, char const *argv[] ) {
 
   // Initialization MUST happen in this order.
   test_init( "SYMBOL_TIDY_TEST" );
+  options_init();
   int const arg_source1 = cli_options_init( &argc, &argv );
   colors_init();
   config_init();
@@ -161,7 +162,7 @@ int main( int argc, char const *argv[] ) {
       verbose_printf( "source file = \"%s\"\n", argv[i] );
 
     tidy_source source = {
-      .path = argv[i],
+      .argv_path = argv[i],
       .lang = opt_lang
     };
     source_init( &source, arg_source1, argv );

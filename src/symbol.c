@@ -878,6 +878,32 @@ static bool symbol_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
 
   enum CXCursorKind const sym_kind = clang_getCursorKind( sym_csr );
   switch ( sym_kind ) {
+    case CXCursor_Constructor:
+      if ( clang_CXXConstructor_isCopyConstructor( sym_csr ) &&
+           config_bool_value( &opt_ignore_cxx_copy_ctors,
+                              source->abs_path ) ) {
+        return true;
+      }
+      if ( clang_CXXConstructor_isMoveConstructor( sym_csr ) &&
+           config_bool_value( &opt_ignore_cxx_move_ctors,
+                              source->abs_path ) ) {
+        return true;
+      }
+      break;
+
+    case CXCursor_CXXMethod:
+      if ( clang_CXXMethod_isCopyAssignmentOperator( sym_csr ) &&
+           config_bool_value( &opt_ignore_cxx_copy_assigns,
+                              source->abs_path ) ) {
+        return true;
+      }
+      if ( clang_CXXMethod_isMoveAssignmentOperator( sym_csr ) &&
+           config_bool_value( &opt_ignore_cxx_move_assigns,
+                              source->abs_path ) ) {
+        return true;
+      }
+      break;
+
     case CXCursor_Namespace:
       //
       // Namespaces first declared in system headers (e.g., "std") should be
@@ -904,8 +930,10 @@ static bool symbol_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
       return true;
 
     default:
-      return false;
+      /* suppress warning */;
   } // switch
+
+  return false;
 }
 
 /**
