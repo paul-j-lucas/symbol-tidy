@@ -1,5 +1,13 @@
+2026-10-29  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * source.c, source.h, symbol-tidy.c, symbol-tidy.h, symbol.c: Now including
+     #include'd files in source_file_set.
+
 2026-10-28  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * fnv1a.c, fnv1a.h: Moved declaration of FNV1A_PRIME.
+   * source.c, source.h: Removed abs_path.
+   * source.c: Added diag_path_cs[0] != '\0'.
    * man/man1/symbol-tidy.1, config_file.c, source.c, symbol.c: ignore-cxx-*
      can now be class-based rather that file-based.
    * config_file.c: #include fix.
