@@ -1128,13 +1128,15 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
           sym_loc, &sym_file, &sym->line, &sym->col, /*offset=*/NULL
         );
 
-        CXString const    path_cxs = clang_getFileName( sym_file );
-        char const *const path = clang_getCString( path_cxs );
-        if ( path != NULL && path[0] != '\0' && is_argv_path( path ) ) {
-          FREE( sym->path );              // just in case
-          sym->path = strdup_or_exit( path );
+        if ( sym_file != NULL ) {
+          CXString const    path_cxs = clang_getFileName( sym_file );
+          char const *const path_cs = clang_getCString( path_cxs );
+          if ( is_source_path( path_cs ) ) {
+            FREE( sym->path );          // just in case
+            sym->path = strdup_or_exit( path_cs );
+          }
+          clang_disposeString( path_cxs );
         }
-        clang_disposeString( path_cxs );
       }
 
       if ( sym->parent_sym == NULL )

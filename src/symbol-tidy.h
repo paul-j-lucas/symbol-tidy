@@ -29,9 +29,6 @@
 // local
 #include "pjl_config.h"
 
-// standard
-#include <stdbool.h>
-
 /**
  * @defgroup misc-globals Miscellaneous Globals
  * Miscellaneous global macros and variables.
@@ -77,18 +74,6 @@
 ////////// extern variables ///////////////////////////////////////////////////
 
 extern char const  *prog_name;            ///< Program name.
-
-////////// extern functions ///////////////////////////////////////////////////
-
-/**
- * Gets whether \a path is among the source paths given on the command line.
- *
- * @param path The path to check.
- * @return Returns `true` only if \a path is among the source paths given on
- * the command line.
- */
-NODISCARD
-bool is_argv_path( char const *path );
 
 ///////////////////////////////////////////////////////////////////////////////
 

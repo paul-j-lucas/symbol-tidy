@@ -34,7 +34,6 @@
 
 // standard
 #include <stdbool.h>
-#include <stddef.h>
 
 /**
  * @defgroup tidy-source-group Source File
@@ -54,14 +53,30 @@ typedef struct tidy_source tidy_source;
 struct tidy_source {
   char const         *argv_path;        ///< Source file's path from `argv`.
   CXTranslationUnit   tu;               ///< Translation unit for \ref path.
-  CXFile              file;             ///< File for \ref path.
   char const         *text;             ///< Text of \ref path.
-  size_t              text_size;        ///< Size of \ref text.
-  bool                is_ignored;       ///< Is \ref path ignored?
   enum CXLanguageKind lang;             ///< Language of \a ref path.
 };
 
 ////////// extern functions ///////////////////////////////////////////////////
+
+/**
+ * Gets whether \a path is among the source paths given on the command line.
+ *
+ * @param path The path to check.
+ * @return Returns `true` only if \a path is among the source paths given on
+ * the command line.
+ */
+NODISCARD
+bool is_source_path( char const *path );
+
+/**
+ * Adds \a path to the set of source files being tidied.
+ *
+ * @param path The path to add.
+ * @return Returns `true` only if \a path was added; `false` only if it was
+ * already in the set.
+ */
+bool source_add( char const *path );
 
 /**
  * Cleans-up all memory associated with \a source but does _not_ free \a source
@@ -79,6 +94,13 @@ void source_cleanup( tidy_source *source );
  * @param argv The command-line argument values.
  */
 void source_init( tidy_source *source, int argc, char const *const argv[] );
+
+/**
+ * Initializes sources.
+ *
+ * @note This function must be called exactly once.
+ */
+void sources_init( void );
 
 ///////////////////////////////////////////////////////////////////////////////
 

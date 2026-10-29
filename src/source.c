@@ -26,8 +26,11 @@
 // local
 #include "pjl_config.h"
 #include "source.h"
+#include "config_file.h"
+#include "fnv1a.h"
+#include "hash_table.h"
+#include "path_util.h"
 #include "print.h"
-#include "str_util.h"
 #include "symbol-tidy.h"
 #include "util.h"
 
@@ -36,10 +39,10 @@
 
 // standard
 #include <assert.h>
-#include <limits.h>                     /* PATH_MAX */
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>                     /* for exit(3) */
+#include <string.h>
 #include <sysexits.h>
 #include <unistd.h>                     /* for access(2) */
 
@@ -50,28 +53,59 @@
 
 ////////// local variables ////////////////////////////////////////////////////
 
-static CXIndex  tidy_index;             ///< Current libclang index.
+static hash_table_t source_file_set;    ///< Source files being tidied.
+static CXIndex      tidy_index;         ///< Libclang index.
 
 ////////// local functions ////////////////////////////////////////////////////
 
 /**
- * Cleans-up libclang.
+ * Visits each file included.
+ *
+ * @remarks For local include files only, adds their paths to source_file_set.
+ *
+ * @param included_file The file being included.
+ * @param inclusion_stack The source locations of includes that lead up to \a
+ * included_file being included.
+ * @param inclusion_len The length of \a inclusion_stack.
+ * @param data The hash table containing the set of source files.
  */
-static void libclang_cleanup( void ) {
-  if ( tidy_index != NULL )
-    clang_disposeIndex( tidy_index );
+static void include_visitor( CXFile included_file,
+                             CXSourceLocation *inclusion_stack,
+                             unsigned inclusion_len, CXClientData data ) {
+  (void)inclusion_stack;
+  (void)data;
+
+  if ( included_file == NULL || inclusion_len == 0 )
+    return;
+
+  CXString const  path_cxs = clang_getFileName( included_file );
+  char const     *path_cs = clang_getCString( path_cxs );
+
+  if ( path_cs == NULL || path_cs[0] == '\0' )
+    goto skip;
+  if ( path_is_absolute( path_cs ) )
+    goto skip;
+  path_cs = path_no_dot_slash( path_cs );
+  if ( path_cs[0] == '.' )              // "../foo.h"
+    goto skip;
+  if ( config_path_is_ignored( path_cs ) )
+    goto skip;
+
+  source_add( path_cs );
+
+skip:
+  clang_disposeString( path_cxs );
 }
 
-////////// extern functions ///////////////////////////////////////////////////
-
 /**
- * Checks the source's translation unit for errors and prints them, if any.
+ * Checks the source's translation unit for diagnostics and prints them, if
+ * any.
  *
  * @note If there are errors, this function does not return.
  *
  * @param source The source file being tidied.
  */
-static void source_check_for_errors( tidy_source const *source ) {
+static void source_check_diagnostics( tidy_source const *source ) {
   assert( source != NULL );
   assert( source->tu != NULL );
 
@@ -127,41 +161,15 @@ static void source_check_for_errors( tidy_source const *source ) {
   }
 }
 
-void source_cleanup( tidy_source *source ) {
-  if ( source != NULL ) {
-    // source->argv_path points to an argv so it doesn't need freeing
-    if ( source->tu != NULL )
-      clang_disposeTranslationUnit( source->tu );
-    // source->text is owned by tu so it doesn't need freeing
-  }
-};
-
-void source_init( tidy_source *source, int argc, char const *const argv[] ) {
-  assert( source != NULL );
-  assert( argc > 0 );
-  assert( argv != NULL );
-
-  RUN_ONCE ATEXIT( &libclang_cleanup );
-
-  tidy_index = clang_createIndex(
-    /*excludeDeclarationsFromPCH=*/false,
-    //
-    // We only want errors printed and not warnings, so set this to false and
-    // print errors ourselves.
-    //
-    /*displayDiagnostics=*/false
-  );
-
-  enum CXErrorCode const error_code = clang_parseTranslationUnit2(
-    tidy_index,
-    source->argv_path,
-    argv + 1, argc - 1,                 // skip argv[0] (program name)
-    /*unsaved_files=*/NULL,
-    /*num_unsaved_files=*/0,
-    CXTranslationUnit_DetailedPreprocessingRecord,
-    &source->tu
-  );
-
+/**
+ * Checks the source's translation unit parsing with libclang for errors.
+ *
+ * @note If there are errors, this function does not return.
+ *
+ * @param source The source file being tidied.
+ */
+static void source_check_errors( tidy_source const *source,
+                                 enum CXErrorCode error_code ) {
   switch ( error_code ) {
     // LCOV_EXCL_START
     case CXError_ASTReadError:
@@ -192,22 +200,94 @@ void source_init( tidy_source *source, int argc, char const *const argv[] ) {
       // LCOV_EXCL_STOP
     case CXError_Success:
       //
-      // All a CXError_Success means is that libclang's parser didn't crash; it
-      // doesn't mean the code is valid, so we have to check for errors later
-      // via trans_unit_check_for_errors().
+      // All CXError_Success means is that libclang's parser didn't crash; it
+      // doesn't mean the code is valid, so we have to check for diagnostics
+      // via source_check_diagnostics().
       //
-      // We don't just check now because we have yet to parse the config file
-      // to see if ignore-as-argument is true: if so, we must ignore the file
-      // completely and not print any errors for it.
-      //
+      source_check_diagnostics( source );
       break;
   } // switch
+}
 
-  source_check_for_errors( source );
+/**
+ * Cleans-up libclang.
+ */
+static void sources_cleanup( void ) {
+  ht_table_cleanup( &source_file_set, /*free_fn=*/NULL );
+  if ( tidy_index != NULL )
+    clang_disposeIndex( tidy_index );
+}
 
-  source->file = clang_getFile( source->tu, source->argv_path );
-  source->text =
-    clang_getFileContents( source->tu, source->file, &source->text_size );
+////////// extern functions ///////////////////////////////////////////////////
+
+bool is_source_path( char const *path ) {
+  if ( path == NULL || path[0] == '\0' )
+    return false;
+  ht_entry_t const *const found_ht = ht_table_find( &source_file_set, path );
+  return found_ht != NULL;
+}
+
+bool source_add( char const *path ) {
+  assert( path != NULL );
+  if ( config_path_is_ignored( path ) )
+    return false;
+  ht_insert_rv_t const hti = ht_table_insert(
+    &source_file_set, CONST_CAST( char*, path ), strlen( path ) + 1/*'\0'*/
+  );
+  return hti.inserted;
+}
+
+void source_cleanup( tidy_source *source ) {
+  if ( source != NULL ) {
+    // source->argv_path points to an argv so it doesn't need freeing
+    if ( source->tu != NULL )
+      clang_disposeTranslationUnit( source->tu );
+    // source->text is owned by tu so it doesn't need freeing
+  }
+};
+
+void source_init( tidy_source *source, int argc, char const *const argv[] ) {
+  assert( source != NULL );
+  assert( argc > 0 );
+  assert( argv != NULL );
+
+  enum CXErrorCode const error_code = clang_parseTranslationUnit2(
+    tidy_index,
+    source->argv_path,
+    argv + 1, argc - 1,                 // skip argv[0] (program name)
+    /*unsaved_files=*/NULL,
+    /*num_unsaved_files=*/0,
+    CXTranslationUnit_DetailedPreprocessingRecord,
+    &source->tu
+  );
+
+  source_check_errors( source, error_code );
+
+  CXFile const file = clang_getFile( source->tu, source->argv_path );
+  source->text = clang_getFileContents( source->tu, file, /*size=*/NULL );
+
+  clang_getInclusions( source->tu, &include_visitor, /*data=*/NULL );
+}
+
+void sources_init( void ) {
+  ASSERT_RUN_ONCE();
+
+  ht_table_init(
+    &source_file_set, HT_DINT, 2.0, 256,
+    POINTER_CAST( ht_cmp_fn_t, &strcmp ),
+    POINTER_CAST( ht_hash_fn_t, &fnv1a_s )
+  );
+
+  tidy_index = clang_createIndex(
+    /*excludeDeclarationsFromPCH=*/false,
+    //
+    // We only want errors printed and not warnings, so set this to false and
+    // print errors ourselves.
+    //
+    /*displayDiagnostics=*/false
+  );
+
+  ATEXIT( &sources_cleanup );
 }
 
 ///////////////////////////////////////////////////////////////////////////////

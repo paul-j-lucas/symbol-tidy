@@ -29,8 +29,6 @@
 #include "cli_options.h"
 #include "color.h"
 #include "config_file.h"
-#include "fnv1a.h"
-#include "hash_table.h"
 #include "options.h"
 #include "path_util.h"
 #include "source.h"
@@ -40,10 +38,7 @@
 #include "verbose.h"
 
 // standard
-#include <assert.h>
-#include <stdbool.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sysexits.h>
 
 ////////// enums //////////////////////////////////////////////////////////////
@@ -55,10 +50,6 @@ enum {
   TIDY_EX_UNUSED          = 1,    ///< One or more unused symbols.
   TIDY_EX_NO_UNUSED_ERROR = 2     ///< No unused symbols, but error anyway.
 };
-
-////////// local variables ////////////////////////////////////////////////////
-
-static hash_table_t argv_path_set;      ///< Source files being tidied.
 
 ////////// extern variables ///////////////////////////////////////////////////
 
@@ -90,13 +81,6 @@ void test_init( char const *env_var ) {
 }
 
 /**
- * Cleans-up **symbol-tidy**.
- */
-static void tidy_cleanup( void ) {
-  ht_table_cleanup( &argv_path_set, /*free_fn=*/NULL );
-}
-
-/**
  * Gets the status **symbol-tidy** should exit with.
  *
  * @param unused_symbols The number of unused symbold.
@@ -115,12 +99,6 @@ static int tidy_status( unsigned unused_symbols ) {
 
 ////////// extern functions ///////////////////////////////////////////////////
 
-bool is_argv_path( char const *path ) {
-  assert( path != NULL );
-  ht_entry_t const *const found_ht = ht_table_find( &argv_path_set, path );
-  return found_ht != NULL;
-}
-
 /**
  * The main entry point.
  *
@@ -129,7 +107,6 @@ bool is_argv_path( char const *path ) {
  * @return Returns 0 on success, non-zero on failure.
  */
 int main( int argc, char const *argv[] ) {
-  ATEXIT( &tidy_cleanup );
   prog_name = path_basename( argv[0] );
 
   // Initialization MUST happen in this order.
@@ -138,24 +115,14 @@ int main( int argc, char const *argv[] ) {
   int const arg_source1 = cli_options_init( &argc, &argv );
   colors_init();
   config_init();
+  sources_init();
   symbols_init();
-
-  ht_table_init(
-    &argv_path_set, HT_DPTR, 2.0, 256,
-    POINTER_CAST( ht_cmp_fn_t, strcmp ),
-    POINTER_CAST( ht_hash_fn_t, fnv1a_s )
-  );
 
   if ( IS_VERBOSE( SRC_FILE_ALWAYS ) )
     verbose_section_begin( /*printed_header=*/NULL );
 
   for ( int i = arg_source1; i < argc; ++i ) {
-    if ( config_path_is_ignored( argv[i] ) )
-      continue;
-    ht_insert_rv_t const hti = ht_table_insert(
-      &argv_path_set, CONST_CAST( char*, argv[i] ), strlen( argv[i] ) + 1
-    );
-    if ( !hti.inserted )
+    if ( !source_add( argv[i] ) )
       continue;
 
     if ( IS_VERBOSE( SRC_FILE_ALWAYS ) )
