@@ -1633,7 +1633,7 @@ static void visit_preprocessor_directives( tidy_source const *source ) {
         CXCursor const sym_csr = tidy_getCursorByName( token_cs, tu_csr );
         tidy_symbol *const sym = add_symbol( sym_csr, source );
         if ( sym != NULL )
-          sym->is_used = true;
+          sym->is_root = true;
       }
 
       clang_disposeString( token_cxs );
