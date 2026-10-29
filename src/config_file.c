@@ -911,7 +911,7 @@ static void ignore_symbol_cleanup( ignore_symbol *igsym ) {
 }
 
 /**
- * Compares to \ref ignore_symbol objects.
+ * Compares two \ref ignore_symbol objects.
  *
  * @param i_igsym The first ignore_symbol.
  * @param j_igsym The second ignore_symbol.
