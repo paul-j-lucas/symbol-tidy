@@ -210,7 +210,7 @@ static void source_check_errors( tidy_source const *source,
 }
 
 /**
- * Cleans-up libclang.
+ * Cleans-up sources.
  */
 static void sources_cleanup( void ) {
   ht_table_cleanup( &source_file_set, /*free_fn=*/NULL );
