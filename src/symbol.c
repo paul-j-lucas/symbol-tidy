@@ -136,32 +136,14 @@ static tidy_symbol* add_symbol( CXCursor sym_csr, tidy_source const *source ) {
   if ( unlikely( key == NULL ) )
     return NULL;
 
-  tidy_symbol  *sym = NULL;
-  char         *sym_name = tidy_Cursor_getScopedSpelling( sym_csr );
-
-  if ( sym_name == NULL )
-    goto done;
-  if ( strcmp( sym_name, TIDY_COMPILER_ID ) == 0 )
-    goto done;
-
-  bool is_sym_ignored = false;
-  CXFile const sym_file = tidy_getCursorLocation_File( sym_csr );
-  if ( sym_file != NULL ) {
-    CXString const    sym_path_cxs = clang_getFileName( sym_file );
-    char const *const sym_path_cs = clang_getCString( sym_path_cxs );
-    is_sym_ignored = config_symbol_is_ignored( sym_name, sym_path_cs );
-    clang_disposeString( sym_path_cxs );
-  }
-  if ( is_sym_ignored )
-    goto done;
-
-  tidy_symbol new_sym = { .key = key, .name = sym_name };
+  tidy_symbol new_sym = {
+    .key = key,
+    .name = tidy_Cursor_getScopedSpelling( sym_csr )
+  };
   key = NULL;                           // new_sym owns this now
-  sym_name = NULL;                      // new_sym owns this now
   ht_insert_rv_t const hti =
     ht_table_insert( &symbol_set, &new_sym, sizeof new_sym );
-  sym = HT_DINT( hti.entry );
-
+  tidy_symbol *const sym = HT_DINT( hti.entry );
   if ( !hti.inserted ) {
     symbol_cleanup( &new_sym );
     goto done;
@@ -189,7 +171,6 @@ static tidy_symbol* add_symbol( CXCursor sym_csr, tidy_source const *source ) {
 
 done:
   free( key );
-  free( sym_name );
   return sym;
 }
 
@@ -876,9 +857,28 @@ static bool symbol_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
   if ( tidy_Cursor_isReservedName( sym_csr, source->lang ) )
     return true;
 
+  char         *cls_name = NULL;
+  bool          is_excluded = true;
+  CXFile const  sym_file = tidy_getCursorLocation_File( sym_csr );
+  char         *sym_scoped_name = tidy_Cursor_getScopedSpelling( sym_csr );
+
+  if ( sym_scoped_name == NULL )
+    goto done;
+  if ( strcmp( sym_scoped_name, TIDY_COMPILER_ID ) == 0 )
+    goto done;
+
+  if ( sym_file != NULL ) {
+    CXString const    sym_path_cxs = clang_getFileName( sym_file );
+    char const *const sym_path_cs = clang_getCString( sym_path_cxs );
+    is_excluded = config_symbol_is_ignored( sym_scoped_name, sym_path_cs );
+    clang_disposeString( sym_path_cxs );
+    if ( is_excluded )
+      goto done;
+  }
+
+  is_excluded = false;
+
   CXCursor                cls_csr;
-  char                   *cls_name = NULL;
-  bool                    is_excluded = false;
   enum CXCursorKind const sym_kind = clang_getCursorKind( sym_csr );
 
   switch ( sym_kind ) {
@@ -943,7 +943,9 @@ static bool symbol_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
       /* suppress warning */;
   } // switch
 
+done:
   free( cls_name );
+  free( sym_scoped_name );
   return is_excluded;
 }
 
