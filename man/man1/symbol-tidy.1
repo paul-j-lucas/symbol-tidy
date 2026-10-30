@@ -35,7 +35,7 @@
 .if !'\\$1'0' .sp
 ..
 .\" ---------------------------------------------------------------------------
-.TH \f3symbol-tidy\fP 1 "October 28, 2026" "PJL TOOLS"
+.TH \f3symbol-tidy\fP 1 "October 30, 2026" "PJL TOOLS"
 .SH NAME
 symbol-tidy \(em Symbol tidier
 .SH SYNOPSIS
@@ -505,9 +505,19 @@ be quoted.
 Neither the order of the tables in a file
 nor the keys in a table matters.
 The type of table is determined
-by the first key in it
-since no two table types
-share keys.
+by the table name:
+.sp
+.PD 0
+.IP \(bu 3
+If it's
+.BR symbol-tidy ,
+then it's the symbol-tidy table.
+.IP \(bu
+If it has a filename extension,
+then it's a source table.
+.IP \(bu
+Otherwise, it's a symbol table.
+.PD
 .PP
 For the keys below,
 a value

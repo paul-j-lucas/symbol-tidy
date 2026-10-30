@@ -788,10 +788,17 @@ static void config_parse( char const *config_path, FILE *config_file ) {
       continue;
     }
 
-    config_table_kind table_kind =
-      strcmp( table.key.name, TABLE_SYMBOL_TIDY_NAME ) == 0 ?
-        TABLE_SYMBOL_TIDY : TABLE_NONE;
-    config_table_kind ok_table_kinds = table_kind;
+    config_table_kind table_kind;
+    if ( strcmp( table.key.name, TABLE_SYMBOL_TIDY_NAME ) == 0 ) {
+      table_kind = TABLE_SYMBOL_TIDY;
+    }
+    else {
+      char const *const ext = path_ext( table.key.name );
+      if ( ext != NULL )
+        table_kind = TABLE_SOURCE;
+      else
+        table_kind = TABLE_SYMBOL;
+    }
 
     toml_iterator iter;
     toml_iterator_init( &iter, &table );
@@ -807,25 +814,12 @@ static void config_parse( char const *config_path, FILE *config_file ) {
         continue;
       }
 
-      if ( table_kind == TABLE_NONE ) {
-        table_kind = found_key->ok_table_kinds &
-                     ~TO_UNSIGNED_EXPR( TABLE_SYMBOL_TIDY );
-        assert( is_1_bit( table_kind ) );
-      }
-
-      if ( ok_table_kinds == TABLE_NONE ||
-           is_0n_bit_only_in_set( found_key->ok_table_kinds,
-                                  ok_table_kinds ) ) {
-        ok_table_kinds = found_key->ok_table_kinds;
-      }
-      else if ( (found_key->ok_table_kinds & ok_table_kinds) == 0 ) {
-        assert( ok_table_kinds < ARRAY_SIZE( TABLE_KINDS ) );
+      if ( (found_key->ok_table_kinds & table_kind) == 0 ) {
         print_file_error(
           config_path, kv->key.loc.line, kv->key.loc.col,
-          "\"%s\": key not allowed in %s table%s; allowed only in %s table%s\n",
+          "\"%s\": key not allowed in %s table; allowed only in %s table%s\n",
           found_key->name,
-          TABLE_KINDS[ ok_table_kinds ],
-          is_1_bit( ok_table_kinds ) ? "" : "s",
+          TABLE_KINDS[ table_kind ],
           TABLE_KINDS[ found_key->ok_table_kinds ],
           is_1_bit( found_key->ok_table_kinds ) ? "" : "s"
         );
