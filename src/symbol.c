@@ -895,6 +895,8 @@ static bool symbol_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
     case CXCursor_ClassDecl:
     case CXCursor_ClassTemplate:
     case CXCursor_ClassTemplatePartialSpecialization:
+    case CXCursor_FunctionDecl:
+    case CXCursor_MacroDefinition:
     case CXCursor_StructDecl:
     case CXCursor_TypeAliasDecl:
     case CXCursor_TypedefDecl:
