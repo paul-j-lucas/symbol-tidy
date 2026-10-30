@@ -1,0 +1,11 @@
+[symbol-tidy]
+ignore-symbols = [
+  "*::pointer",
+  "reference"
+]
+
+[ignore-symbols.cpp]
+ignore-symbols = [
+  "*::const_pointer",
+  "const_reference"
+]

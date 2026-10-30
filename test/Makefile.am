@@ -32,6 +32,7 @@ TESTS=	tests/enum.test \
 TESTS+=	tests/constructors-implicit.test \
 	tests/destructors.test \
 	tests/functor.test \
+	tests/ignore-symbols.test \
 	tests/range-for.test \
 	tests/std-exclude.test
 
