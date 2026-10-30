@@ -847,6 +847,10 @@ static bool symbol_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
   if ( tidy_Cursor_isInvalid( sym_csr ) )
     return true;
 
+  CXFile const sym_file = tidy_getCursorLocation_File( sym_csr );
+  if ( sym_file == NULL )
+    return true;
+
   assert( source != NULL );
 
   //
@@ -866,17 +870,12 @@ static bool symbol_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
   if ( strcmp( sym_scoped_name, TIDY_COMPILER_ID ) == 0 )
     goto done;
 
-  bool          is_ignored = false;
-  CXFile const  sym_file = tidy_getCursorLocation_File( sym_csr );
-
-  if ( sym_file != NULL ) {
-    CXString const    sym_path_cxs = clang_getFileName( sym_file );
-    char const *const sym_path_cs = clang_getCString( sym_path_cxs );
-    is_ignored = config_symbol_is_ignored( sym_scoped_name, sym_path_cs );
-    clang_disposeString( sym_path_cxs );
-  }
-
   is_excluded = false;
+
+  CXString const    sym_path_cxs = clang_getFileName( sym_file );
+  char const *const sym_path_cs = clang_getCString( sym_path_cxs );
+  bool const ignored = config_symbol_is_ignored( sym_scoped_name, sym_path_cs );
+  clang_disposeString( sym_path_cxs );
 
   CXCursor const          parent_csr = clang_getCursorSemanticParent( sym_csr );
   enum CXCursorKind const sym_kind = clang_getCursorKind( sym_csr );
@@ -901,7 +900,7 @@ static bool symbol_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
     case CXCursor_TypeAliasDecl:
     case CXCursor_TypedefDecl:
     case CXCursor_UnionDecl:
-      is_excluded = is_ignored;
+      is_excluded = ignored;
       break;
 
     case CXCursor_Constructor:
@@ -916,7 +915,7 @@ static bool symbol_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
       break;
 
     case CXCursor_CXXMethod:
-      if ( is_ignored ) {
+      if ( ignored ) {
         is_excluded = true;
       }
       else if ( clang_CXXMethod_isCopyAssignmentOperator( sym_csr ) ) {
