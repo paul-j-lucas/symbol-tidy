@@ -52,8 +52,8 @@ typedef struct tidy_source tidy_source;
  */
 struct tidy_source {
   char const         *argv_path;        ///< Source file's path from `argv`.
-  CXTranslationUnit   tu;               ///< Translation unit for \ref path.
-  char const         *text;             ///< Text of \ref path.
+  CXTranslationUnit   tu;               ///< Translation unit.
+  char const         *text;             ///< Full text of source code.
   enum CXLanguageKind lang;             ///< Language of \a ref path.
 };
 

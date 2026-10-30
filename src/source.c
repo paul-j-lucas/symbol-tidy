@@ -167,6 +167,7 @@ static void source_check_diagnostics( tidy_source const *source ) {
  * @note If there are errors, this function does not return.
  *
  * @param source The source file being tidied.
+ * @param error_code The error_code from `clang_parseTranslationUnit2()`.
  */
 static void source_check_errors( tidy_source const *source,
                                  enum CXErrorCode error_code ) {
