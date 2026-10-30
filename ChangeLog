@@ -1,5 +1,18 @@
+2026-10-30  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * symbol.c: Now checking sym_file == NULL first.
+   * symbol.c: Added additional cases for exclusion.
+   * config_file.c, cxx_util.c: #include fixes.
+   * src/Makefile.am, config_file.c, cxx_util.c, cxx_util.h, symbol.c: *:: any
+     scope matching.
+   * man/man1/symbol-tidy.1, config_file.c: The table name is now inspected to
+     determine the table kind.
+
 2026-10-29  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * symbol.c: Moved more symbol exlusion from add_symbol to
+     symbol_is_excluded.
+   * symbol.c: Marking an identifier in a preprocessor directive as a root.
    * source.c, source.h, symbol-tidy.c, symbol-tidy.h, symbol.c: Now including
      #include'd files in source_file_set.
 
