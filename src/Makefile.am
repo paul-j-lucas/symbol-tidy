@@ -62,6 +62,7 @@ symbol_tidy_SOURCES =	array.c array.h \
 			cli_options.c cli_options.h \
 			color.c color.h \
 			config_file.c config_file.h \
+			cxx_util.c cxx_util.h \
 			file_ext.c file_ext.h \
 			fnv1a.c fnv1a.h \
 			hash_table.c hash_table.h \

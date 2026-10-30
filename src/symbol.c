@@ -857,41 +857,51 @@ static bool symbol_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
   if ( tidy_Cursor_isReservedName( sym_csr, source->lang ) )
     return true;
 
-  char         *cls_name = NULL;
-  bool          is_excluded = true;
-  CXFile const  sym_file = tidy_getCursorLocation_File( sym_csr );
-  char         *sym_scoped_name = tidy_Cursor_getScopedSpelling( sym_csr );
+  char *cls_name = NULL;
+  bool  is_excluded = true;
+  char *sym_scoped_name = tidy_Cursor_getScopedSpelling( sym_csr );
 
   if ( sym_scoped_name == NULL )
     goto done;
   if ( strcmp( sym_scoped_name, TIDY_COMPILER_ID ) == 0 )
     goto done;
 
+  bool          is_ignored = false;
+  CXFile const  sym_file = tidy_getCursorLocation_File( sym_csr );
+
   if ( sym_file != NULL ) {
     CXString const    sym_path_cxs = clang_getFileName( sym_file );
     char const *const sym_path_cs = clang_getCString( sym_path_cxs );
-    is_excluded = config_symbol_is_ignored( sym_scoped_name, sym_path_cs );
+    is_ignored = config_symbol_is_ignored( sym_scoped_name, sym_path_cs );
     clang_disposeString( sym_path_cxs );
-    if ( is_excluded )
-      goto done;
   }
 
   is_excluded = false;
 
-  CXCursor                cls_csr;
+  CXCursor const          parent_csr = clang_getCursorSemanticParent( sym_csr );
   enum CXCursorKind const sym_kind = clang_getCursorKind( sym_csr );
 
   switch ( sym_kind ) {
     case CXCursor_Constructor:
     case CXCursor_CXXMethod:
-      cls_csr = clang_getCursorSemanticParent( sym_csr );
-      cls_name = tidy_Cursor_getScopedSpelling( cls_csr );
+      // Get the (expensive) class name only when needed.
+      cls_name = tidy_Cursor_getScopedSpelling( parent_csr );
       break;
     default:
       /* suppress warning */;
   } // switch
 
   switch ( sym_kind ) {
+    case CXCursor_ClassDecl:
+    case CXCursor_ClassTemplate:
+    case CXCursor_ClassTemplatePartialSpecialization:
+    case CXCursor_StructDecl:
+    case CXCursor_TypeAliasDecl:
+    case CXCursor_TypedefDecl:
+    case CXCursor_UnionDecl:
+      is_excluded = is_ignored;
+      break;
+
     case CXCursor_Constructor:
       if ( clang_CXXConstructor_isCopyConstructor( sym_csr ) &&
            config_bool_value( &opt_ignore_cxx_copy_ctors, cls_name ) ) {
@@ -904,13 +914,16 @@ static bool symbol_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
       break;
 
     case CXCursor_CXXMethod:
-      if ( clang_CXXMethod_isCopyAssignmentOperator( sym_csr ) &&
-           config_bool_value( &opt_ignore_cxx_copy_assigns, cls_name ) ) {
+      if ( is_ignored ) {
         is_excluded = true;
       }
-      if ( clang_CXXMethod_isMoveAssignmentOperator( sym_csr ) &&
-           config_bool_value( &opt_ignore_cxx_move_assigns, cls_name ) ) {
-        is_excluded = true;
+      else if ( clang_CXXMethod_isCopyAssignmentOperator( sym_csr ) ) {
+        if ( config_bool_value( &opt_ignore_cxx_copy_assigns, cls_name ) )
+          is_excluded = true;
+      }
+      else if ( clang_CXXMethod_isMoveAssignmentOperator( sym_csr ) ) {
+        if ( config_bool_value( &opt_ignore_cxx_move_assigns, cls_name ) )
+          is_excluded = true;
       }
       break;
 

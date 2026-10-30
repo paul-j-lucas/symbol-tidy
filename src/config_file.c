@@ -29,6 +29,7 @@
 #include "config_file.h"
 #include "bit_util.h"
 #include "cli_options.h"
+#include "cxx_util.h"
 #include "fnv1a.h"
 #include "hash_table.h"
 #include "options.h"
@@ -149,8 +150,9 @@ struct config_parse_fn_args {
  * A symbol to ignore set via the `ignore-symbols` key.
  */
 struct ignore_symbol {
-  char const *path;                     ///< Symbol path; if NULL, any path.
   char const *name;                     ///< Symbol name.
+  char const *path;                     ///< Symbol path; if NULL, any path.
+  bool        in_any_cxx_scope;         ///< Match \ref name in any C++ scope?
 };
 
 ////////// local functions ////////////////////////////////////////////////////
@@ -477,7 +479,16 @@ static void ignore_symbols_parse_string( config_parse_fn_args const *config ) {
   assert( config != NULL );
   assert( config->value->type == TOML_STRING );
 
-  ignore_symbol new_igsym = { .name = config->value->s };
+  bool const in_any_cxx_scope = STRNCMPLIT( config->value->s, "*::" ) == 0;
+  //
+  // The .name field needs to be just the name without the *:: so it will have
+  // the same hash as the plain name.
+  //
+  ignore_symbol new_igsym = {
+    .name = in_any_cxx_scope ? config->value->s + 3 : config->value->s,
+    .in_any_cxx_scope = in_any_cxx_scope
+  };
+
   ht_insert_rv_t const hti =
     ht_table_insert( &ignore_symbol_set, &new_igsym, sizeof new_igsym );
   if ( hti.inserted ) {
@@ -794,10 +805,23 @@ static void config_parse( char const *config_path, FILE *config_file ) {
     }
     else {
       char const *const ext = path_ext( table.key.name );
-      if ( ext != NULL )
+      if ( ext != NULL ) {
         table_kind = TABLE_SOURCE;
-      else
+      }
+      else {
+        char const *const cxx_bad_char = cxx_name_check( table.key.name );
+        if ( cxx_bad_char != NULL ) {
+          print_file_error(
+            config_path, table.key.loc.line, table.key.loc.col,
+            "\"%s\": invalid C/C++ name: '%c': unexpected character\n",
+            table.key.name,
+            *cxx_bad_char
+          );
+          ++error_count;
+          continue;
+        }
         table_kind = TABLE_SYMBOL;
+      }
     }
 
     toml_iterator iter;
@@ -907,6 +931,18 @@ static void ignore_symbol_cleanup( ignore_symbol *igsym ) {
 /**
  * Compares two \ref ignore_symbol objects.
  *
+ * @remarks
+ * @parblock
+ * Two ignore_symbol objects can only compare equal if their \ref
+ * ignore_symbol::in_any_cxx_scope "in_any_cxx_scope" values match and:
+ *
+ *  + If both are true, then their unqualified names must match; or:
+ *  + If both are false, then their qualified names must match.
+ *
+ * Additionally, if both their \ref ignore_symbol::path "paths" are not NULL,
+ * then they must also match.
+ * @endparblock
+ *
  * @param i_igsym The first ignore_symbol.
  * @param j_igsym The second ignore_symbol.
  * @return eturns a number less than 0, 0, or greater than 0 if the name of \a
@@ -915,9 +951,16 @@ static void ignore_symbol_cleanup( ignore_symbol *igsym ) {
  */
 static int ignore_symbol_cmp( ignore_symbol const *i_igsym,
                               ignore_symbol const *j_igsym ) {
-  int const cmp = strcmp( i_igsym->name, j_igsym->name );
+  int cmp = i_igsym->in_any_cxx_scope - j_igsym->in_any_cxx_scope;
   if ( cmp != 0 )
     return cmp;
+
+  cmp = i_igsym->in_any_cxx_scope ?
+    cxx_unqual_strcmp( i_igsym->name, j_igsym->name ) :
+    strcmp( i_igsym->name, j_igsym->name );
+  if ( cmp != 0 )
+    return cmp;
+
   if ( i_igsym->path == NULL || j_igsym->path == NULL )
     return 0;
   return strcmp( i_igsym->path, j_igsym->path );
@@ -1084,9 +1127,21 @@ bool config_path_is_ignored( char const *path ) {
 }
 
 bool config_symbol_is_ignored( char const *sym_name, char const *sym_path ) {
-  ignore_symbol const find_igsym = { .name = sym_name, .path = sym_path };
-  ht_entry_t const *const found_igsym =
+  // First, try looking for the name as-is.
+  ignore_symbol find_igsym = { .name = sym_name, .path = sym_path };
+  ht_entry_t const *found_igsym =
     ht_table_find( &ignore_symbol_set, &find_igsym );
+
+  if ( found_igsym == NULL ) {
+    // Second, if the name is qualified, try looking for its unqualified name.
+    char const *const unqual_name = cxx_unqual_name( sym_name );
+    if ( unqual_name == sym_name )
+      return false;
+    find_igsym.name = unqual_name;
+    find_igsym.in_any_cxx_scope = true;
+    found_igsym = ht_table_find( &ignore_symbol_set, &find_igsym );
+  }
+
   return found_igsym != NULL;
 }
 
