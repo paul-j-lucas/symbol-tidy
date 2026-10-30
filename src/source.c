@@ -176,13 +176,16 @@ static void source_check_errors( tidy_source const *source,
     case CXError_ASTReadError:
       print_file_error( source->argv_path, 0, 0, "libclang AST error\n" );
       exit( EX_UNAVAILABLE );
+
     case CXError_Crashed:
       print_file_error( source->argv_path, 0, 0, "libclang crashed\n" );
       exit( EX_UNAVAILABLE );
+
     case CXError_InvalidArguments:
       print_error( "invalid arguments given to libclang\n" );
       exit( EX_SOFTWARE );
     // LCOV_EXCL_STOP
+
     case CXError_Failure:
       //
       // Libclang isn't specific about the cause of a failure, so see if the
@@ -199,6 +202,7 @@ static void source_check_errors( tidy_source const *source,
       print_file_error( source->argv_path, 0, 0, "libclang failed\n" );
       exit( EX_DATAERR );
       // LCOV_EXCL_STOP
+
     case CXError_Success:
       //
       // All CXError_Success means is that libclang's parser didn't crash; it
