@@ -28,7 +28,7 @@ AUTOMAKE_OPTIONS = 1.12			# needed for TEST_LOG_DRIVER
 TESTS=	tests/enum.test \
 	tests/labels.test
 
-# Command-line option tests
+# Command-line option tests.
 TESTS+=	tests/cli-compiler-no-exists.test \
 	tests/cli-compiler-no-include-end.test \
 	tests/cli-compiler-no-include-start.test \
@@ -40,11 +40,13 @@ TESTS+=	tests/cli-compiler-no-exists.test \
 	tests/cli-usage.test \
 	tests/libclang-error.test
 
-# C++
+# Configuration file tests.
+TESTS+=	tests/config-ignore-symbols.test
+
+# C++ tests.
 TESTS+=	tests/constructors-implicit.test \
 	tests/destructors.test \
 	tests/functor.test \
-	tests/ignore-symbols.test \
 	tests/range-for.test \
 	tests/std-exclude.test
 
