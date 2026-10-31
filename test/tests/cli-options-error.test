@@ -1,0 +1,50 @@
+EXPECTED_EXIT=64
+
+test_symbol_tidy -Xtidy
+test_symbol_tidy -Xtidy X
+
+test_symbol_tidy -Xtidy --bogus
+test_symbol_tidy -Xtidy -b
+test_symbol_tidy -Xtidy foo.c
+
+test_symbol_tidy -Xtidy --compiler
+test_symbol_tidy -Xtidy --compiler=
+test_symbol_tidy -Xtidy -C
+
+test_symbol_tidy -Xtidy --config
+test_symbol_tidy -Xtidy --config=
+test_symbol_tidy -Xtidy -c
+
+test_symbol_tidy -Xtidy --directory
+test_symbol_tidy -Xtidy --directory=
+test_symbol_tidy -Xtidy -d
+
+test_symbol_tidy -Xtidy --color
+test_symbol_tidy -Xtidy --color=
+test_symbol_tidy -Xtidy --color=X
+test_symbol_tidy -Xtidy -k
+test_symbol_tidy -Xtidy -kX
+
+test_symbol_tidy -Xtidy --error
+test_symbol_tidy -Xtidy --error=
+test_symbol_tidy -Xtidy --error=X
+test_symbol_tidy -Xtidy -e
+test_symbol_tidy -Xtidy -eX
+
+test_symbol_tidy -Xtidy --verbose
+test_symbol_tidy -Xtidy --verbose=
+test_symbol_tidy -Xtidy --verbose=X
+test_symbol_tidy -Xtidy -V
+test_symbol_tidy -Xtidy -VX
+
+test_symbol_tidy --help X
+test_symbol_tidy --help=X
+test_symbol_tidy --help --version
+
+test_symbol_tidy -x
+test_symbol_tidy -xX
+
+test_symbol_tidy --version X
+test_symbol_tidy --version=X
+
+# vim:set syntax=bash et sw=2 ts=2:

@@ -36,6 +36,7 @@ TESTS+=	tests/cli-compiler-no-exists.test \
 	tests/cli-error-always.test \
 	tests/cli-help.test \
 	tests/cli-options.test \
+	tests/cli-options-error.test \
 	tests/libclang-error.test
 
 # C++

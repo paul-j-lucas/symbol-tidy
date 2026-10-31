@@ -1,0 +1,144 @@
+$ symbol-tidy -Xtidy
+symbol-tidy: error: -Xtidy requires subsequent option
+
+$ symbol-tidy -Xtidy X
+symbol-tidy: error: -Xtidy requires subsequent option
+
+$ symbol-tidy -Xtidy --bogus
+symbol-tidy: error: "bogus": invalid -Xtidy option; use --help or -h for help
+
+$ symbol-tidy -Xtidy -b
+symbol-tidy: error: 'b': invalid -Xtidy option; use --help or -h for help
+
+$ symbol-tidy -Xtidy foo.c
+symbol-tidy: error: -Xtidy requires subsequent option
+
+$ symbol-tidy -Xtidy --compiler
+symbol-tidy: error: "--compiler" requires an argument
+
+$ symbol-tidy -Xtidy --compiler=
+symbol-tidy: error: "--compiler" requires an argument
+
+$ symbol-tidy -Xtidy -C
+symbol-tidy: error: "-C" requires an argument
+
+$ symbol-tidy -Xtidy --config
+symbol-tidy: error: "--config" requires an argument
+
+$ symbol-tidy -Xtidy --config=
+symbol-tidy: error: "--config" requires an argument
+
+$ symbol-tidy -Xtidy -c
+symbol-tidy: error: "-c" requires an argument
+
+$ symbol-tidy -Xtidy --directory
+symbol-tidy: error: "--directory" requires an argument
+
+$ symbol-tidy -Xtidy --directory=
+symbol-tidy: error: "--directory" requires an argument
+
+$ symbol-tidy -Xtidy -d
+symbol-tidy: error: "-d" requires an argument
+
+$ symbol-tidy -Xtidy --color
+symbol-tidy: error: "--color" requires an argument
+
+$ symbol-tidy -Xtidy --color=
+symbol-tidy: error: "--color" requires an argument
+
+$ symbol-tidy -Xtidy --color=X
+symbol-tidy: error: "X": invalid value for --color/-k
+
+$ symbol-tidy -Xtidy -k
+symbol-tidy: error: "-k" requires an argument
+
+$ symbol-tidy -Xtidy -kX
+symbol-tidy: error: "X": invalid value for --color/-k
+
+$ symbol-tidy -Xtidy --error
+symbol-tidy: error: "--error" requires an argument
+
+$ symbol-tidy -Xtidy --error=
+symbol-tidy: error: "--error" requires an argument
+
+$ symbol-tidy -Xtidy --error=X
+symbol-tidy: error: "X": invalid value for --error/-e; must be one of "violations", "always", or "never"
+
+$ symbol-tidy -Xtidy -e
+symbol-tidy: error: "-e" requires an argument
+
+$ symbol-tidy -Xtidy -eX
+symbol-tidy: error: "X": invalid value for --error/-e; must be one of "violations", "always", or "never"
+
+$ symbol-tidy -Xtidy --verbose
+symbol-tidy: error: "--verbose" requires an argument
+
+$ symbol-tidy -Xtidy --verbose=
+symbol-tidy: error: "--verbose" requires an argument
+
+$ symbol-tidy -Xtidy --verbose=X
+symbol-tidy: error: "X": invalid value for --verbose/-V; must be [acCdfFsSz]+
+
+$ symbol-tidy -Xtidy -V
+symbol-tidy: error: "-V" requires an argument
+
+$ symbol-tidy -Xtidy -VX
+symbol-tidy: error: "X": invalid value for --verbose/-V; must be [acCdfFsSz]+
+
+$ symbol-tidy --help X
+usage: symbol-tidy [-Xtidy tidy-option]... [compiler-option]... source-file...
+       symbol-tidy other-option
+
+tidy options:
+  --color=ARG        (-k) When to colorize output; default="not_file".
+  --compiler=ARG     (-C) Path of compiler to use or "none"; default="clang".
+  --config=ARG       (-c) Configuration file path.
+  --debug            (-D) Print symbol-tidy debug output.
+  --directory=ARG    (-d) Change directory before tidying.
+  --error=ARG        (-e) When to exit with a non-zero status.
+  --no-config-layers (-L) Don't do configuration file layering.
+  --verbose=ARG      (-V) Print verbose output.
+
+other options:
+  --help             (-h) Print this help and exit.
+  --version          (-v) Print version and exit.
+
+symbol-tidy home page: https://github.com/paul-j-lucas/symbol-tidy
+Report bugs to: https://github.com/paul-j-lucas/symbol-tidy/issues
+
+$ symbol-tidy --help=X
+symbol-tidy: error: "help=X": invalid -Xtidy option; use --help or -h for help
+
+$ symbol-tidy --help --version
+symbol-tidy: error: --help/-h can be given only by itself
+
+$ symbol-tidy -x
+symbol-tidy: error: "-x" requires an argument
+
+$ symbol-tidy -xX
+symbol-tidy: error: "X": invalid value for -x; must be either "c" or "c++"
+
+$ symbol-tidy --version X
+usage: symbol-tidy [-Xtidy tidy-option]... [compiler-option]... source-file...
+       symbol-tidy other-option
+
+tidy options:
+  --color=ARG        (-k) When to colorize output; default="not_file".
+  --compiler=ARG     (-C) Path of compiler to use or "none"; default="clang".
+  --config=ARG       (-c) Configuration file path.
+  --debug            (-D) Print symbol-tidy debug output.
+  --directory=ARG    (-d) Change directory before tidying.
+  --error=ARG        (-e) When to exit with a non-zero status.
+  --no-config-layers (-L) Don't do configuration file layering.
+  --verbose=ARG      (-V) Print verbose output.
+
+other options:
+  --help             (-h) Print this help and exit.
+  --version          (-v) Print version and exit.
+
+symbol-tidy home page: https://github.com/paul-j-lucas/symbol-tidy
+Report bugs to: https://github.com/paul-j-lucas/symbol-tidy/issues
+
+$ symbol-tidy --version=X
+symbol-tidy: error: "version=X": invalid -Xtidy option; use --help or -h for help
+
