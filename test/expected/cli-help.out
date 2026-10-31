@@ -1,0 +1,21 @@
+$ symbol-tidy --help
+usage: symbol-tidy [-Xtidy tidy-option]... [compiler-option]... source-file...
+       symbol-tidy other-option
+
+tidy options:
+  --color=ARG        (-k) When to colorize output; default="not_file".
+  --compiler=ARG     (-C) Path of compiler to use or "none"; default="clang".
+  --config=ARG       (-c) Configuration file path.
+  --debug            (-D) Print symbol-tidy debug output.
+  --directory=ARG    (-d) Change directory before tidying.
+  --error=ARG        (-e) When to exit with a non-zero status.
+  --no-config-layers (-L) Don't do configuration file layering.
+  --verbose=ARG      (-V) Print verbose output.
+
+other options:
+  --help             (-h) Print this help and exit.
+  --version          (-v) Print version and exit.
+
+symbol-tidy home page: https://github.com/paul-j-lucas/symbol-tidy
+Report bugs to: https://github.com/paul-j-lucas/symbol-tidy/issues
+
