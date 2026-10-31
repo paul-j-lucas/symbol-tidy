@@ -532,7 +532,7 @@ static char const* get_short_opt_value( int argc, char const *const argv[],
 }
 
 /**
- * Gets the likely source path from \a argv.
+ * Gets the index of the likely first source file in \a argv.
  *
  * @param argc The argument count from `main()`.
  * @param argv The argument values from `main()`.
@@ -573,9 +573,6 @@ static int get_source_index( int argc, char const *argv[],
     }
     arg_source1 = i;
   } // for
-
-  if ( arg_source1 == 0 )
-    fatal_error( EX_USAGE, "no source files given\n" );
 
   if ( *x_lang == CXLanguage_Invalid )
     *x_lang = lang;
@@ -1070,6 +1067,8 @@ int cli_options_init( int *pargc, char const **pargv[] ) {
 
   opt_lang = get_source_language( *pargc, *pargv );
   int arg_source1 = get_source_index( *pargc, *pargv, &opt_lang );
+  bool const any_source_files = arg_source1 > 0;
+
   char const *const compiler_path = get_compiler_path( tidy_argc, tidy_argv );
   if ( compiler_path != NULL )
     add_compiler_include_paths( pargc, pargv, &arg_source1, compiler_path );
@@ -1196,7 +1195,7 @@ int cli_options_init( int *pargc, char const **pargv[] ) {
   free( tidy_argv );
 
   if ( opt_help )
-    print_usage( argc > 1 ? EX_USAGE : EX_OK );
+    print_usage( any_source_files ? EX_USAGE : EX_OK );
   if ( opt_version > 0 ) {
     if ( argc > 1 )                     // symbol-tidy --version foo
       print_usage( EX_USAGE );
@@ -1205,8 +1204,8 @@ int cli_options_init( int *pargc, char const **pargv[] ) {
     exit( EX_OK );
     // LCOV_EXCL_STOP
   }
-  if ( tidy_argc != 1 )
-    print_usage( EX_USAGE );
+  if ( !any_source_files )
+    fatal_error( EX_USAGE, "no source files given\n" );
 
   if ( opt_directory != NULL ) {
     if ( IS_VERBOSE( DIRECTORY ) ) {
