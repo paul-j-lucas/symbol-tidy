@@ -356,8 +356,6 @@ static char const* get_compiler_path( int argc, char const *const argv[] ) {
   char const *const compiler_long_opt = compiler_option->name;
 
   for ( int i = 1; i < argc; ++i ) {
-    if ( !is_Xtidy_opt( argc, argv, &i ) )
-      continue;
     char const *compiler_path =
       get_short_opt_value( argc, argv, COPT(COMPILER), &i );
     if ( compiler_path == NULL )
@@ -1066,21 +1064,21 @@ int cli_options_init( int *pargc, char const **pargv[] ) {
   //   uses and insert `-isystem` options for them since libclang doesn't start
   //   out with any include paths.
 
-  strbuf_t      err_buf = STRBUF_INIT();
-  char const   *opt_directory = NULL;
-  bool          opt_help = false;
-  unsigned      opt_version = 0;
-  char   *const short_opts = make_short_opts( OPTIONS );
   int           tidy_argc;
   char const  **tidy_argv;
-
   move_tidy_args( pargc, *pargv, &tidy_argc, &tidy_argv );
 
   opt_lang = get_source_language( *pargc, *pargv );
   int arg_source1 = get_source_index( *pargc, *pargv, &opt_lang );
-  char const *const compiler_path = get_compiler_path( *pargc, *pargv );
+  char const *const compiler_path = get_compiler_path( tidy_argc, tidy_argv );
   if ( compiler_path != NULL )
     add_compiler_include_paths( pargc, pargv, &arg_source1, compiler_path );
+
+  strbuf_t    err_buf = STRBUF_INIT();
+  char const *opt_directory = NULL;
+  bool        opt_help = false;
+  unsigned    opt_version = 0;
+  char *const short_opts = make_short_opts( OPTIONS );
 
   opterr = 0;                           // suppress default error message
   for (;;) {

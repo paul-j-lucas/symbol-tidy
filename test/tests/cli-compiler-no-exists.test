@@ -1,0 +1,23 @@
+EXPECTED_EXIT=69
+
+test_symbol_tidy $TIDY_TEST_OPTIONS \
+  $TIDY_TEST_CONFIG \
+  -Xtidy --compiler=no-exists-cc \
+  minimal.c
+
+test_symbol_tidy $TIDY_TEST_OPTIONS \
+  $TIDY_TEST_CONFIG \
+  -Xtidy --compiler no-exists-cc \
+  minimal.c
+
+test_symbol_tidy $TIDY_TEST_OPTIONS \
+  $TIDY_TEST_CONFIG \
+  -Xtidy -Cno-exists-cc \
+  minimal.c
+
+test_symbol_tidy $TIDY_TEST_OPTIONS \
+  $TIDY_TEST_CONFIG \
+  -Xtidy -C no-exists-cc \
+  minimal.c
+
+# vim:set syntax=bash et sw=2 ts=2:

@@ -1,0 +1,3 @@
+$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --compiler=bin/no-include-end-cc.sh minimal.c
+symbol-tidy: warning: "End of search list." not found in "bin/no-include-end-cc.sh" output
+
