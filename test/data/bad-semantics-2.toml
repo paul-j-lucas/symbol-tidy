@@ -1,0 +1,7 @@
+[symbol-tidy]
+color = "foo"
+error = "foo"
+ignore-paths = [ 0 ]
+ignore-symbols = [ 0 ]
+
+# vim:se et sw=2 ts=2:

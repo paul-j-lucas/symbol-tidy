@@ -1,0 +1,7 @@
+$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --config=bad-semantics-2.toml minimal.c
+"bad-semantics-2.toml":2,9: error: "foo": invalid value for "color"; must be one of "always", "auto", "isatty", "never", "not_file", "not_isreg", or "tty"
+"bad-semantics-2.toml":3,9: error: "foo": invalid value for "error"; must be one of "always", "never", or "violations"
+"bad-semantics-2.toml":4,18: error: "0": invalid value for "ignore-paths"; expected string
+"bad-semantics-2.toml":5,20: error: "0": invalid value for "ignore-symbols"; expected string
+symbol-tidy: 4 errors generated
+

@@ -42,6 +42,7 @@ TESTS+=	tests/cli-compiler-no-exists.test \
 
 # Configuration file tests.
 TESTS+=	tests/config-bad-semantics-1.test \
+	tests/config-bad-semantics-2.test \
 	tests/config-bad-toml.test \
 	tests/config-ignore-symbols.test
 
