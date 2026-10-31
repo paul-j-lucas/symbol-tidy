@@ -1,5 +1,22 @@
 2026-10-30  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * test/Makefile.am, cli-options-error.out, cli-options-error.test: Added CLI
+     options error test.
+   * test/Makefile.am, libclang-error.out, libclang-error.test: libclang CLI
+     test.
+   * test/Makefile.am, cli-options.out, cli-options.test: CLI options test.
+   * cli_options.c: --help exit code fix.
+   * test/Makefile.am, cli-help.out, cli-help.test: Added --help test.
+   * test/Makefile.am, cli-error-always.out, cli-error-always.test: Added
+     --error=always tests.
+   * cli_options.c, test/Makefile.am, no-include-end-cc.sh,
+     no-include-start-cc.sh, minimal.c, cli-compiler-no-exists.out,
+     cli-compiler-no-include-end.out, cli-compiler-no-include-start.out,
+     cli-directory-error.out, cli-compiler-no-exists.test,
+     cli-compiler-no-include-end.test, cli-compiler-no-include-start.test,
+     cli-directory-error.test: More CLI tests.
+   * test/Makefile.am, ignore-symbols.cpp, ignore-symbols.toml,
+     ignore-symbols.out, ignore-symbols.test: ignore-symbols test.
    * symbol.c: Now checking sym_file == NULL first.
    * symbol.c: Added additional cases for exclusion.
    * config_file.c, cxx_util.c: #include fixes.
