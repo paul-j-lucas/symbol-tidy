@@ -41,7 +41,8 @@ TESTS+=	tests/cli-compiler-no-exists.test \
 	tests/libclang-error.test
 
 # Configuration file tests.
-TESTS+=	tests/config-ignore-symbols.test
+TESTS+=	tests/config-bad-toml.test \
+	tests/config-ignore-symbols.test
 
 # C++ tests.
 TESTS+=	tests/constructors-implicit.test \
