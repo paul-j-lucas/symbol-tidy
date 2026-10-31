@@ -1,0 +1,13 @@
+EXPECTED_EXIT=2
+
+test_symbol_tidy $TIDY_TEST_OPTIONS \
+  $TIDY_TEST_CONFIG \
+  -Xtidy --error=always \
+  minimal.c
+
+test_symbol_tidy $TIDY_TEST_OPTIONS \
+  $TIDY_TEST_CONFIG \
+  -Xtidy -e always \
+  minimal.c
+
+# vim:set syntax=bash et sw=2 ts=2:
