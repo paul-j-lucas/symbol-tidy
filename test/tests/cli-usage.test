@@ -1,0 +1,6 @@
+EXPECTED_EXIT=64
+
+test_symbol_tidy
+test_symbol_tidy foo
+
+# vim:set syntax=bash et sw=2 ts=2:

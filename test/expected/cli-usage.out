@@ -1,0 +1,6 @@
+$ symbol-tidy
+symbol-tidy: error: no source files given
+
+$ symbol-tidy foo
+symbol-tidy: error: no source files given
+
