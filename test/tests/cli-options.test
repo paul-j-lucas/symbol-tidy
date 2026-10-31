@@ -1,0 +1,43 @@
+EXPECTED_EXIT=0
+
+test_symbol_tidy $TIDY_TEST_OPTIONS \
+  $TIDY_TEST_CONFIG \
+  -Xtidy --color=never \
+  minimal.c
+
+test_symbol_tidy $TIDY_TEST_OPTIONS \
+  $TIDY_TEST_CONFIG \
+  -Xtidy --color never \
+  minimal.c
+
+test_symbol_tidy $TIDY_TEST_OPTIONS \
+  $TIDY_TEST_CONFIG \
+  -Xtidy -knever \
+  minimal.c
+
+test_symbol_tidy $TIDY_TEST_OPTIONS \
+  $TIDY_TEST_CONFIG \
+  -Xtidy -k never \
+  minimal.c
+
+test_symbol_tidy $TIDY_TEST_OPTIONS \
+  $TIDY_TEST_CONFIG \
+  -Xtidy --verbose=- \
+  minimal.c
+
+test_symbol_tidy $TIDY_TEST_OPTIONS \
+  $TIDY_TEST_CONFIG \
+  -Xtidy --verbose=d \
+  minimal.c
+
+test_symbol_tidy $TIDY_TEST_OPTIONS \
+  $TIDY_TEST_CONFIG \
+  -Xtidy --verbose=f \
+  minimal.c
+
+test_symbol_tidy $TIDY_TEST_OPTIONS \
+  $TIDY_TEST_CONFIG \
+  -Xtidy --verbose=F \
+  minimal.c
+
+# vim:set syntax=bash et sw=2 ts=2:

@@ -34,7 +34,8 @@ TESTS+=	tests/cli-compiler-no-exists.test \
 	tests/cli-compiler-no-include-start.test \
 	tests/cli-directory-error.test \
 	tests/cli-error-always.test \
-	tests/cli-help.test
+	tests/cli-help.test \
+	tests/cli-options.test
 
 # C++
 TESTS+=	tests/constructors-implicit.test \
