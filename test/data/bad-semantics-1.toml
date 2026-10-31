@@ -1,0 +1,16 @@
+color = 0
+
+[symbol-tidy]
+color = 0
+error = 0
+ignore-cxx-copy-assigns = 0
+ignore-cxx-copy-ctors = 0
+ignore-cxx-move-assigns = 0
+ignore-cxx-move-ctors = 0
+ignore-paths = 0
+ignore-symbols = 0
+unknown = 0
+
+[empty]
+
+# vim:se et sw=2 ts=2:
