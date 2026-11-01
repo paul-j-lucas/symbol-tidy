@@ -1,3 +1,19 @@
+2026-11-01  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * configure.ac, util.h: Added -Werror=pointer-arith, VOID_TO_CHAR_PTR.
+
+2026-10-31  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * test/Makefile.am, config-enoent.out, config-enoent.test: Added
+     config-enoent test.
+   * test/Makefile.am, bad-semantics-2.toml, config-bad-semantics-2.out,
+     config-bad-semantics-2.test: Added another bad TOML semantics test.
+   * test/Makefile.am, bad-semantics-1.toml, config-bad-semantics-1.out,
+     config-bad-semantics-1.test: Added bad TOML semantics test.
+   * test/Makefile.am, bad.toml, config-bad-toml.out, config-bad-toml.test:
+     Added bad TOML test.
+   * test/Makefile.am, cli-usage.out, cli-usage.test: CLI usage test.
+
 2026-10-30  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
    * test/Makefile.am, cli-options-error.out, cli-options-error.test: Added CLI
