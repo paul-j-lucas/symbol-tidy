@@ -493,8 +493,10 @@ static void ignore_symbols_parse_string( config_parse_fn_args const *config ) {
   if ( hti.inserted ) {
     ignore_symbol *const igsym = HT_DINT( hti.entry );
     igsym->name = strdup_or_exit( igsym->name );
-    if ( config->table_kind != TABLE_SYMBOL_TIDY )
-      igsym->path = strdup_or_exit( config->table->key.name );
+    if ( config->table_kind != TABLE_SYMBOL_TIDY ) {
+      char const *const path = path_no_dot_slash( config->table->key.name );
+      igsym->path = strdup_or_exit( path );
+    }
   }
   else {
     print_file_warning(
@@ -1129,7 +1131,10 @@ bool config_path_is_ignored( char const *path ) {
 
 bool config_symbol_is_ignored( char const *sym_name, char const *sym_path ) {
   // First, try looking for the name as-is.
-  ignore_symbol find_igsym = { .name = sym_name, .path = sym_path };
+  ignore_symbol find_igsym = {
+    .name = sym_name,
+    .path = path_no_dot_slash( sym_path )
+  };
   ht_entry_t const *found_igsym =
     ht_table_find( &ignore_symbol_set, &find_igsym );
 
