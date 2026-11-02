@@ -1,3 +1,10 @@
+2026-11-02  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * array.c, array.h, cli_options.c, cli_options.h, options.c, options.h,
+     source.c, source.h, symbol-tidy.c, test/Makefile.am, c-cxx-main.cpp,
+     c-cxx.c, c-cxx.cpp, c-cxx-1.out, c-cxx-2.out, cli-options-error.out,
+     c-cxx-1.test, c-cxx-2.test: Now support multiple -x/--language options.
+
 2026-11-01  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
    * cli_options.c: Better pipe draining.
