@@ -168,7 +168,7 @@ static void source_check_diagnostics( tidy_source const *source ) {
  *
  * @param source The source file being tidied.
  */
-static void source_parse_impl( tidy_source const *source ) {
+static void source_parse_impl( tidy_source *source ) {
   assert( source != NULL );
   assert( source->argv_path != NULL );
 
