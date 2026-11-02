@@ -710,7 +710,10 @@ static int get_sources( int argc, char const *const argv[],
       lang = file_ext->lang;
     }
 
-    tidy_source source = { .argv_path = argv[i], .lang = lang };
+    tidy_source source = {
+      .argv_path = path_no_dot_slash( argv[i] ),
+      .lang = lang
+    };
     *(tidy_source*)array_push_back( rv_sources ) = source;
   } // for
 
