@@ -164,7 +164,7 @@ inline bool path_is_relative( char const *path ) {
  *
  * @warning If \a path starts with `./`, the pointer returned is within \a
  * path. If \a path was dynamically allocated, \a path --- and not a pointer
- * with \a path --- must be freed.
+ * within \a path --- must be freed.
  */
 NODISCARD
 char const* path_no_dot_slash( char const *path );
