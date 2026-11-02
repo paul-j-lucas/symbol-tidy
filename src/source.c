@@ -218,8 +218,7 @@ static void source_parse_impl( tidy_source *source ) {
     case CXError_Success:
       //
       // All CXError_Success means is that libclang's parser didn't crash; it
-      // doesn't mean the code is valid, so we have to check for diagnostics
-      // via source_check_diagnostics().
+      // doesn't mean the code is valid, so we have to check for diagnostics.
       //
       source_check_diagnostics( source );
       break;
