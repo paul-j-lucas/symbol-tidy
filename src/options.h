@@ -32,9 +32,6 @@
 #include "color.h"
 #include "config_file.h"
 
-// libclang
-#include <clang-c/Index.h>
-
 // standard
 #include <stdbool.h>
 
@@ -120,10 +117,6 @@ extern config_bool  opt_ignore_cxx_copy_assigns; ///< Ignore copy assignments?
 extern config_bool  opt_ignore_cxx_copy_ctors;   ///< Ignore copy constructors?
 extern config_bool  opt_ignore_cxx_move_assigns; ///< Ignore move assignments?
 extern config_bool  opt_ignore_cxx_move_ctors;   ///< Ignore move constructors?
-
-extern
-enum CXLanguageKind opt_lang;           ///< Explicitly specified language.
-
 extern tidy_test    opt_test;           ///< Is **symbol-tidy** under test?
 extern tidy_verbose opt_verbose;        ///< Print verbose output?
 

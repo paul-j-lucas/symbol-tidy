@@ -102,14 +102,25 @@
 ////////// macros /////////////////////////////////////////////////////////////
 
 /**
- * An initializer that can be assigned to stand-alone arrays.
+ * An initializer that can be used to initialize arrays.
  *
  * @param ESIZE The element size.
  *
  * @sa array_cleanup()
  * @sa array_init()
+ * @sa #ARRAY_LIT()
  */
-#define ARRAY_INIT(ESIZE)         (array_t){ .esize = (ESIZE) }
+#define ARRAY_INIT(ESIZE)         { .esize = (ESIZE) }
+
+/**
+ * An array literal that can be assigned to arrays.
+ *
+ * @param ESIZE The element size.
+ *
+ * @sa array_init()
+ * @sa #ARRAY_INIT()
+ */
+#define ARRAY_LIT(ESIZE)          ((array_t)ARRAY_INIT( (ESIZE) ))
 
 ////////// typedefs ///////////////////////////////////////////////////////////
 
@@ -457,10 +468,10 @@ inline void* nonconst_array_front( array_t *array ) {
  * @param esize The element size.
  *
  * @sa array_cleanup()
- * @sa #ARRAY_INIT()
+ * @sa #ARRAY_LIT()
  */
 inline void array_init( array_t *array, size_t esize ) {
-  *array = ARRAY_INIT( esize );
+  *array = ARRAY_LIT( esize );
 }
 
 /**
@@ -534,6 +545,22 @@ inline void* array_pop_back( array_t *array ) {
 }
 
 /**
+ * Inserts space for new elements at \a index.
+ *
+ * @param array The \ref array to insert into.
+ * @param index The index to insert at.  If &ge; \ref array::len "len",
+ * equivalent to array_push_back().
+ * @param n The number of elements to insert.
+ * @return Returns a pointer to the first new element.
+ *
+ * @note This is an O(N) operation.
+ *
+ * @sa array_push_back()
+ */
+NODISCARD
+void* array_insert( array_t *restrict array, size_t index, size_t n );
+
+/**
  * Appends space for a new element onto the back of \a array.
  *
  * @param array The \ref array to push onto.
@@ -541,6 +568,7 @@ inline void* array_pop_back( array_t *array ) {
  *
  * @note This is an O(1) amortized operation and O(N) worst-case.
  *
+ * @sa array_insert()
  * @sa array_push_array_back()
  */
 NODISCARD

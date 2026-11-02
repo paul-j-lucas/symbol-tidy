@@ -68,6 +68,23 @@ void array_cleanup( array_t *restrict array, array_free_fn_t free_fn ) {
   array_init( array, esize );
 }
 
+void* array_insert( array_t *restrict array, size_t index, size_t n ) {
+  assert( array != NULL );
+
+  if ( unlikely( n == 0 ) )
+    return NULL;
+  if ( index > array->len )
+    index = array->len;
+
+  array_reserve( array, n );
+  char *const src = array_at_nc( array, index );
+  void *const dst = src + n * array->esize;
+  memmove( dst, src, (array->len - index) * array->esize );
+
+  array->len += n;
+  return src;
+}
+
 void array_merge( array_t *restrict array, array_merge_fn_t merge_fn,
                   array_free_fn_t free_fn ) {
   assert( array != NULL );

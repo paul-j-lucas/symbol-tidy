@@ -34,9 +34,6 @@
 
 /// @cond DOXYGEN_IGNORE
 
-// libclang
-#include <clang-c/Index.h>
-
 // standard
 #include <assert.h>
 #include <stdbool.h>
@@ -56,18 +53,17 @@
 /// @cond DOXYGEN_IGNORE
 /// Otherwise Doxygen generates two entries.
 
-color_when          opt_color_when = COLOR_NOT_FILE;
-bool                opt_config_layers = true;
-char const         *opt_config_path;
-bool                opt_debug;
-tidy_error          opt_error;
-config_bool         opt_ignore_cxx_copy_assigns;
-config_bool         opt_ignore_cxx_copy_ctors;
-config_bool         opt_ignore_cxx_move_assigns;
-config_bool         opt_ignore_cxx_move_ctors;
-enum CXLanguageKind opt_lang = CXLanguage_Invalid;
-tidy_test           opt_test;
-tidy_verbose        opt_verbose;
+color_when    opt_color_when = COLOR_NOT_FILE;
+bool          opt_config_layers = true;
+char const   *opt_config_path;
+bool          opt_debug;
+tidy_error    opt_error;
+config_bool   opt_ignore_cxx_copy_assigns;
+config_bool   opt_ignore_cxx_copy_ctors;
+config_bool   opt_ignore_cxx_move_assigns;
+config_bool   opt_ignore_cxx_move_ctors;
+tidy_test     opt_test;
+tidy_verbose  opt_verbose;
 
 /// @endcond
 

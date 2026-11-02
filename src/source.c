@@ -162,15 +162,27 @@ static void source_check_diagnostics( tidy_source const *source ) {
 }
 
 /**
- * Checks the source's translation unit parsing with libclang for errors.
+ * Parses \a source and checks for errors.
  *
  * @note If there are errors, this function does not return.
  *
  * @param source The source file being tidied.
- * @param error_code The error_code from `clang_parseTranslationUnit2()`.
  */
-static void source_check_errors( tidy_source const *source,
-                                 enum CXErrorCode error_code ) {
+static void source_parse_impl( tidy_source const *source ) {
+  assert( source != NULL );
+  assert( source->argv_path != NULL );
+
+  enum CXErrorCode const error_code = clang_parseTranslationUnit2(
+    tidy_index,
+    source->argv_path,
+    source->ptu_argv->elements,
+    STATIC_CAST( int, source->ptu_argv->len ),
+    /*unsaved_files=*/NULL,
+    /*num_unsaved_files=*/0,
+    CXTranslationUnit_DetailedPreprocessingRecord,
+    &source->tu
+  );
+
   switch ( error_code ) {
     // LCOV_EXCL_START
     case CXError_ASTReadError:
@@ -251,27 +263,14 @@ void source_cleanup( tidy_source *source ) {
   }
 };
 
-void source_init( tidy_source *source, int argc, char const *const argv[] ) {
+void source_parse( tidy_source *source ) {
   assert( source != NULL );
-  assert( argc > 0 );
-  assert( argv != NULL );
 
-  enum CXErrorCode const error_code = clang_parseTranslationUnit2(
-    tidy_index,
-    source->argv_path,
-    argv + 1, argc - 1,                 // skip argv[0] (program name)
-    /*unsaved_files=*/NULL,
-    /*num_unsaved_files=*/0,
-    CXTranslationUnit_DetailedPreprocessingRecord,
-    &source->tu
-  );
-
-  source_check_errors( source, error_code );
+  source_parse_impl( source );
+  clang_getInclusions( source->tu, &include_visitor, /*data=*/NULL );
 
   CXFile const file = clang_getFile( source->tu, source->argv_path );
   source->text = clang_getFileContents( source->tu, file, /*size=*/NULL );
-
-  clang_getInclusions( source->tu, &include_visitor, /*data=*/NULL );
 }
 
 void sources_init( void ) {

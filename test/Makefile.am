@@ -54,6 +54,10 @@ TESTS+=	tests/constructors-implicit.test \
 	tests/range-for.test \
 	tests/std-exclude.test
 
+# Miscellaneous tests.
+TESTS+=	tests/c-cxx-1.test \
+	tests/c-cxx-2.test
+
 ###############################################################################
 
 ABS_TOP_BUILDDIR =	$(abs_top_builddir)

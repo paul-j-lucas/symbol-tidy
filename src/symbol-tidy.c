@@ -26,6 +26,7 @@
 // local
 #include "pjl_config.h"                 /* must go first */
 #include "symbol-tidy.h"
+#include "array.h"
 #include "cli_options.h"
 #include "color.h"
 #include "config_file.h"
@@ -112,7 +113,8 @@ int main( int argc, char const *argv[] ) {
   // Initialization MUST happen in this order.
   test_init( "SYMBOL_TIDY_TEST" );
   options_init();
-  int const arg_source1 = cli_options_init( &argc, &argv );
+  array_t sources = ARRAY_INIT( sizeof( tidy_source ) );
+  cli_options_init( argc, argv, &sources );
   colors_init();
   config_init();
   sources_init();
@@ -121,22 +123,20 @@ int main( int argc, char const *argv[] ) {
   if ( IS_VERBOSE( SRC_FILE_ALWAYS ) )
     verbose_section_begin( /*printed_header=*/NULL );
 
-  for ( int i = arg_source1; i < argc; ++i ) {
-    if ( !source_add( argv[i] ) )
+  for ( size_t i = 0; i < sources.len; ++i ) {
+    tidy_source *const source = array_at_nc( &sources, i );
+    if ( !source_add( source->argv_path ) )
       continue;
 
     if ( IS_VERBOSE( SRC_FILE_ALWAYS ) )
-      verbose_printf( "source file = \"%s\"\n", argv[i] );
+      verbose_printf( "source file = \"%s\"\n", source->argv_path );
 
-    tidy_source source = {
-      .argv_path = argv[i],
-      .lang = opt_lang
-    };
-    source_init( &source, arg_source1, argv );
-    symbols_visit( &source );
-    source_cleanup( &source );
+    source_parse( source );
+    symbols_visit( source );
+    source_cleanup( source );
   } // for
 
   unsigned const unused = symbols_print_unused();
+  array_cleanup( &sources, /*free_fn=*/NULL );
   return tidy_status( unused );
 }

@@ -28,6 +28,7 @@
 
 // local
 #include "pjl_config.h"                 /* must go first */
+#include "array.h"
 #include "util.h"
 
 /// @cond DOXYGEN_IGNORE
@@ -65,14 +66,13 @@
 /**
  * Initializes **symbol-tidy** options from the command-line.
  *
- * @param pargc A pointer to the argument count from \c main().
- * @param pargv A pointer to the argument values from \c main().
- * @return Returns the index in \a *pargv of the first source file to tidy.
+ * @param argc The command-line argument count from `main()`.
+ * @param argv The command-line argument values from `main()`.
+ * @param rv_sources An array to receive the tidy_source files to be tidied.
  *
  * @note This function must be called exactly once.
  */
-NODISCARD
-int cli_options_init( int *pargc, char const **pargv[] );
+void cli_options_init( int argc, char const *argv[], array_t *rv_sources );
 
 /**
  * Gets whether the option has been set.

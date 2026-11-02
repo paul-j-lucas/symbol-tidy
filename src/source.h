@@ -28,6 +28,7 @@
 
 // local
 #include "pjl_config.h"
+#include "array.h"
 
 // libclang
 #include <clang-c/Index.h>
@@ -53,6 +54,13 @@ typedef struct tidy_source tidy_source;
 struct tidy_source {
   char const         *argv_path;        ///< Source file's path from `argv`.
   enum CXLanguageKind lang;             ///< Language of source file.
+
+  /**
+   * Points to an \ref ptu_argv_global "array" of command-line arguments to
+   * pass to `clang_parseTranslationUnit2` corresponding to \ref lang.
+   */
+  array_t const      *ptu_argv;
+
   CXTranslationUnit   tu;               ///< Translation unit.
   char const         *text;             ///< Full source text.
 };
@@ -87,13 +95,11 @@ bool source_add( char const *path );
 void source_cleanup( tidy_source *source );
 
 /**
- * Further initializes \a source.
+ * Parses \a source.
  *
- * @param source The source to initialize.
- * @param argc The command-line argument count.
- * @param argv The command-line argument values.
+ * @param source The source to parse.
  */
-void source_init( tidy_source *source, int argc, char const *const argv[] );
+void source_parse( tidy_source *source );
 
 /**
  * Initializes sources.

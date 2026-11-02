@@ -1,0 +1,2 @@
+$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers c-cxx.cpp c-cxx.c c-cxx-main.cpp
+

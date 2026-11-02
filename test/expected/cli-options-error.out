@@ -116,7 +116,7 @@ $ symbol-tidy -x
 symbol-tidy: error: "-x" requires an argument
 
 $ symbol-tidy -xX
-symbol-tidy: error: "X": invalid value for -x; must be either "c" or "c++"
+symbol-tidy: error: "X": invalid value for -x/--language; must be one of "c", "c++", or "none"
 
 $ symbol-tidy --version X
 usage: symbol-tidy [-Xtidy tidy-option]... [compiler-option]... source-file...
