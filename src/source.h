@@ -62,7 +62,6 @@ struct tidy_source {
   array_t const      *ptu_argv;
 
   CXTranslationUnit   tu;               ///< Translation unit.
-  char const         *text;             ///< Full source text.
 };
 
 ////////// extern functions ///////////////////////////////////////////////////

@@ -258,18 +258,13 @@ void source_cleanup( tidy_source *source ) {
     // source->argv_path points to an argv so it doesn't need freeing
     if ( source->tu != NULL )
       clang_disposeTranslationUnit( source->tu );
-    // source->text is owned by tu so it doesn't need freeing
   }
 };
 
 void source_parse( tidy_source *source ) {
   assert( source != NULL );
-
   source_parse_impl( source );
   clang_getInclusions( source->tu, &include_visitor, /*data=*/NULL );
-
-  CXFile const file = clang_getFile( source->tu, source->argv_path );
-  source->text = clang_getFileContents( source->tu, file, /*size=*/NULL );
 }
 
 void sources_init( void ) {

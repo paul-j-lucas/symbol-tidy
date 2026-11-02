@@ -1630,7 +1630,7 @@ static void visit_preprocessor_directives( tidy_source const *source ) {
       unsigned const token_line =
         tidy_getTokenLocation_Line( source->tu, tokens[i] );
       if ( token_line > last_line ) {
-        if ( !tidy_isEscapedNewline( source->tu, source->text, tokens, i ) ) {
+        if ( !tidy_isEscapedNewline( source->tu, tokens, i ) ) {
           --i;
           break;
         }

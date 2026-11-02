@@ -748,9 +748,8 @@ bool tidy_isCursorDefinition( CXCursor cursor ) {
   return true;
 }
 
-bool tidy_isEscapedNewline( CXTranslationUnit tu, char const *source_text,
-                            CXToken const *tokens, unsigned token_idx ) {
-  assert( source_text != NULL );
+bool tidy_isEscapedNewline( CXTranslationUnit tu, CXToken const *tokens,
+                            unsigned token_idx ) {
   assert( tokens != NULL );
   assert( token_idx > 0 );
 
@@ -772,8 +771,14 @@ bool tidy_isEscapedNewline( CXTranslationUnit tu, char const *source_text,
   if ( prev_file == NULL || prev_file != curr_file )
     return false;
 
+  size_t source_len;
+  char const *const source_text =
+    clang_getFileContents( tu, prev_file, &source_len );
+  if ( source_text == NULL )
+    return false;
+
   bool saw_backslash = false;
-  for ( unsigned i = prev_offset; i < curr_offset; ++i ) {
+  for ( unsigned i = prev_offset; i < curr_offset && i < source_len; ++i ) {
     switch ( source_text[i] ) {
       case '\\':
         saw_backslash = true;
