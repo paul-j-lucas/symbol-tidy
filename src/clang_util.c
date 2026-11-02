@@ -26,6 +26,7 @@
 // local
 #include "pjl_config.h"
 #include "clang_util.h"
+#include "path_util.h"
 #include "str_util.h"
 #include "strbuf.h"
 #include "util.h"
@@ -722,7 +723,7 @@ char* tidy_getCursorUSR( CXCursor cursor ) {
     return NULL;
 
   CXString const    path_cxs = clang_getFileName( file );
-  char const *const path_cs = clang_getCString( path_cxs );
+  char const *const path_cs = path_no_dot_slash( clang_getCString( path_cxs ) );
   CXString const    label_cxs = clang_getCursorSpelling( cursor );
   char const *const label_cs = clang_getCString( label_cxs );
 
