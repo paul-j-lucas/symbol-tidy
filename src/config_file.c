@@ -442,9 +442,9 @@ static void ignore_paths_parse_string( config_parse_fn_args const *config ) {
   assert( config != NULL );
   assert( config->value->type == TOML_STRING );
 
+  char const *const path = path_no_dot_slash( config->value->s );
   ht_insert_rv_t const hti = ht_table_insert(
-    &ignore_path_set, CONST_CAST( char*, config->value->s ),
-    strlen( config->value->s ) + 1/*\0*/
+    &ignore_path_set, CONST_CAST( char*, path ), strlen( path ) + 1/*\0*/
   );
   if ( !hti.inserted ) {
     print_file_warning(
@@ -1122,6 +1122,8 @@ void config_init( void ) {
 }
 
 bool config_path_is_ignored( char const *path ) {
+  assert( path != NULL );
+  path = path_no_dot_slash( path );
   return ht_table_find( &ignore_path_set, path ) != NULL;
 }
 
