@@ -1083,7 +1083,7 @@ static void print_version( bool verbose ) {
 // LCOV_EXCL_STOP
 
 /**
- * Initializes every tidy_source's \ref tidy_source::ptr_argv.
+ * Initializes every tidy_source's \ref tidy_source::ptu_argv.
  *
  * @param sources The sources to initialize.
  * @param argc The command-line argument count from `main()`.
