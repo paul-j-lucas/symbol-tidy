@@ -1149,7 +1149,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
           char const *const path_cs = clang_getCString( path_cxs );
           if ( is_source_path( path_cs ) ) {
             FREE( sym->path );          // just in case
-            sym->path = strdup_or_exit( path_cs );
+            sym->path = strdup_or_exit( path_no_dot_slash( path_cs ) );
           }
           clang_disposeString( path_cxs );
         }
@@ -1726,7 +1726,7 @@ unsigned symbols_print_unused( void ) {
     tidy_symbol const *const sym = array_at_nc( &symbol_array, i );
     if ( strcmp( sym->path, prev_path ) != 0 ) {
       color_start( stderr, sgr_locus );
-      EPRINTF( "\"%s\"", path_no_dot_slash( sym->path ) );
+      EPRINTF( "\"%s\"", sym->path );
       color_end( stderr, sgr_locus );
       EPUTS( ": " );
       prev_path = sym->path;
