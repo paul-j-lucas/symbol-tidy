@@ -51,29 +51,11 @@
  * @param n The number to check.
  * @return Returns `true` only if \a n has either 0 or 1 bits set.
  *
- * @sa is_0n_bit_only_in_set()
  * @sa is_1_bit()
  */
 NODISCARD
 inline bool is_01_bit( uint64_t n ) {
   return (n & (n - 1)) == 0;
-}
-
-/**
- * Checks whether there are 0 or more bits set in \a n that are only among the
- * bits set in \a set.
- *
- * @param n The bits to check.
- * @param set The bits to check against.
- * @return Returns `true` only if there are 0 or more bits set in \a n that are
- * only among the bits set in \a set.
- *
- * @sa is_01_bit()
- * @sa is_1_bit()
- */
-NODISCARD
-inline bool is_0n_bit_only_in_set( uint64_t n, uint64_t set ) {
-  return (n & set) == n;
 }
 
 /**
@@ -83,7 +65,6 @@ inline bool is_0n_bit_only_in_set( uint64_t n, uint64_t set ) {
  * @return Returns `true` only if \a n has exactly 1 bit set.
  *
  * @sa is_01_bit()
- * @sa is_0n_bit_only_in_set()
  */
 NODISCARD
 inline bool is_1_bit( uint64_t n ) {
