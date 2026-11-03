@@ -1,5 +1,18 @@
 2026-11-02  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * source.c, symbol.c, symbol.h: Finally visiting all preprocessor
+     directives.
+   * bit_util.c, bit_util.h: Eliminated is_0n_bit_only_in_set -- not used.
+   * util.c, util.h: Eliminated false_set -- not used.
+   * symbol.c: Moved use of path_no_dot_slash.
+   * config_file.c: Using path_no_dot_slash().
+   * symbol-tidy.c: No longer need path_no_dot_slash here.
+   * config_file.c: Using path_no_dot_slash().
+   * clang_util.c: Using path_no_dot_slash().
+   * cli_options.c, symbol-tidy.c: Calling path_no_dot_slash() more.
+   * clang_util.c, clang_util.h, source.c, source.h, symbol.c:
+     tidy_isEscapedNewline() now gets the source text itself.
+   * source.c: Removed "const".
    * array.c, array.h, cli_options.c, cli_options.h, options.c, options.h,
      source.c, source.h, symbol-tidy.c, test/Makefile.am, c-cxx-main.cpp,
      c-cxx.c, c-cxx.cpp, c-cxx-1.out, c-cxx-2.out, cli-options-error.out,
