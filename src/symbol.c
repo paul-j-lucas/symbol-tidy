@@ -677,11 +677,12 @@ static void print_statistics( void ) {
 }
 
 /**
- * Adds a symbol to symbol_set.
+ * Finds or adds a symbol to symbol_set.
  *
  * @param sym_csr The cursor for the symbol to add.
  * @param source The tidy_source to use.
- * @return Returns the new tidy_symbol or NULL if it could not be added.
+ * @return Returns the new or existing tidy_symbol, or NULL if it could not be
+ * added.
  */
 static tidy_symbol* symbol_add( CXCursor sym_csr, tidy_source const *source ) {
   if ( symbol_is_excluded( sym_csr, source ) )
