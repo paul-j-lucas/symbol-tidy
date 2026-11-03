@@ -326,77 +326,6 @@ static void cxx_dtor_add_ref( CXCursor cls_csr,
 }
 
 /**
- * Adds a reference from \a member_sym for either a non-static member function
- * or field to the class's default constructor.
- *
- * @remarks
- * @parblock
- * Consider a class and code like:
- *
- *      struct word_info {
- *        word_info() : _count{ 0 } { }
- *
- *        void print() const;
- *
- *        unsigned _count;
- *      };
- *
- *      std::map<std::string,word_info> word_map;
- *      auto &wi = word_map[ "foo" ];
- *
- *      if ( wi._count > 0 )
- *        wi.print();
- *
- * If all accesses to `word_info` objects are via a `map`, the default
- * constructor is only ever called by code in `map`'s implementation and never
- * in user's code (the code being tidied).  Hence, **symbol-tidy** will wrongly
- * conclude that `word_info`'s default constructor is unused.
- *
- * However, if any field is accessed or any member function is called, then
- * it's on an object that _must_ have been constructed.  If the class's only
- * constructor is a default constructor, then _that_ constructor must have been
- * called.
- * @endparblock
- *
- * @param member_csr The cursor for the member.
- * @param member_sym The member symbol to add a reference from.
- * @param svd The symbols_visit_data to use.
- */
-static void cxx_member_add_def_ctor_ref( CXCursor member_csr,
-                                         tidy_symbol *member_sym,
-                                         symbols_visit_data const *svd ) {
-  assert( member_sym != NULL );
-  assert( svd->source->lang == CXLanguage_CPlusPlus );
-
-  enum CXCursorKind const kind = clang_getCursorKind( member_csr );
-  switch ( kind ) {
-    case CXCursor_CXXMethod:
-      if ( clang_CXXMethod_isStatic( member_csr ) )
-        return;
-      break;
-    case CXCursor_FieldDecl:
-      break;
-    default:
-      return;
-  } // switch
-
-  CXCursor const        cls_csr = clang_getCursorSemanticParent( member_csr );
-  tidy_ConstructorInfo  ctor_info;
-
-  if ( !tidy_Cursor_getConstructorInfo( cls_csr, &ctor_info ) )
-    return;
-  if ( ctor_info.has_other_ctors )
-    return;
-  if ( clang_Cursor_isNull( ctor_info.default_ctor_csr ) )
-    return;
-
-  tidy_symbol *const def_ctor_sym =
-    add_symbol( ctor_info.default_ctor_csr, svd->source );
-  if ( def_ctor_sym != NULL )
-    symbol_add_ref( member_sym, def_ctor_sym );
-}
-
-/**
  * A helper function for visit_CXXForRangeStmt() that attempts to find
  * `begin()` and `end()` functions.
  *
@@ -405,9 +334,9 @@ static void cxx_member_add_def_ctor_ref( CXCursor member_csr,
  * @param data The symbols_visit_data to use.
  * @return Returns either `CXChildVisit_Break` or `CXChildVisit_Continue`.
  */
-static enum CXChildVisitResult find_begin_end_visitor( CXCursor cursor,
-                                                       CXCursor parent,
-                                                       CXClientData data ) {
+static enum CXChildVisitResult cxx_find_begin_end_visitor( CXCursor cursor,
+                                                           CXCursor parent,
+                                                           CXClientData data ) {
   (void)parent;
   assert( data != NULL );
   symbols_visit_data *const svd = data;
@@ -489,9 +418,9 @@ skip:
  * @param data A pointer to receive the cursor for the range expression.
  * @return Returns either `CXChildVisit_Break` or `CXChildVisit_Continue`.
  */
-static enum CXChildVisitResult get_Expr_visitor( CXCursor cursor,
-                                                 CXCursor parent,
-                                                 CXClientData data ) {
+static enum CXChildVisitResult cxx_get_Expr_visitor( CXCursor cursor,
+                                                     CXCursor parent,
+                                                     CXClientData data ) {
   (void)parent;
 
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
@@ -503,6 +432,77 @@ static enum CXChildVisitResult get_Expr_visitor( CXCursor cursor,
   }
 
   return CXChildVisit_Continue;
+}
+
+/**
+ * Adds a reference from \a member_sym for either a non-static member function
+ * or field to the class's default constructor.
+ *
+ * @remarks
+ * @parblock
+ * Consider a class and code like:
+ *
+ *      struct word_info {
+ *        word_info() : _count{ 0 } { }
+ *
+ *        void print() const;
+ *
+ *        unsigned _count;
+ *      };
+ *
+ *      std::map<std::string,word_info> word_map;
+ *      auto &wi = word_map[ "foo" ];
+ *
+ *      if ( wi._count > 0 )
+ *        wi.print();
+ *
+ * If all accesses to `word_info` objects are via a `map`, the default
+ * constructor is only ever called by code in `map`'s implementation and never
+ * in user's code (the code being tidied).  Hence, **symbol-tidy** will wrongly
+ * conclude that `word_info`'s default constructor is unused.
+ *
+ * However, if any field is accessed or any member function is called, then
+ * it's on an object that _must_ have been constructed.  If the class's only
+ * constructor is a default constructor, then _that_ constructor must have been
+ * called.
+ * @endparblock
+ *
+ * @param member_csr The cursor for the member.
+ * @param member_sym The member symbol to add a reference from.
+ * @param svd The symbols_visit_data to use.
+ */
+static void cxx_member_add_def_ctor_ref( CXCursor member_csr,
+                                         tidy_symbol *member_sym,
+                                         symbols_visit_data const *svd ) {
+  assert( member_sym != NULL );
+  assert( svd->source->lang == CXLanguage_CPlusPlus );
+
+  enum CXCursorKind const kind = clang_getCursorKind( member_csr );
+  switch ( kind ) {
+    case CXCursor_CXXMethod:
+      if ( clang_CXXMethod_isStatic( member_csr ) )
+        return;
+      break;
+    case CXCursor_FieldDecl:
+      break;
+    default:
+      return;
+  } // switch
+
+  CXCursor const        cls_csr = clang_getCursorSemanticParent( member_csr );
+  tidy_ConstructorInfo  ctor_info;
+
+  if ( !tidy_Cursor_getConstructorInfo( cls_csr, &ctor_info ) )
+    return;
+  if ( ctor_info.has_other_ctors )
+    return;
+  if ( clang_Cursor_isNull( ctor_info.default_ctor_csr ) )
+    return;
+
+  tidy_symbol *const def_ctor_sym =
+    add_symbol( ctor_info.default_ctor_csr, svd->source );
+  if ( def_ctor_sym != NULL )
+    symbol_add_ref( member_sym, def_ctor_sym );
 }
 
 /**
@@ -1267,7 +1267,7 @@ static void visit_Constructor( CXCursor ctor_csr, symbols_visit_data *svd ) {
 static void visit_CXXForRangeStmt( CXCursor range_stmt_csr,
                                    symbols_visit_data *svd ) {
   CXCursor range_expr = clang_getNullCursor();
-  clang_visitChildren( range_stmt_csr, &get_Expr_visitor, &range_expr );
+  clang_visitChildren( range_stmt_csr, &cxx_get_Expr_visitor, &range_expr );
   if ( clang_Cursor_isNull( range_expr ) )
     return;
 
@@ -1293,7 +1293,7 @@ static void visit_CXXForRangeStmt( CXCursor range_stmt_csr,
   };
 
   // Try looking for T::{ begin | end }() [const] member functions first.
-  clang_visitChildren( cls_csr, &find_begin_end_visitor, svd );
+  clang_visitChildren( cls_csr, &cxx_find_begin_end_visitor, svd );
 
   // If either is not found, try looking for { begin | end }([const] T&)
   // non-member functions second.
@@ -1304,7 +1304,7 @@ static void visit_CXXForRangeStmt( CXCursor range_stmt_csr,
 
     CXCursor scope_csr = clang_getCursorSemanticParent( cls_csr );
     while ( !tidy_Cursor_isInvalid( scope_csr ) ) {
-      clang_visitChildren( scope_csr, &find_begin_end_visitor, svd );
+      clang_visitChildren( scope_csr, &cxx_find_begin_end_visitor, svd );
       if ( !clang_Cursor_isNull( svd->cxx_for_range.begin_csr ) &&
            !clang_Cursor_isNull( svd->cxx_for_range.end_csr ) ) {
         break;
