@@ -32,6 +32,9 @@
 #include "hash_table.h"
 #include "source.h"
 
+// libclang
+#include <clang-c/Index.h>
+
 // standard
 #include <stdbool.h>
 
@@ -132,6 +135,17 @@ struct tidy_symbol {
 };
 
 ////////// extern functions ///////////////////////////////////////////////////
+
+/**
+ * Adds a symbol to symbol_set unless it already exists.
+ *
+ * @param sym_csr The cursor for the symbol to add.
+ * @param source The tidy_source \a sym_csr is from.
+ * @return Returns a new or existing tidy_symbol, or NULL if it is excluded or
+ * could could not be added.
+ */
+NODISCARD
+tidy_symbol* symbol_add( CXCursor sym_csr, tidy_source const *source );
 
 /**
  * Initializes the internal set of all symbols in the translation unit.

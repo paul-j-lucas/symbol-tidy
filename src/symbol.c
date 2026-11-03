@@ -98,7 +98,6 @@ struct symbols_visit_data {
 ////////// local functions ////////////////////////////////////////////////////
 
 static void         cxx_dtor_add_ref( CXCursor, symbols_visit_data const* );
-static tidy_symbol* symbol_add( CXCursor, tidy_source const* );
 static void         symbol_add_ref( tidy_symbol*, tidy_symbol* );
 
 NODISCARD
@@ -674,59 +673,6 @@ static void print_statistics( void ) {
       "        rss-size = %u\n", max_sym->ref_sym_set.size
     );
   }
-}
-
-/**
- * Finds or adds a symbol to symbol_set.
- *
- * @param sym_csr The cursor for the symbol to add.
- * @param source The tidy_source to use.
- * @return Returns the new or existing tidy_symbol, or NULL if it could not be
- * added.
- */
-static tidy_symbol* symbol_add( CXCursor sym_csr, tidy_source const *source ) {
-  if ( symbol_is_excluded( sym_csr, source ) )
-    return NULL;
-  char *key = tidy_getCursorUSR( sym_csr );
-  if ( unlikely( key == NULL ) )
-    return NULL;
-
-  tidy_symbol new_sym = {
-    .key = key,
-    .name = tidy_Cursor_getScopedSpelling( sym_csr )
-  };
-  key = NULL;                           // new_sym owns this now
-  ht_insert_rv_t const hti =
-    ht_table_insert( &symbol_set, &new_sym, sizeof new_sym );
-  tidy_symbol *const sym = HT_DINT( hti.entry );
-  if ( !hti.inserted ) {
-    symbol_cleanup( &new_sym );
-    goto done;
-  }
-
-  if ( source->lang == CXLanguage_CPlusPlus )
-    sym->display_name = tidy_Cursor_getScopedDisplayName( sym_csr );
-
-  //
-  // If the symbol's name is "main", we have to mark it as a root since nothing
-  // calls main().  But first ensure that it's the program's main() function:
-  // in C, anything named "main" must be main(); however, in C++, other things,
-  // e.g., member functions, can also be named "main".
-  //
-  if ( strcmp( sym->name, "main" ) == 0 &&
-       tidy_Cursor_isExternalGlobalFunction( sym_csr ) ) {
-    sym->is_root = true;
-  }
-
-  ht_table_init(
-    &sym->ref_sym_set, HT_DPTR, 2.0, 128,
-    POINTER_CAST( ht_cmp_fn_t, &symbol_cmp ),
-    POINTER_CAST( ht_hash_fn_t, &fnv1a_s )
-  );
-
-done:
-  free( key );
-  return sym;
 }
 
 /**
@@ -1581,89 +1527,6 @@ static void visit_OverloadedDeclRef( CXCursor overloaded_csr,
 }
 
 /**
- * Visits all preprocessor directives that can reference symbols to mark them
- * as used.
- *
- * @remarks Libclang's AST doesn't include conditional preprocessor directives,
- * e.g., `#if`, `#ifdef`, etc.), so `clang_visitChildren()` can't visit them to
- * look for symbols that are referenced to mark them as used.  Consequently,
- * we're forced to iterate through all of \a source's tokens looking for `#`
- * followed by a directive name and check subsequent tokens for identifiers.
- *
- * @param source The source file whose preprocessor directives to visit.
- */
-static void visit_preprocessor_directives( tidy_source const *source ) {
-  assert( source != NULL );
-
-  CXCursor const tu_csr = clang_getTranslationUnitCursor( source->tu );
-  CXSourceRange const tu_range = clang_getCursorExtent( tu_csr );
-
-  CXToken *tokens;
-  unsigned token_count;
-  clang_tokenize( source->tu, tu_range, &tokens, &token_count );
-  if ( unlikely( token_count == 0 ) )
-    return;                             // LCOV_EXCL_LINE
-
-  for ( unsigned i = 0; i < token_count; ++i ) {
-    CXSourceLocation const token_loc =
-      clang_getTokenLocation( source->tu, tokens[i] );
-    if ( clang_Location_isInSystemHeader( token_loc ) )
-      continue;
-
-    CXTokenKind token_kind = clang_getTokenKind( tokens[i] );
-    if ( token_kind != CXToken_Punctuation )
-      continue;
-    if ( !tidy_Token_isSpellingEqualTo( source->tu, tokens[i], "#" ) )
-      continue;
-    if ( ++i == token_count )
-      break;
-
-    token_kind = clang_getTokenKind( tokens[i] );
-    if ( token_kind != CXToken_Identifier )
-      continue;
-    int const directive_idx = tidy_Token_isSpellingEqualToAny(
-      source->tu, tokens[i],
-      "if", "ifdef", "ifndef", "elif", "elifdef", "elifndef"
-    );
-    if ( directive_idx == -1 )
-      continue;
-
-    unsigned last_line = tidy_getSpellingLocation_Line( token_loc );
-
-    while ( ++i < token_count ) {
-      unsigned const token_line =
-        tidy_getTokenLocation_Line( source->tu, tokens[i] );
-      if ( token_line > last_line ) {
-        if ( !tidy_isEscapedNewline( source->tu, tokens, i ) ) {
-          --i;
-          break;
-        }
-        last_line = token_line;
-      }
-
-      token_kind = clang_getTokenKind( tokens[i] );
-      if ( token_kind != CXToken_Identifier )
-        continue;
-      CXString const token_cxs =
-        clang_getTokenSpelling( source->tu, tokens[i] );
-      char const *const token_cs = clang_getCString( token_cxs );
-
-      if ( strcmp( token_cs, "defined" ) != 0 &&
-           strcmp( token_cs, "__has_include" ) != 0 ) {
-        CXCursor const sym_csr = tidy_getCursorByName( token_cs, tu_csr );
-        tidy_symbol *const sym = symbol_add( sym_csr, source );
-        if ( sym != NULL )
-          sym->is_root = true;
-      }
-
-      clang_disposeString( token_cxs );
-    } // while
-  } // for
-
-  clang_disposeTokens( source->tu, tokens, token_count );
-}
-
-/**
  * Visits a `CXCursor_VarDeclRef` kind of cursor.
  *
  * @remarks For C++ only, if a variable of a class type is declared and the
@@ -1694,6 +1557,51 @@ static void visit_VarDecl( CXCursor var_decl_csr, symbols_visit_data *svd ) {
 }
 
 ////////// extern functions ///////////////////////////////////////////////////
+
+tidy_symbol* symbol_add( CXCursor sym_csr, tidy_source const *source ) {
+  if ( symbol_is_excluded( sym_csr, source ) )
+    return NULL;
+  char *key = tidy_getCursorUSR( sym_csr );
+  if ( unlikely( key == NULL ) )
+    return NULL;
+
+  tidy_symbol new_sym = {
+    .key = key,
+    .name = tidy_Cursor_getScopedSpelling( sym_csr )
+  };
+  key = NULL;                           // new_sym owns this now
+  ht_insert_rv_t const hti =
+    ht_table_insert( &symbol_set, &new_sym, sizeof new_sym );
+  tidy_symbol *const sym = HT_DINT( hti.entry );
+  if ( !hti.inserted ) {
+    symbol_cleanup( &new_sym );
+    goto done;
+  }
+
+  if ( source->lang == CXLanguage_CPlusPlus )
+    sym->display_name = tidy_Cursor_getScopedDisplayName( sym_csr );
+
+  //
+  // If the symbol's name is "main", we have to mark it as a root since nothing
+  // calls main().  But first ensure that it's the program's main() function:
+  // in C, anything named "main" must be main(); however, in C++, other things,
+  // e.g., member functions, can also be named "main".
+  //
+  if ( strcmp( sym->name, "main" ) == 0 &&
+       tidy_Cursor_isExternalGlobalFunction( sym_csr ) ) {
+    sym->is_root = true;
+  }
+
+  ht_table_init(
+    &sym->ref_sym_set, HT_DPTR, 2.0, 128,
+    POINTER_CAST( ht_cmp_fn_t, &symbol_cmp ),
+    POINTER_CAST( ht_hash_fn_t, &fnv1a_s )
+  );
+
+done:
+  free( key );
+  return sym;
+}
 
 void symbols_init( void ) {
   ASSERT_RUN_ONCE();
@@ -1774,7 +1682,6 @@ void symbols_visit( tidy_source *source ) {
   };
   CXCursor const cursor = clang_getTranslationUnitCursor( source->tu );
   clang_visitChildren( cursor, &symbols_visitor, &svd );
-  visit_preprocessor_directives( source );
 }
 
 ///////////////////////////////////////////////////////////////////////////////

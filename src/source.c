@@ -26,11 +26,13 @@
 // local
 #include "pjl_config.h"
 #include "source.h"
+#include "clang_util.h"
 #include "config_file.h"
 #include "fnv1a.h"
 #include "hash_table.h"
 #include "path_util.h"
 #include "print.h"
+#include "symbol.h"
 #include "symbol-tidy.h"
 #include "util.h"
 
@@ -58,24 +60,34 @@ static CXIndex      tidy_index;         ///< Libclang index.
 
 ////////// local functions ////////////////////////////////////////////////////
 
+static void source_cpp_visit( tidy_source const*, CXFile );
+
+////////// local functions ////////////////////////////////////////////////////
+
 /**
- * Visits each file included.
+ * Visits each file included to:
  *
- * @remarks For local include files only, adds their paths to source_file_set.
+ *  1. Add it to the global set of source files.
+ *  2. Visit all preprocessor directives in it.
+ *
+ * @note Absolute paths, non-local files (`../`), and files explicitly ignored
+ * via a config. file are skipped.
  *
  * @param included_file The file being included.
  * @param inclusion_stack The source locations of includes that lead up to \a
  * included_file being included.
  * @param inclusion_len The length of \a inclusion_stack.
- * @param data The hash table containing the set of source files.
+ * @param data The tidy_source file whose included files are being visited.
+ *
+ * @sa source_cpp_visit()
  */
 static void include_visitor( CXFile included_file,
                              CXSourceLocation *inclusion_stack,
                              unsigned inclusion_len, CXClientData data ) {
   (void)inclusion_stack;
-  (void)data;
+  (void)inclusion_len;
 
-  if ( included_file == NULL || inclusion_len == 0 )
+  if ( included_file == NULL )
     return;
 
   CXString const  path_cxs = clang_getFileName( included_file );
@@ -86,12 +98,16 @@ static void include_visitor( CXFile included_file,
   if ( path_is_absolute( path_cs ) )
     goto skip;
   path_cs = path_no_dot_slash( path_cs );
-  if ( path_cs[0] == '.' )              // "../foo.h"
+  if ( STRNCMPLIT( path_cs, "../" ) == 0 )
     goto skip;
   if ( config_path_is_ignored( path_cs ) )
     goto skip;
+  if ( !source_path_add( path_cs ) )
+    goto skip;
 
-  source_path_add( path_cs );
+  assert( data != NULL );
+  tidy_source const *const source = data;
+  source_cpp_visit( source, included_file );
 
 skip:
   clang_disposeString( path_cxs );
@@ -159,6 +175,97 @@ static void source_check_diagnostics( tidy_source const *source ) {
     );
     exit( EX_DATAERR );
   }
+}
+
+/**
+ * Visits all preprocessor directives in \a file that can reference symbols to
+ * mark them as roots.
+ *
+ * @remarks Libclang's AST doesn't include conditional preprocessor directives,
+ * e.g., `#if`, `#ifdef`, etc.), so `clang_visitChildren()` can't visit them to
+ * look for symbols that are referenced to mark them as used.  Consequently,
+ * we're forced to iterate through all of \a source's tokens looking for `#`
+ * followed by a directive name and check subsequent tokens for identifiers.
+ *
+ * @param source The source file for the translation unit.
+ * @param file The file whose preprocessor directives to visit.
+ */
+static void source_cpp_visit( tidy_source const *source, CXFile file ) {
+  assert( source != NULL );
+
+  CXSourceLocation const start_loc =
+    clang_getLocation( source->tu, file, 1, 1 );
+  size_t file_size;
+  (void)clang_getFileContents( source->tu, file, &file_size );
+  CXSourceLocation const end_loc =
+    clang_getLocationForOffset( source->tu, file, (unsigned)file_size );
+  CXSourceRange const file_range = clang_getRange( start_loc, end_loc );
+
+  CXToken *tokens;
+  unsigned token_count;
+  clang_tokenize( source->tu, file_range, &tokens, &token_count );
+  if ( unlikely( token_count == 0 ) )
+    return;                             // LCOV_EXCL_LINE
+
+  CXCursor const tu_csr = clang_getTranslationUnitCursor( source->tu );
+
+  for ( unsigned i = 0; i < token_count; ++i ) {
+    CXSourceLocation const token_loc =
+      clang_getTokenLocation( source->tu, tokens[i] );
+    if ( clang_Location_isInSystemHeader( token_loc ) )
+      continue;
+
+    CXTokenKind token_kind = clang_getTokenKind( tokens[i] );
+    if ( token_kind != CXToken_Punctuation )
+      continue;
+    if ( !tidy_Token_isSpellingEqualTo( source->tu, tokens[i], "#" ) )
+      continue;
+    if ( ++i == token_count )
+      break;
+
+    token_kind = clang_getTokenKind( tokens[i] );
+    if ( token_kind != CXToken_Identifier )
+      continue;
+    int const directive_idx = tidy_Token_isSpellingEqualToAny(
+      source->tu, tokens[i],
+      "if", "ifdef", "ifndef", "elif", "elifdef", "elifndef"
+    );
+    if ( directive_idx == -1 )
+      continue;
+
+    unsigned last_line = tidy_getSpellingLocation_Line( token_loc );
+
+    while ( ++i < token_count ) {
+      unsigned const token_line =
+        tidy_getTokenLocation_Line( source->tu, tokens[i] );
+      if ( token_line > last_line ) {
+        if ( !tidy_isEscapedNewline( source->tu, tokens, i ) ) {
+          --i;
+          break;
+        }
+        last_line = token_line;
+      }
+
+      token_kind = clang_getTokenKind( tokens[i] );
+      if ( token_kind != CXToken_Identifier )
+        continue;
+      CXString const token_cxs =
+        clang_getTokenSpelling( source->tu, tokens[i] );
+      char const *const token_cs = clang_getCString( token_cxs );
+
+      if ( strcmp( token_cs, "defined" ) != 0 &&
+           strcmp( token_cs, "__has_include" ) != 0 ) {
+        CXCursor const sym_csr = tidy_getCursorByName( token_cs, tu_csr );
+        tidy_symbol *const sym = symbol_add( sym_csr, source );
+        if ( sym != NULL )
+          sym->is_root = true;
+      }
+
+      clang_disposeString( token_cxs );
+    } // while
+  } // for
+
+  clang_disposeTokens( source->tu, tokens, token_count );
 }
 
 /**
@@ -239,6 +346,7 @@ static void sources_cleanup( void ) {
 bool is_source_path( char const *path ) {
   if ( path == NULL || path[0] == '\0' )
     return false;
+  path = path_no_dot_slash( path );
   ht_entry_t const *const found_ht = ht_table_find( &source_file_set, path );
   return found_ht != NULL;
 }
@@ -254,13 +362,16 @@ void source_cleanup( tidy_source *source ) {
 void source_parse( tidy_source *source ) {
   assert( source != NULL );
   source_parse_impl( source );
-  clang_getInclusions( source->tu, &include_visitor, /*data=*/NULL );
+  CXFile const file = clang_getFile( source->tu, source->argv_path );
+  source_cpp_visit( source, file );
+  clang_getInclusions( source->tu, &include_visitor, source );
 }
 
 bool source_path_add( char const *path ) {
   assert( path != NULL );
   if ( config_path_is_ignored( path ) )
     return false;
+  path = path_no_dot_slash( path );
   ht_insert_rv_t const hti = ht_table_insert(
     &source_file_set, CONST_CAST( char*, path ), strlen( path ) + 1/*'\0'*/
   );
