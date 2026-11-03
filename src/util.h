@@ -788,23 +788,6 @@ PJL_PRINTF_LIKE_FUNC(2)
 unsigned asprintf_or_exit( char **rv_s, char const *format, ... );
 
 /**
- * Checks \a flag: if `false`, sets it to `true`.
- *
- * @param flag A pointer to the Boolean flag to be tested and, if `false`,
- * sets it to `true`.
- * @return Returns `true` only if \a flag was `false` initially.
- *
- * @sa true_or_set()
- */
-NODISCARD
-inline bool false_set( bool *flag ) {
-  if ( *flag )
-    return false;
-  *flag = true;
-  return true;
-}
-
-/**
  * Prints an error message to standard error and exits with \a status code.
  *
  * @param status The status code to exit with.
@@ -869,8 +852,6 @@ void* realloc_or_exit( void *p, size_t size );
  * @param flag A pointer to the Boolean flag to be tested and, if `false`, sets
  * it to `true`.
  * @return Returns `true` only if \a flag was `true` initially.
- *
- * @sa false_set()
  */
 NODISCARD
 inline bool true_or_set( bool *flag ) {
