@@ -1049,6 +1049,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       break;
 
     case CXCursor_EnumConstantDecl:
+    case CXCursor_FieldDecl:
     case CXCursor_LabelStmt:
     case CXCursor_MacroDefinition:
     case CXCursor_TypeAliasDecl:
