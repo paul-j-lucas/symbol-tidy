@@ -79,12 +79,11 @@ struct tidy_symbol {
    * roots:
    *
    *  + All symbols in system headers since template code calls back into user
-   *    code, so it should be marked used.
+   *    code, so they should be marked as roots.
    *
    *  + All variables of types that have constructors.  Even if such variables
    *    are apparently unused, their constructors might have side effects
-   *    (e.g., locking a mutex), so they (and any symbols they reference) have
-   *    to be marked as used.
+   *    (e.g., locking a mutex), so they have to be marked as a root.
    *
    *  + All user-defined `operator()` functions due to limitations of
    *    libclang's C API.
