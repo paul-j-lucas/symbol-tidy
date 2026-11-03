@@ -250,19 +250,22 @@ static void source_cpp_visit( tidy_source const *source, CXFile file ) {
       token_kind = clang_getTokenKind( tokens[i] );
       if ( token_kind != CXToken_Identifier )
         continue;
+
       CXString const token_cxs =
         clang_getTokenSpelling( source->tu, tokens[i] );
       char const *const token_cs = clang_getCString( token_cxs );
 
-      if ( strcmp( token_cs, "defined" ) != 0 &&
-           strcmp( token_cs, "__has_include" ) != 0 ) {
-        CXCursor const sym_csr = tidy_getCursorByName( token_cs, tu_csr );
-        tidy_symbol *const sym = symbol_add( sym_csr, source );
-        if ( sym != NULL )
-          sym->is_root = true;
-      }
+      if ( strcmp( token_cs, "defined" ) == 0 )
+        goto skip;
+      if ( strcmp( token_cs, "__has_include" ) == 0 )
+        goto skip;
 
-      clang_disposeString( token_cxs );
+      CXCursor const sym_csr = tidy_getCursorByName( token_cs, tu_csr );
+      tidy_symbol *const sym = symbol_add( sym_csr, source );
+      if ( sym != NULL )
+        sym->is_root = true;
+
+skip: clang_disposeString( token_cxs );
     } // while
   } // for
 
