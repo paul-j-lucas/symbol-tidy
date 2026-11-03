@@ -219,6 +219,42 @@ skip:
 }
 
 /**
+ * Checks whether \a decl_csr invokes a default constructor and destructor: if
+ * so, adds references to them.
+ *
+ * @param decl_csr A field or variable declaration cursor.
+ * @param svd The symbols_visit_data to use.
+ */
+static void cxx_def_ctor_dtor( CXCursor decl_csr, symbols_visit_data *svd ) {
+  assert( svd != NULL );
+  assert( svd->source->lang == CXLanguage_CPlusPlus );
+
+  CXCursor const  obj_csr = tidy_Cursor_getElementIfArray( decl_csr );
+  CXType          type = clang_getCursorType( obj_csr );
+                  type = clang_getCanonicalType( type );
+                  type = clang_getNonReferenceType( type );
+
+  CXCursor const cls_csr = clang_getTypeDeclaration( type );
+  if ( !tidy_Cursor_isClassDecl( cls_csr ) )
+    return;
+
+  tidy_ConstructorInfo ctor_info;
+  if ( tidy_Cursor_getConstructorInfo( cls_csr, &ctor_info ) &&
+       !clang_Cursor_isNull( ctor_info.default_ctor_csr ) ) {
+    CXCursor const expr_csr = tidy_Cursor_getFirstExprChild( decl_csr );
+    if ( !clang_Cursor_isNull( expr_csr ) ) {
+      tidy_symbol *const def_ctor_sym =
+        symbol_add( ctor_info.default_ctor_csr, svd->source );
+      if ( def_ctor_sym != NULL )
+        symbol_add_ref( svd->curr_sym, def_ctor_sym );
+    }
+  }
+
+  cxx_dtor_add_ref( cls_csr, svd );
+  clang_visitChildren( cls_csr, &cxx_base_dtor_add_ref_visitor, svd );
+}
+
+/**
  * Helper function for visit_CXXDeleteExpr() that adds a reference to the
  * destructor of the object's class.
  *
@@ -356,31 +392,6 @@ static enum CXChildVisitResult cxx_find_begin_end_visitor( CXCursor cursor,
   }
 
 skip:
-  return CXChildVisit_Continue;
-}
-
-/**
- * A helper function for visit_CXXForRangeStmt() that attempts to find the
- * range expression of a range-for statement.
- *
- * @param cursor The cursor being visited.
- * @param parent Not used.
- * @param data A pointer to receive the cursor for the range expression.
- * @return Returns either `CXChildVisit_Break` or `CXChildVisit_Continue`.
- */
-static enum CXChildVisitResult cxx_get_Expr_visitor( CXCursor cursor,
-                                                     CXCursor parent,
-                                                     CXClientData data ) {
-  (void)parent;
-
-  enum CXCursorKind const kind = clang_getCursorKind( cursor );
-  if ( clang_isExpression( kind ) ) {
-    assert( data != NULL );
-    CXCursor *const expr_csr = data;
-    *expr_csr = cursor;
-    return CXChildVisit_Break;
-  }
-
   return CXChildVisit_Continue;
 }
 
@@ -1217,8 +1228,7 @@ static void visit_Constructor( CXCursor ctor_csr, symbols_visit_data *svd ) {
  */
 static void visit_CXXForRangeStmt( CXCursor range_stmt_csr,
                                    symbols_visit_data *svd ) {
-  CXCursor range_expr = clang_getNullCursor();
-  clang_visitChildren( range_stmt_csr, &cxx_get_Expr_visitor, &range_expr );
+  CXCursor range_expr = tidy_Cursor_getFirstExprChild( range_stmt_csr );
   if ( clang_Cursor_isNull( range_expr ) )
     return;
 
@@ -1400,6 +1410,9 @@ static void visit_FieldDecl( CXCursor field_csr, symbols_visit_data *svd ) {
   } // for
 
   clang_disposeTokens( tu, tokens, token_count );
+
+  if ( svd->source->lang == CXLanguage_CPlusPlus )
+    cxx_def_ctor_dtor( field_csr, svd );
 }
 
 /**
@@ -1538,23 +1551,8 @@ static void visit_OverloadedDeclRef( CXCursor overloaded_csr,
  * @param svd The symbols_visit_data to use.
  */
 static void visit_VarDecl( CXCursor var_decl_csr, symbols_visit_data *svd ) {
-  if ( svd->source->lang != CXLanguage_CPlusPlus )
-    return;
-
-  CXCursor  obj_csr = tidy_Cursor_getElementIfArray( var_decl_csr );
-  CXType    type = clang_getCursorType( obj_csr );
-            type = clang_getCanonicalType( type );
-            type = clang_getNonReferenceType( type );
-
-  CXCursor const cls_csr = clang_getTypeDeclaration( type );
-
-  if ( tidy_Cursor_isClassDecl( cls_csr ) ) {
-    if ( tidy_Cursor_getConstructorInfo( cls_csr, /*ctor_info=*/NULL ) )
-      svd->curr_sym->is_root = true;
-
-    cxx_dtor_add_ref( cls_csr, svd );
-    clang_visitChildren( cls_csr, &cxx_base_dtor_add_ref_visitor, svd );
-  }
+  if ( svd->source->lang == CXLanguage_CPlusPlus )
+    cxx_def_ctor_dtor( var_decl_csr, svd );
 }
 
 ////////// extern functions ///////////////////////////////////////////////////

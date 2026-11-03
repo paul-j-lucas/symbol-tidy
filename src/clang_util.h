@@ -116,6 +116,17 @@ NODISCARD
 CXCursor tidy_Cursor_getElementIfArray( CXCursor cursor );
 
 /**
+ * Gets the first expression child cursor of \a cursor, if any.
+ *
+ * @param cursor The cursor to get the first expression child cursor of, if
+ * any.
+ * @return Returns the first child expression cursor of \a cursor, or the null
+ * cursor if none.
+ */
+NODISCARD
+CXCursor tidy_Cursor_getFirstExprChild( CXCursor cursor );
+
+/**
  * Given a cursor at a local name of an enumeration, class, class data member,
  * class member function, structure, union, or namespace, gets its fully scoped
  * "display" name that includes template parameters (if any).

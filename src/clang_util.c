@@ -156,7 +156,6 @@ static enum CXChildVisitResult getConstructorInfo_visitor( CXCursor cursor,
       else if ( !clang_CXXConstructor_isCopyConstructor( cursor ) &&
                 !clang_CXXConstructor_isMoveConstructor( cursor ) ) {
         ctor_info->has_other_ctors = true;
-        return CXChildVisit_Break;
       }
       break;
 
@@ -171,7 +170,6 @@ static enum CXChildVisitResult getConstructorInfo_visitor( CXCursor cursor,
            !clang_CXXConstructor_isCopyConstructor( ref_csr ) &&
            !clang_CXXConstructor_isMoveConstructor( ref_csr ) ) {
         ctor_info->has_other_ctors = true;
-        return CXChildVisit_Break;
       }
       break;
 
@@ -285,6 +283,33 @@ static enum CXChildVisitResult getDestructor_visitor( CXCursor cursor,
     return CXChildVisit_Break;
   }
 
+  return CXChildVisit_Continue;
+}
+
+/**
+ * A helper function for tidy_Cursor_getFirstExprChild() that visits only the
+ * first expression child cursor, if any, of a cursor.
+ *
+ * @param cursor The cursor being visited.
+ * @param parent The parent of \a cursor.
+ * @param data A pointer to receive the first expression child cursor.
+ * @return Returns `CXChildVisit_Break` if \a cursor is an expression or
+ * `CXChildVisit_Continue` otherwise.
+ *
+ * @sa getFirstChild_visitor()
+ */
+static enum CXChildVisitResult getFirstExprChild_visitor( CXCursor cursor,
+                                                          CXCursor parent,
+                                                          CXClientData data ) {
+  (void)parent;
+
+  enum CXCursorKind const kind = clang_getCursorKind( cursor );
+  if ( clang_isExpression( kind ) ) {
+    assert( data != NULL );
+    CXCursor *const expr_csr = data;
+    *expr_csr = cursor;
+    return CXChildVisit_Break;
+  }
   return CXChildVisit_Continue;
 }
 
@@ -445,6 +470,12 @@ CXCursor tidy_Cursor_getElementIfArray( CXCursor cursor ) {
   }
 
   return cursor;
+}
+
+CXCursor tidy_Cursor_getFirstExprChild( CXCursor cursor ) {
+  CXCursor expr_child_csr = clang_getNullCursor();
+  clang_visitChildren( cursor, &getFirstExprChild_visitor, &expr_child_csr );
+  return expr_child_csr;
 }
 
 char* tidy_Cursor_getScopedDisplayName( CXCursor cursor ) {
