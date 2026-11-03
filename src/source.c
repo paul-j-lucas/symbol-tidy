@@ -193,10 +193,11 @@ static void source_check_diagnostics( tidy_source const *source ) {
 static void source_cpp_visit( tidy_source const *source, CXFile file ) {
   assert( source != NULL );
 
-  CXSourceLocation const start_loc =
-    clang_getLocation( source->tu, file, 1, 1 );
   size_t file_size;
   (void)clang_getFileContents( source->tu, file, &file_size );
+
+  CXSourceLocation const start_loc =
+    clang_getLocation( source->tu, file, 1, 1 );
   CXSourceLocation const end_loc =
     clang_getLocationForOffset( source->tu, file, (unsigned)file_size );
   CXSourceRange const file_range = clang_getRange( start_loc, end_loc );
