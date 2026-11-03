@@ -1,3 +1,9 @@
+2026-11-03  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * clang_util.c, clang_util.h, symbol.c: Now handling default constructors
+     better.
+   * symbol.c: Added CXCursor_FieldDecl.
+
 2026-11-02  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
    * source.c, symbol.c, symbol.h: Finally visiting all preprocessor
