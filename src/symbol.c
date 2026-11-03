@@ -97,82 +97,33 @@ struct symbols_visit_data {
 
 ////////// local functions ////////////////////////////////////////////////////
 
-static void cxx_dtor_add_ref( CXCursor, symbols_visit_data const* );
-static void symbol_add_ref( tidy_symbol*, tidy_symbol* );
-NODISCARD
-static int  symbol_cmp( tidy_symbol const*, tidy_symbol const* );
-static void symbol_cleanup( tidy_symbol* );
+static void         cxx_dtor_add_ref( CXCursor, symbols_visit_data const* );
+static tidy_symbol* symbol_add( CXCursor, tidy_source const* );
+static void         symbol_add_ref( tidy_symbol*, tidy_symbol* );
 
 NODISCARD
-static bool symbol_is_excluded( CXCursor, tidy_source const* );
+static int          symbol_cmp( tidy_symbol const*, tidy_symbol const* );
 
-static void visit_Constructor( CXCursor, symbols_visit_data* );
-static void visit_CXXDeleteExpr( CXCursor, symbols_visit_data* );
-static void visit_CXXForRangeStmt( CXCursor, symbols_visit_data* );
-static void visit_CXXMethod( CXCursor, symbols_visit_data* );
-static void visit_FieldDecl( CXCursor, symbols_visit_data* );
-static void visit_MacroDefinition( CXCursor, symbols_visit_data* );
-static void visit_most_Ref( CXCursor, symbols_visit_data* );
-static void visit_OverloadedDeclRef( CXCursor, symbols_visit_data* );
-static void visit_VarDecl( CXCursor, symbols_visit_data* );
+static void         symbol_cleanup( tidy_symbol* );
+
+NODISCARD
+static bool         symbol_is_excluded( CXCursor, tidy_source const* );
+
+static void         visit_Constructor( CXCursor, symbols_visit_data* );
+static void         visit_CXXDeleteExpr( CXCursor, symbols_visit_data* );
+static void         visit_CXXForRangeStmt( CXCursor, symbols_visit_data* );
+static void         visit_CXXMethod( CXCursor, symbols_visit_data* );
+static void         visit_FieldDecl( CXCursor, symbols_visit_data* );
+static void         visit_MacroDefinition( CXCursor, symbols_visit_data* );
+static void         visit_most_Ref( CXCursor, symbols_visit_data* );
+static void         visit_OverloadedDeclRef( CXCursor, symbols_visit_data* );
+static void         visit_VarDecl( CXCursor, symbols_visit_data* );
 
 ////////// local variables ////////////////////////////////////////////////////
 
 static hash_table_t symbol_set;         ///< Set of symbols.
 
 ////////// local functions ////////////////////////////////////////////////////
-
-/**
- * Adds a symbol to symbol_set.
- *
- * @param sym_csr The cursor for the symbol to add.
- * @param source The tidy_source to use.
- * @return Returns the new tidy_symbol or NULL if it could not be added.
- */
-static tidy_symbol* add_symbol( CXCursor sym_csr, tidy_source const *source ) {
-  if ( symbol_is_excluded( sym_csr, source ) )
-    return NULL;
-  char *key = tidy_getCursorUSR( sym_csr );
-  if ( unlikely( key == NULL ) )
-    return NULL;
-
-  tidy_symbol new_sym = {
-    .key = key,
-    .name = tidy_Cursor_getScopedSpelling( sym_csr )
-  };
-  key = NULL;                           // new_sym owns this now
-  ht_insert_rv_t const hti =
-    ht_table_insert( &symbol_set, &new_sym, sizeof new_sym );
-  tidy_symbol *const sym = HT_DINT( hti.entry );
-  if ( !hti.inserted ) {
-    symbol_cleanup( &new_sym );
-    goto done;
-  }
-
-  if ( source->lang == CXLanguage_CPlusPlus )
-    sym->display_name = tidy_Cursor_getScopedDisplayName( sym_csr );
-
-  //
-  // If the symbol's name is "main", we have to mark it as a root since nothing
-  // calls main().  But first ensure that it's the program's main() function:
-  // in C, anything named "main" must be main(); however, in C++, other things,
-  // e.g., member functions, can also be named "main".
-  //
-  if ( strcmp( sym->name, "main" ) == 0 &&
-       tidy_Cursor_isExternalGlobalFunction( sym_csr ) ) {
-    sym->is_root = true;
-  }
-
-  ht_table_init(
-    &sym->ref_sym_set, HT_DPTR, 2.0, 128,
-    POINTER_CAST( ht_cmp_fn_t, &symbol_cmp ),
-    POINTER_CAST( ht_hash_fn_t, &fnv1a_s )
-  );
-
-done:
-  free( key );
-  return sym;
-}
 
 /**
  * A helper function for visit_VarDecl() that adds a reference to each base
@@ -251,7 +202,7 @@ enum CXChildVisitResult cxx_def_ctor_add_ref_visitor( CXCursor cursor,
   if ( tidy_Cursor_isInvalid( def_ctor ) )
     goto skip;
 
-  tidy_symbol *const def_ctor_sym = add_symbol( def_ctor, svd->source );
+  tidy_symbol *const def_ctor_sym = symbol_add( def_ctor, svd->source );
   if ( def_ctor_sym == NULL )
     goto skip;
 
@@ -320,7 +271,7 @@ static void cxx_dtor_add_ref( CXCursor cls_csr,
   if ( tidy_Cursor_isInvalid( dtor_csr ) )
     return;
 
-  tidy_symbol *const dtor_sym = add_symbol( dtor_csr, svd->source );
+  tidy_symbol *const dtor_sym = symbol_add( dtor_csr, svd->source );
   if ( dtor_sym != NULL )
     symbol_add_ref( svd->curr_sym, dtor_sym );
 }
@@ -500,7 +451,7 @@ static void cxx_member_add_def_ctor_ref( CXCursor member_csr,
     return;
 
   tidy_symbol *const def_ctor_sym =
-    add_symbol( ctor_info.default_ctor_csr, svd->source );
+    symbol_add( ctor_info.default_ctor_csr, svd->source );
   if ( def_ctor_sym != NULL )
     symbol_add_ref( member_sym, def_ctor_sym );
 }
@@ -723,6 +674,58 @@ static void print_statistics( void ) {
       "        rss-size = %u\n", max_sym->ref_sym_set.size
     );
   }
+}
+
+/**
+ * Adds a symbol to symbol_set.
+ *
+ * @param sym_csr The cursor for the symbol to add.
+ * @param source The tidy_source to use.
+ * @return Returns the new tidy_symbol or NULL if it could not be added.
+ */
+static tidy_symbol* symbol_add( CXCursor sym_csr, tidy_source const *source ) {
+  if ( symbol_is_excluded( sym_csr, source ) )
+    return NULL;
+  char *key = tidy_getCursorUSR( sym_csr );
+  if ( unlikely( key == NULL ) )
+    return NULL;
+
+  tidy_symbol new_sym = {
+    .key = key,
+    .name = tidy_Cursor_getScopedSpelling( sym_csr )
+  };
+  key = NULL;                           // new_sym owns this now
+  ht_insert_rv_t const hti =
+    ht_table_insert( &symbol_set, &new_sym, sizeof new_sym );
+  tidy_symbol *const sym = HT_DINT( hti.entry );
+  if ( !hti.inserted ) {
+    symbol_cleanup( &new_sym );
+    goto done;
+  }
+
+  if ( source->lang == CXLanguage_CPlusPlus )
+    sym->display_name = tidy_Cursor_getScopedDisplayName( sym_csr );
+
+  //
+  // If the symbol's name is "main", we have to mark it as a root since nothing
+  // calls main().  But first ensure that it's the program's main() function:
+  // in C, anything named "main" must be main(); however, in C++, other things,
+  // e.g., member functions, can also be named "main".
+  //
+  if ( strcmp( sym->name, "main" ) == 0 &&
+       tidy_Cursor_isExternalGlobalFunction( sym_csr ) ) {
+    sym->is_root = true;
+  }
+
+  ht_table_init(
+    &sym->ref_sym_set, HT_DPTR, 2.0, 128,
+    POINTER_CAST( ht_cmp_fn_t, &symbol_cmp ),
+    POINTER_CAST( ht_hash_fn_t, &fnv1a_s )
+  );
+
+done:
+  free( key );
+  return sym;
 }
 
 /**
@@ -1123,7 +1126,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
   } // switch
 
   if ( is_definition ) {
-    tidy_symbol *const sym = add_symbol( cursor, svd->source );
+    tidy_symbol *const sym = symbol_add( cursor, svd->source );
     if ( likely( sym != NULL ) ) {
       if ( tidy_Cursor_isEnclosingScope( cursor ) )
         sym->is_scope = true;
@@ -1317,11 +1320,11 @@ static void visit_CXXForRangeStmt( CXCursor range_stmt_csr,
   }
 
   if ( !clang_Cursor_isNull( svd->cxx_for_range.begin_csr ) ) {
-    tidy_symbol *sym = add_symbol( svd->cxx_for_range.begin_csr, svd->source );
+    tidy_symbol *sym = symbol_add( svd->cxx_for_range.begin_csr, svd->source );
     if ( sym != NULL )
       symbol_add_ref( svd->curr_sym, sym );
     assert( !clang_Cursor_isNull( svd->cxx_for_range.end_csr ) );
-    sym = add_symbol( svd->cxx_for_range.end_csr, svd->source );
+    sym = symbol_add( svd->cxx_for_range.end_csr, svd->source );
     if ( sym != NULL )
       symbol_add_ref( svd->curr_sym, sym );
   }
@@ -1363,7 +1366,7 @@ static void visit_CXXMethod( CXCursor method_csr, symbols_visit_data *svd ) {
   );
 
   for ( unsigned i = 0; i < overridden_csrs_count; ++i ) {
-    tidy_symbol *const base_sym = add_symbol( overridden_csrs[i], svd->source );
+    tidy_symbol *const base_sym = symbol_add( overridden_csrs[i], svd->source );
     if ( base_sym != NULL )
       symbol_add_ref( base_sym, svd->curr_sym );
   } // for
@@ -1443,7 +1446,7 @@ static void visit_FieldDecl( CXCursor field_csr, symbols_visit_data *svd ) {
     CXCursor const sym_csr = tidy_Token_getScopedNameCursor(
       tu, tokens, token_count, &i, cls_csr, svd->source->lang
     );
-    tidy_symbol *const sym = add_symbol( sym_csr, svd->source );
+    tidy_symbol *const sym = symbol_add( sym_csr, svd->source );
     if ( sym != NULL )
       symbol_add_ref( svd->curr_sym, sym );
   } // for
@@ -1503,7 +1506,7 @@ static void visit_MacroDefinition( CXCursor macro_csr,
       svd->source->tu, tokens, token_count, &i, &param_set, svd->source->lang
     );
     if ( !tidy_Cursor_isInvalid( sym_csr ) ) {
-      tidy_symbol *const sym = add_symbol( sym_csr, svd->source );
+      tidy_symbol *const sym = symbol_add( sym_csr, svd->source );
       if ( sym != NULL )
         symbol_add_ref( svd->curr_sym, sym );
     }
@@ -1526,7 +1529,7 @@ static void visit_most_Ref( CXCursor cursor, symbols_visit_data *svd ) {
   if ( unlikely( tidy_Cursor_isInvalid( ref_csr ) ) )
     return;
 
-  tidy_symbol *const ref_sym = add_symbol( ref_csr, svd->source );
+  tidy_symbol *const ref_sym = symbol_add( ref_csr, svd->source );
   if ( ref_sym != NULL ) {
     symbol_add_ref( svd->curr_sym, ref_sym );
     if ( svd->source->lang == CXLanguage_CPlusPlus )
@@ -1544,7 +1547,7 @@ static void visit_most_Ref( CXCursor cursor, symbols_visit_data *svd ) {
     // semantic parent is an EnumDecl), mark the enumeration as a whole as
     // used.
     //
-    tidy_symbol *const enum_decl_sym = add_symbol( sem_parent, svd->source );
+    tidy_symbol *const enum_decl_sym = symbol_add( sem_parent, svd->source );
     if ( enum_decl_sym != NULL )
       symbol_add_ref( svd->curr_sym, enum_decl_sym );
   }
@@ -1570,7 +1573,7 @@ static void visit_OverloadedDeclRef( CXCursor overloaded_csr,
     if ( tidy_Cursor_isInvalid( dec_csr ) )
       continue;                         // LCOV_EXCL_LINE
     dec_csr = clang_getCanonicalCursor( dec_csr );
-    tidy_symbol *const dec_sym = add_symbol( dec_csr, svd->source );
+    tidy_symbol *const dec_sym = symbol_add( dec_csr, svd->source );
     if ( dec_sym != NULL )
       symbol_add_ref( svd->curr_sym, dec_sym );
   } // for
@@ -1647,7 +1650,7 @@ static void visit_preprocessor_directives( tidy_source const *source ) {
       if ( strcmp( token_cs, "defined" ) != 0 &&
            strcmp( token_cs, "__has_include" ) != 0 ) {
         CXCursor const sym_csr = tidy_getCursorByName( token_cs, tu_csr );
-        tidy_symbol *const sym = add_symbol( sym_csr, source );
+        tidy_symbol *const sym = symbol_add( sym_csr, source );
         if ( sym != NULL )
           sym->is_root = true;
       }
