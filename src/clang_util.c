@@ -53,6 +53,7 @@
 
 typedef struct callsBaseConstructor_data  callsBaseConstructor_data;
 typedef struct getCursorByName_data       getCursorByName_data;
+typedef struct isFieldInitialized_data    isFieldInitialized_data;
 typedef CXString                        (*getCursorName_fn)( CXCursor );
 
 ////////// structs ////////////////////////////////////////////////////////////
@@ -73,6 +74,15 @@ struct getCursorByName_data {
   CXCursor    found_csr;                ///< The name's cursor, if found.
   CXCursor    skip_csr;                 ///< Skip this cursor.
   bool        cxx_recurse_into_scope;   ///< C++: recurse into scope?
+};
+
+/**
+ * Additional data passed by isFieldInitialized_visitor() and
+ * isFieldMemInitialized_visitor().
+ */
+struct isFieldInitialized_data {
+  CXCursor  field_csr;                  ///< The field to look for.
+  bool      is_initialized;             ///< Is it initialized?
 };
 
 ////////// local functions ////////////////////////////////////////////////////
@@ -369,6 +379,66 @@ static char* getScopedName_thunk( CXCursor cursor, getCursorName_fn name_fn ) {
   return strbuf_take( &sbuf );
 }
 
+/**
+ * A helper function for isFieldInitialized_visitor() that looks to see whether
+ * a field is mem-initialized by a constructor.
+ *
+ * @param cursor The cursor being visited.
+ * @param parent Not used.
+ * @param data The isFieldInitialized_data to use.
+ * @return Returns either `CXChildVisit_Break` or `CXChildVisit_Continue`.
+ */
+static
+enum CXChildVisitResult isFieldMemInitialized_visitor( CXCursor cursor,
+                                                       CXCursor parent,
+                                                       CXClientData data ) {
+  (void)parent;
+
+  enum CXCursorKind const kind = clang_getCursorKind( cursor );
+  if ( kind != CXCursor_MemberRef )
+    goto skip;
+
+  assert( data != NULL );
+  isFieldInitialized_data *const ifid = data;
+
+  CXCursor const ref_csr = clang_getCursorReferenced( cursor );
+  if ( clang_equalCursors( ref_csr, ifid->field_csr ) ) {
+    ifid->is_initialized = true;
+    return CXChildVisit_Break;
+  }
+
+skip:
+  return CXChildVisit_Recurse;
+}
+
+/**
+ * A helper function for tidy_Cursor_isFieldInitialzed() that looks for a
+ * construcor that mem-initializes a given field.
+ *
+ * @param cursor The cursor being visited.
+ * @param parent Not used.
+ * @param data The isFieldInitialized_data to use.
+ * @return Returns either `CXChildVisit_Break` or `CXChildVisit_Continue`.
+ */
+static enum CXChildVisitResult isFieldInitialized_visitor( CXCursor cursor,
+                                                           CXCursor parent,
+                                                           CXClientData data ) {
+  (void)parent;
+
+  enum CXCursorKind const kind = clang_getCursorKind( cursor );
+  if ( kind != CXCursor_Constructor )
+    goto skip;
+
+  assert( data != NULL );
+  isFieldInitialized_data *const ifid = data;
+  clang_visitChildren( cursor, &isFieldMemInitialized_visitor, ifid );
+  if ( ifid->is_initialized )
+    return CXChildVisit_Break;
+
+skip:
+  return CXChildVisit_Continue;
+}
+
 ////////// extern functions ///////////////////////////////////////////////////
 
 bool tidy_Cursor_callsBaseConstructor( CXCursor ctor_csr,
@@ -544,6 +614,17 @@ bool tidy_Cursor_isExternalLinkage( CXCursor cursor ) {
     default:
       return false;
   } // switch
+}
+
+bool tidy_Cursor_isFieldInitialized( CXCursor field_csr ) {
+  CXCursor const init_csr = tidy_Cursor_getFirstExprChild( field_csr );
+  if ( !tidy_Cursor_isInvalid( init_csr ) )
+    return true;
+
+  isFieldInitialized_data ifid = { .field_csr = field_csr };
+  CXCursor const cls_csr = clang_getCursorSemanticParent( field_csr );
+  clang_visitChildren( cls_csr, &isFieldInitialized_visitor, &ifid );
+  return ifid.is_initialized;
 }
 
 bool tidy_Cursor_isReservedName( CXCursor cursor, enum CXLanguageKind lang ) {
@@ -768,15 +849,23 @@ char* tidy_getCursorUSR( CXCursor cursor ) {
 bool tidy_isCursorDefinition( CXCursor cursor ) {
   if ( clang_isCursorDefinition( cursor ) )
     return true;
-  enum CXLanguageKind const lang = clang_getCursorLanguage( cursor );
-  if ( lang == CXLanguage_CPlusPlus )
-    return false;
+
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
   if ( kind != CXCursor_VarDecl )
     return false;
+
   enum CX_StorageClass const storage = clang_Cursor_getStorageClass( cursor );
-  if ( storage == CX_SC_Extern )
-    return false;
+  if ( storage == CX_SC_Extern ) {
+    CXCursor const init_csr = tidy_Cursor_getFirstExprChild( cursor );
+    return !clang_Cursor_isNull( init_csr );
+  }
+
+  CXCursor const parent = clang_getCursorSemanticParent( cursor );
+  if ( tidy_Cursor_isClassDecl( parent ) ) {
+    CXCursor const init_csr = tidy_Cursor_getFirstExprChild( cursor );
+    return !clang_Cursor_isNull( init_csr );
+  }
+
   return true;
 }
 

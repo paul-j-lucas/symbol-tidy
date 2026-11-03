@@ -207,6 +207,16 @@ NODISCARD
 bool tidy_Cursor_isExternalLinkage( CXCursor cursor );
 
 /**
+ * Gets whether \a field_csr is initialized, either via an expression or a
+ * constructor's mem-initializer list.
+ *
+ * @param field_csr The cursor of the field to check.
+ * @return Returns `true` only if \a field_csr is explicitly initialized.
+ */
+NODISCARD
+bool tidy_Cursor_isFieldInitialized( CXCursor field_csr );
+
+/**
  * Gets whether \a cursor is either null or invalid.
  *
  * @param cursor The cursor to check.
