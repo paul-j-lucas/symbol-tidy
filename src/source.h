@@ -77,15 +77,6 @@ NODISCARD
 bool is_source_path( char const *path );
 
 /**
- * Adds \a path to the set of source files being tidied.
- *
- * @param path The path to add.
- * @return Returns `true` only if \a path was added; `false` only if it was
- * already in the set.
- */
-bool source_add( char const *path );
-
-/**
  * Cleans-up all memory associated with \a source but does _not_ free \a source
  * itself.
  *
@@ -99,6 +90,15 @@ void source_cleanup( tidy_source *source );
  * @param source The source to parse.
  */
 void source_parse( tidy_source *source );
+
+/**
+ * Adds \a path to the set of source files being tidied.
+ *
+ * @param path The path to add.
+ * @return Returns `true` only if \a path was added; `false` only if it was
+ * already in the set.
+ */
+bool source_path_add( char const *path );
 
 /**
  * Initializes sources.

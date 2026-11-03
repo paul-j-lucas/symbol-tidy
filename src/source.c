@@ -91,7 +91,7 @@ static void include_visitor( CXFile included_file,
   if ( config_path_is_ignored( path_cs ) )
     goto skip;
 
-  source_add( path_cs );
+  source_path_add( path_cs );
 
 skip:
   clang_disposeString( path_cxs );
@@ -243,16 +243,6 @@ bool is_source_path( char const *path ) {
   return found_ht != NULL;
 }
 
-bool source_add( char const *path ) {
-  assert( path != NULL );
-  if ( config_path_is_ignored( path ) )
-    return false;
-  ht_insert_rv_t const hti = ht_table_insert(
-    &source_file_set, CONST_CAST( char*, path ), strlen( path ) + 1/*'\0'*/
-  );
-  return hti.inserted;
-}
-
 void source_cleanup( tidy_source *source ) {
   if ( source != NULL ) {
     // source->argv_path points to an argv so it doesn't need freeing
@@ -265,6 +255,16 @@ void source_parse( tidy_source *source ) {
   assert( source != NULL );
   source_parse_impl( source );
   clang_getInclusions( source->tu, &include_visitor, /*data=*/NULL );
+}
+
+bool source_path_add( char const *path ) {
+  assert( path != NULL );
+  if ( config_path_is_ignored( path ) )
+    return false;
+  ht_insert_rv_t const hti = ht_table_insert(
+    &source_file_set, CONST_CAST( char*, path ), strlen( path ) + 1/*'\0'*/
+  );
+  return hti.inserted;
 }
 
 void sources_init( void ) {
