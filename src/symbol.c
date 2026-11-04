@@ -286,8 +286,8 @@ CXChildVisitResult cxx_field_add_dtor_ref_visitor( CXCursor cursor,
 /**
  * A helper function for visit_Constructor() that visits all base classes of \a
  * cursor looking for an explicit call to a base class's constructor: if none
- * is found, find the base class's default constructor and add a reference to
- * it.
+ * is found, look for the base class's default constructor and add a reference
+ * to it, if any.
  *
  * @param cursor The cursor to visit.
  * @param parent Not used.
@@ -1327,6 +1327,11 @@ static void visit_Constructor( CXCursor ctor_csr, symbols_visit_data *svd ) {
 /**
  * Visits a `CXCursor_CXXForRangeStmt` kind of cursor.
  *
+ * @remarks In a C++ for-range statement, if the object being iterated over is
+ * of a class type, we have to add references either to the class's `begin()`
+ * and `end()` member functions or `begin(T [const]&)` and `end(T [const]&)`
+ * global functions.
+ *
  * @param range_stmt_csr The range-for statement's cursor.
  * @param svd The symbols_visit_data to use.
  */
@@ -1357,11 +1362,15 @@ static void visit_CXXForRangeStmt( CXCursor range_stmt_csr,
     .is_const = is_range_const
   };
 
+  //
   // Try looking for T::{ begin | end }() [const] member functions first.
+  //
   clang_visitChildren( cls_csr, &cxx_find_begin_end_visitor, svd );
 
-  // If either is not found, try looking for { begin | end }([const] T&)
+  //
+  // If either is not found, try looking for { begin | end }(T [const]&)
   // non-member functions second.
+  //
   if ( clang_Cursor_isNull( svd->cxx_for_range.begin_csr ) ||
        clang_Cursor_isNull( svd->cxx_for_range.end_csr ) ) {
     svd->cxx_for_range.begin_csr = clang_getNullCursor();
@@ -1407,9 +1416,9 @@ static void visit_CXXDeleteExpr( CXCursor delete_csr,
  * @note In what follows, "function" includes destructor.
  *
  * @remarks When a C++ virtual member function is called, libclang generates an
- * AST containing only the base class's member function since it can't know
- * which overridden functions are actually called.  So as not to them as
- * unused, add references from the base one to all the overridden ones.
+ * AST containing only the base class's function since it can't know which
+ * overridden functions are actually called at run-time.  We therefore have to
+ * add references from the base class's function to all the overridden ones.
  *
  * @param method_csr The method's cursor to visit.
  * @param svd The symbols_visit_data to use.
