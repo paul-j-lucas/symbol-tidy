@@ -442,7 +442,7 @@ static enum CXChildVisitResult cxx_find_begin_end_visitor( CXCursor cursor,
 
       break;
 
-    case CXCursor_FunctionDecl:         // func( [const] T& )
+    case CXCursor_FunctionDecl:         // func( T [const]& )
       if ( num_args != 1 )
         goto skip;
       CXCursor const arg_csr = clang_Cursor_getArgument( cursor, 0 );
