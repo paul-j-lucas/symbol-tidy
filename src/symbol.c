@@ -97,32 +97,131 @@ struct symbols_visit_data {
 
 ////////// local functions ////////////////////////////////////////////////////
 
-static void         cxx_dtor_add_ref( CXCursor, symbols_visit_data const* );
-static void         symbol_add_ref( tidy_symbol*, tidy_symbol* );
+static void cxx_dtor_add_ref( CXCursor, symbols_visit_data const* );
+static void cxx_field_add_def_ctor_ref( CXCursor, symbols_visit_data* );
+static void symbol_add_ref( tidy_symbol*, tidy_symbol* );
 
 NODISCARD
-static int          symbol_cmp( tidy_symbol const*, tidy_symbol const* );
+static int  symbol_cmp( tidy_symbol const*, tidy_symbol const* );
 
-static void         symbol_cleanup( tidy_symbol* );
+static void symbol_cleanup( tidy_symbol* );
 
 NODISCARD
-static bool         symbol_is_excluded( CXCursor, tidy_source const* );
+static bool symbol_is_excluded( CXCursor, tidy_source const* );
 
-static void         visit_Constructor( CXCursor, symbols_visit_data* );
-static void         visit_CXXDeleteExpr( CXCursor, symbols_visit_data* );
-static void         visit_CXXForRangeStmt( CXCursor, symbols_visit_data* );
-static void         visit_CXXMethod( CXCursor, symbols_visit_data* );
-static void         visit_FieldDecl( CXCursor, symbols_visit_data* );
-static void         visit_MacroDefinition( CXCursor, symbols_visit_data* );
-static void         visit_most_Ref( CXCursor, symbols_visit_data* );
-static void         visit_OverloadedDeclRef( CXCursor, symbols_visit_data* );
-static void         visit_VarDecl( CXCursor, symbols_visit_data* );
+static void visit_Constructor( CXCursor, symbols_visit_data* );
+static void visit_CXXDeleteExpr( CXCursor, symbols_visit_data* );
+static void visit_CXXForRangeStmt( CXCursor, symbols_visit_data* );
+static void visit_CXXMethod( CXCursor, symbols_visit_data* );
+static void visit_FieldDecl( CXCursor, symbols_visit_data* );
+static void visit_MacroDefinition( CXCursor, symbols_visit_data* );
+static void visit_most_Ref( CXCursor, symbols_visit_data* );
+static void visit_OverloadedDeclRef( CXCursor, symbols_visit_data* );
+static void visit_VarDecl( CXCursor, symbols_visit_data* );
 
 ////////// local variables ////////////////////////////////////////////////////
 
 static hash_table_t symbol_set;         ///< Set of symbols.
 
 ////////// local functions ////////////////////////////////////////////////////
+
+/**
+ * TODO.
+ *
+ * @param cursor The cursor to visit.
+ * @param parent Not used.
+ * @param data The symbols_visit_data to use.
+ * @return Returns `CXChildVisit_Continue`.
+ */
+static enum
+CXChildVisitResult cxx_field_add_def_ctor_ref_visitor( CXCursor cursor,
+                                                       CXCursor parent,
+                                                       CXClientData data ) {
+  (void)parent;
+
+  enum CXCursorKind const kind = clang_getCursorKind( cursor );
+  if ( kind == CXCursor_FieldDecl ) {
+    symbols_visit_data *const svd = data;
+    cxx_field_add_def_ctor_ref( cursor, svd );
+  }
+  return CXChildVisit_Continue;
+}
+
+/**
+ * TODO.
+ *
+ * @param field_csr TODO.
+ * @param svd The symbols_visit_data to use.
+ */
+static void cxx_field_add_def_ctor_ref( CXCursor field_csr,
+                                        symbols_visit_data *svd ) {
+  assert( svd->source->lang == CXLanguage_CPlusPlus );
+
+  CXCursor const init_csr = tidy_Cursor_getFieldInitializer( field_csr );
+
+  if ( !clang_Cursor_isNull( init_csr ) ) {
+    enum CXCursorKind const kind = clang_getCursorKind( init_csr );
+    if ( kind == CXCursor_Constructor ) {
+      tidy_symbol *const ctor_sym = symbol_add( init_csr, svd->source );
+      if ( ctor_sym != NULL )
+        symbol_add_ref( svd->curr_sym, ctor_sym );
+    }
+    return;
+  }
+
+  CXCursor const cls_csr = tidy_Cursor_getTypeDecl( field_csr );
+  if ( !tidy_Cursor_isClassDecl( cls_csr ) )
+    return;
+
+  tidy_ConstructorInfo ctor_info;
+  bool has_ctor = tidy_Cursor_getConstructorInfo( cls_csr, &ctor_info );
+
+  if ( has_ctor && !clang_Cursor_isNull( ctor_info.default_ctor_csr ) ) {
+    tidy_symbol *const def_ctor_sym =
+      symbol_add( ctor_info.default_ctor_csr, svd->source );
+    if ( def_ctor_sym != NULL )
+      symbol_add_ref( svd->curr_sym, def_ctor_sym );
+  }
+  else {
+    // Recurse for aggregate sub-objects without explicit constructors
+    clang_visitChildren( cls_csr, &cxx_field_add_def_ctor_ref_visitor, svd );
+  }
+}
+
+static void cxx_field_add_dtor_ref( CXCursor field_csr,
+                                        symbols_visit_data *svd ) {
+  assert( svd->source->lang == CXLanguage_CPlusPlus );
+
+  CXCursor const cls_csr = tidy_Cursor_getTypeDecl( field_csr );
+  if ( tidy_Cursor_isClassDecl( cls_csr ) )
+    cxx_dtor_add_ref( cls_csr, svd );
+}
+
+/**
+ * TODO.
+ */
+static enum
+CXChildVisitResult cxx_field_add_dtor_ref_visitor( CXCursor cursor,
+                                                   CXCursor parent,
+                                                   CXClientData data ) {
+  (void)parent;
+
+  enum CXCursorKind const kind = clang_getCursorKind( cursor );
+  if ( kind == CXCursor_FieldDecl ) {
+    symbols_visit_data *const svd = data;
+    cxx_field_add_dtor_ref( cursor, svd );
+  }
+  return CXChildVisit_Continue;
+}
+
+static bool cxx_var_has_init_args( CXCursor var_decl_csr ) {
+  CXCursor const expr_csr = tidy_Cursor_getFirstExprChild( var_decl_csr );
+  if ( tidy_Cursor_isInvalid( expr_csr ) )
+    return false;
+
+  int const num_args = clang_Cursor_getNumArguments( expr_csr );
+  return num_args != 0;
+}
 
 /**
  * A helper function for visit_VarDecl() that adds a reference to each base
@@ -176,8 +275,16 @@ enum CXChildVisitResult cxx_def_ctor_add_ref_visitor( CXCursor cursor,
                                                       CXCursor parent,
                                                       CXClientData data ) {
   (void)parent;
+  assert( data != NULL );
+  symbols_visit_data *const svd = data;
 
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
+
+  if ( kind == CXCursor_FieldDecl ) {
+    cxx_field_add_def_ctor_ref( cursor, svd );
+    return CXChildVisit_Continue;
+  }
+
   if ( kind != CXCursor_CXXBaseSpecifier )
     goto skip;
 
@@ -188,8 +295,6 @@ enum CXChildVisitResult cxx_def_ctor_add_ref_visitor( CXCursor cursor,
   }
   base_cls_csr = clang_getCanonicalCursor( base_cls_csr );
 
-  assert( data != NULL );
-  symbols_visit_data *const svd = data;
   if ( tidy_Cursor_callsBaseConstructor( svd->cxx_constructor.ctor_csr,
                                          base_cls_csr ) ) {
     goto skip;
@@ -212,15 +317,15 @@ skip:
   //
   // We can't return CXChildVisit_Break even if we find either an explicit base
   // class constructor call or an implicit base class default constructor call
-  // since there may be multiple base classes.  Hance, we always have to return
+  // since there may be multiple base classes.  Hence, we always have to return
   // CXChildVisit_Continue.
   //
   return CXChildVisit_Continue;
 }
 
 /**
- * Checks whether \a decl_csr invokes a default constructor and destructor: if
- * so, adds references to them.
+ * Checks whether \a decl_csr is of a type that has a constructor and
+ * destructor: if so, adds references to them.
  *
  * @param decl_csr A field or variable declaration cursor.
  * @param svd The symbols_visit_data to use.
@@ -229,29 +334,46 @@ static void cxx_def_ctor_dtor( CXCursor decl_csr, symbols_visit_data *svd ) {
   assert( svd != NULL );
   assert( svd->source->lang == CXLanguage_CPlusPlus );
 
-  CXCursor const  obj_csr = tidy_Cursor_getElementIfArray( decl_csr );
-  CXType          type = clang_getCursorType( obj_csr );
-                  type = clang_getCanonicalType( type );
-                  type = clang_getNonReferenceType( type );
-
-  CXCursor const cls_csr = clang_getTypeDeclaration( type );
+  CXCursor const cls_csr = tidy_Cursor_getTypeDecl( decl_csr );
   if ( !tidy_Cursor_isClassDecl( cls_csr ) )
     return;
 
-  tidy_ConstructorInfo ctor_info;
-  if ( tidy_Cursor_getConstructorInfo( cls_csr, &ctor_info ) &&
-       !clang_Cursor_isNull( ctor_info.default_ctor_csr ) ) {
-    CXCursor const expr_csr = tidy_Cursor_getFirstExprChild( decl_csr );
-    if ( !clang_Cursor_isNull( expr_csr ) ) {
-      tidy_symbol *const def_ctor_sym =
-        symbol_add( ctor_info.default_ctor_csr, svd->source );
-      if ( def_ctor_sym != NULL )
-        symbol_add_ref( svd->curr_sym, def_ctor_sym );
+  unsigned const prev_ref_count =
+    svd->curr_sym != NULL ? svd->curr_sym->ref_sym_set.size : 0;
+
+  enum CXCursorKind const kind = clang_getCursorKind( decl_csr );
+  if ( kind == CXCursor_VarDecl ) {
+    if ( !cxx_var_has_init_args( decl_csr ) ) {
+      tidy_ConstructorInfo ctor_info;
+      if ( tidy_Cursor_getConstructorInfo( cls_csr, &ctor_info ) &&
+           !clang_Cursor_isNull( ctor_info.default_ctor_csr ) ) {
+        tidy_symbol *const def_ctor_sym =
+          symbol_add( ctor_info.default_ctor_csr, svd->source );
+        if ( def_ctor_sym != NULL )
+          symbol_add_ref( svd->curr_sym, def_ctor_sym );
+      }
+      else {
+        clang_visitChildren( cls_csr, &cxx_field_add_def_ctor_ref_visitor, svd );
+      }
     }
   }
 
   cxx_dtor_add_ref( cls_csr, svd );
   clang_visitChildren( cls_csr, &cxx_base_dtor_add_ref_visitor, svd );
+  clang_visitChildren( cls_csr, &cxx_field_add_dtor_ref_visitor, svd );
+
+  if ( kind == CXCursor_VarDecl && svd->curr_sym != NULL ) {
+    bool const has_init_args = cxx_var_has_init_args( decl_csr );
+    bool const added_ref = svd->curr_sym->ref_sym_set.size > prev_ref_count;
+    if ( has_init_args || added_ref ) {
+      //
+      // Variables of types that have constructors must be marked as roots even
+      // if such variables are apparently unused since their constructors might
+      // have side effects (e.g., locking a mutex).
+      //
+      svd->curr_sym->is_root = true;
+    }
+  }
 }
 
 /**
@@ -1391,7 +1513,7 @@ static void visit_FieldDecl( CXCursor field_csr, symbols_visit_data *svd ) {
   if ( unlikely( token_count == 0 ) )
     return;                             // LCOV_EXCL_LINE
 
-  CXCursor const    cls_csr = clang_getCursorSemanticParent( field_csr );
+  CXCursor          cls_csr = clang_getCursorSemanticParent( field_csr );
   CXString const    field_name_cxs = clang_getCursorSpelling( field_csr );
   char const *const field_name_cs  = clang_getCString( field_name_cxs );
 
@@ -1411,8 +1533,10 @@ static void visit_FieldDecl( CXCursor field_csr, symbols_visit_data *svd ) {
 
   clang_disposeTokens( tu, tokens, token_count );
 
-  if ( svd->source->lang == CXLanguage_CPlusPlus )
+  if ( svd->source->lang == CXLanguage_CPlusPlus ) {
+    cxx_field_add_def_ctor_ref( field_csr, svd );
     cxx_def_ctor_dtor( field_csr, svd );
+  }
 }
 
 /**
