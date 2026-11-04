@@ -569,6 +569,48 @@ static void cxx_member_add_def_ctor_ref( CXCursor member_csr,
 }
 
 /**
+ * Recursively checks the template arguments of a variable's type and adds
+ * references to the default constructors of any class arguments.
+ *
+ * @param type The type to check for template arguments.
+ * @param svd The symbols_visit_data to use.
+ */
+static void cxx_var_template_args_add_def_ctor_ref( CXType type,
+                                                    symbols_visit_data *svd ) {
+  int num_args = clang_Type_getNumTemplateArguments( type );
+  if ( num_args <= 0 ) {
+    type = clang_getCanonicalType( type );
+    num_args = clang_Type_getNumTemplateArguments( type );
+    if ( num_args <= 0 )
+      return;
+  }
+
+  for ( unsigned i = 0; i < STATIC_CAST( unsigned, num_args ); ++i ) {
+    CXType const arg_type = clang_Type_getTemplateArgumentAsType( type, i );
+    if ( arg_type.kind == CXType_Invalid )
+      continue;
+
+    CXType const    canon_arg_type = clang_getCanonicalType( arg_type );
+    CXCursor const  arg_cls_csr = clang_getTypeDeclaration( canon_arg_type );
+
+    if ( tidy_Cursor_isClassDecl( arg_cls_csr ) ) {
+      tidy_ConstructorInfo ctor_info;
+      if ( tidy_Cursor_getConstructorInfo( arg_cls_csr, &ctor_info ) &&
+           !clang_Cursor_isNull( ctor_info.def_ctor_csr ) &&
+           !ctor_info.has_other_ctors ) {
+        cursor_add_ref( ctor_info.def_ctor_csr, svd );
+      }
+    }
+
+    //
+    // Visit nested template arguments (e.g., std::vector<std::vector<T>>)
+    // recursively.
+    //
+    cxx_var_template_args_add_def_ctor_ref( arg_type, svd );
+  } // for
+}
+
+/**
  * For a macro, gets the cursor for the identifier given by \a token within \a
  * scope_csr, but only if \a token actually is an identifier, neither
  * `__VA_ARGS__` nor `__VA_OPT__`, nor one of the current macro's parameters.
@@ -1704,6 +1746,13 @@ static void visit_VarDecl( CXCursor var_decl_csr, symbols_visit_data *svd ) {
       clang_visitChildren( cls_csr, &cxx_field_add_def_ctor_ref_visitor, svd );
     }
   }
+
+  //
+  // If the variable's type is a template specialization (e.g., std::vector<S>),
+  // add default constructor references for any template type arguments.
+  //
+  CXType const var_type = clang_getCursorType( var_decl_csr );
+  cxx_var_template_args_add_def_ctor_ref( var_type, svd );
 
   //
   // Add references to the variable's class's destructor and its base class
