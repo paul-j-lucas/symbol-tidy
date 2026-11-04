@@ -1601,9 +1601,9 @@ static void visit_most_Ref( CXCursor cursor, symbols_visit_data *svd ) {
   enum CXCursorKind const sem_parent_kind = clang_getCursorKind( sem_parent );
   if ( sem_parent_kind == CXCursor_EnumDecl ) {
     //
-    // Special case: if any enumeration constant is referenced (which means its
-    // semantic parent is an EnumDecl), mark the enumeration as a whole as
-    // used.
+    // Special case: if any enumeration constant is referenced, add a reference
+    // to the enumeration declaration so if any enumeration constant is used,
+    // the declaration will be also.
     //
     cursor_add_ref( sem_parent, svd );
   }
