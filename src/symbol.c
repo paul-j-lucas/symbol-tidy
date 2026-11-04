@@ -144,6 +144,43 @@ static void cursor_add_ref( CXCursor to_csr, symbols_visit_data *svd ) {
 }
 
 /**
+ * A helper function for visit_VarDecl() that adds a reference to each base
+ * class's destructor.
+ *
+ * @param cursor The cursor to visit.
+ * @param parent Not used.
+ * @param data The symbols_visit_data to use.
+ * @return Returns either `CXChildVisit_Continue` or `CXChildVisit_Recurse`.
+ */
+static
+enum CXChildVisitResult cxx_base_add_dtor_ref_visitor( CXCursor cursor,
+                                                       CXCursor parent,
+                                                       CXClientData data ) {
+  (void)parent;
+
+  enum CXCursorKind const kind = clang_getCursorKind( cursor );
+  if ( kind != CXCursor_CXXBaseSpecifier )
+    goto skip;
+
+  CXCursor base_cls_csr = clang_getCursorReferenced( cursor );
+  if ( tidy_Cursor_isInvalid( base_cls_csr ) ) {
+    CXType const type = clang_getCursorType( cursor );
+    base_cls_csr = clang_getTypeDeclaration( type );
+  }
+  base_cls_csr = clang_getCanonicalCursor( base_cls_csr );
+  if ( tidy_Cursor_isInvalid( base_cls_csr ) )
+    goto skip;
+
+  assert( data != NULL );
+  symbols_visit_data *const svd = data;
+  cxx_dtor_add_ref( base_cls_csr, svd );
+  return CXChildVisit_Recurse;
+
+skip:
+  return CXChildVisit_Continue;
+}
+
+/**
  * A helper function for cxx_field_add_def_ctor_ref().
  *
  * @param cursor The cursor to visit.
@@ -206,20 +243,23 @@ static void cxx_field_add_def_ctor_ref( CXCursor field_csr,
 
   tidy_ConstructorInfo ctor_info;
   if ( tidy_Cursor_getConstructorInfo( cls_csr, &ctor_info ) &&
-       !clang_Cursor_isNull( ctor_info.default_ctor_csr ) ) {
+       !clang_Cursor_isNull( ctor_info.def_ctor_csr ) ) {
     //
     // The field is initialized implicitly via a default constructor.
     //
-    cursor_add_ref( ctor_info.default_ctor_csr, svd );
+    cursor_add_ref( ctor_info.def_ctor_csr, svd );
   }
   else {
-    // Recurse for aggregate sub-objects without explicit constructors
+    //
+    // The field is not initialized via a default constructor, but the class's
+    // fields might be.
+    //
     clang_visitChildren( cls_csr, &cxx_field_add_def_ctor_ref_visitor, svd );
   }
 }
 
 /**
- * A helper function for cxx_def_ctor_dtor().
+ * A helper function for cxx_dtors_add_refs().
  *
  * @param cursor The cursor to visit.
  * @param parent Not used.
@@ -240,43 +280,6 @@ CXChildVisitResult cxx_field_add_dtor_ref_visitor( CXCursor cursor,
       cxx_dtor_add_ref( cls_csr, svd );
     }
   }
-  return CXChildVisit_Continue;
-}
-
-/**
- * A helper function for visit_VarDecl() that adds a reference to each base
- * class's destructor.
- *
- * @param cursor The cursor to visit.
- * @param parent Not used.
- * @param data The symbols_visit_data to use.
- * @return Returns either `CXChildVisit_Continue` or `CXChildVisit_Recurse`.
- */
-static
-enum CXChildVisitResult cxx_base_dtor_add_ref_visitor( CXCursor cursor,
-                                                       CXCursor parent,
-                                                       CXClientData data ) {
-  (void)parent;
-
-  enum CXCursorKind const kind = clang_getCursorKind( cursor );
-  if ( kind != CXCursor_CXXBaseSpecifier )
-    goto skip;
-
-  CXCursor base_cls_csr = clang_getCursorReferenced( cursor );
-  if ( tidy_Cursor_isInvalid( base_cls_csr ) ) {
-    CXType const type = clang_getCursorType( cursor );
-    base_cls_csr = clang_getTypeDeclaration( type );
-  }
-  base_cls_csr = clang_getCanonicalCursor( base_cls_csr );
-  if ( tidy_Cursor_isInvalid( base_cls_csr ) )
-    goto skip;
-
-  assert( data != NULL );
-  symbols_visit_data *const svd = data;
-  cxx_dtor_add_ref( base_cls_csr, svd );
-  return CXChildVisit_Recurse;
-
-skip:
   return CXChildVisit_Continue;
 }
 
@@ -339,26 +342,6 @@ skip:
 }
 
 /**
- * Checks whether \a decl_csr is of a type that has a constructor and
- * destructor: if so, adds references to them.
- *
- * @param decl_csr A field or variable declaration cursor.
- * @param svd The symbols_visit_data to use.
- */
-static void cxx_def_ctor_dtor( CXCursor decl_csr, symbols_visit_data *svd ) {
-  assert( svd != NULL );
-  assert( svd->source->lang == CXLanguage_CPlusPlus );
-
-  CXCursor const cls_csr = tidy_Cursor_getUnderlyingTypeDecl( decl_csr );
-  if ( !tidy_Cursor_isClassDecl( cls_csr ) )
-    return;
-
-  cxx_dtor_add_ref( cls_csr, svd );
-  clang_visitChildren( cls_csr, &cxx_base_dtor_add_ref_visitor, svd );
-  clang_visitChildren( cls_csr, &cxx_field_add_dtor_ref_visitor, svd );
-}
-
-/**
  * Helper function for visit_CXXDeleteExpr() that adds a reference to the
  * destructor of the object's class.
  *
@@ -408,6 +391,26 @@ static void cxx_dtor_add_ref( CXCursor cls_csr, symbols_visit_data *svd ) {
   CXCursor const dtor_csr = tidy_Cursor_getDestructor( cls_csr );
   if ( !tidy_Cursor_isInvalid( dtor_csr ) )
     cursor_add_ref( dtor_csr, svd );
+}
+
+/**
+ * Adds references to the destructor of the class of \a decl_csr and all its
+ * base class and field destructors.
+ *
+ * @param decl_csr A field or variable declaration cursor.
+ * @param svd The symbols_visit_data to use.
+ */
+static void cxx_dtors_add_refs( CXCursor decl_csr, symbols_visit_data *svd ) {
+  assert( svd != NULL );
+  assert( svd->source->lang == CXLanguage_CPlusPlus );
+
+  CXCursor const cls_csr = tidy_Cursor_getUnderlyingTypeDecl( decl_csr );
+  if ( !tidy_Cursor_isClassDecl( cls_csr ) )
+    return;
+
+  cxx_dtor_add_ref( cls_csr, svd );
+  clang_visitChildren( cls_csr, &cxx_base_add_dtor_ref_visitor, svd );
+  clang_visitChildren( cls_csr, &cxx_field_add_dtor_ref_visitor, svd );
 }
 
 /**
@@ -556,11 +559,11 @@ static void cxx_member_add_def_ctor_ref( CXCursor member_csr,
     return;
   if ( ctor_info.has_other_ctors )
     return;
-  if ( clang_Cursor_isNull( ctor_info.default_ctor_csr ) )
+  if ( clang_Cursor_isNull( ctor_info.def_ctor_csr ) )
     return;
 
   tidy_symbol *const def_ctor_sym =
-    symbol_add( ctor_info.default_ctor_csr, svd->source );
+    symbol_add( ctor_info.def_ctor_csr, svd->source );
   if ( def_ctor_sym != NULL )
     symbol_add_ref( member_sym, def_ctor_sym );
 }
@@ -1508,7 +1511,7 @@ static void visit_FieldDecl( CXCursor field_csr, symbols_visit_data *svd ) {
 
   if ( svd->source->lang == CXLanguage_CPlusPlus ) {
     cxx_field_add_def_ctor_ref( field_csr, svd );
-    cxx_def_ctor_dtor( field_csr, svd );
+    cxx_dtors_add_refs( field_csr, svd );
   }
 }
 
@@ -1648,39 +1651,62 @@ static void visit_VarDecl( CXCursor var_decl_csr, symbols_visit_data *svd ) {
   if ( !tidy_Cursor_isClassDecl( cls_csr ) )
     return;
 
-  unsigned const prev_ref_count =
+  unsigned const prev_num_refs =
     svd->curr_sym != NULL ? svd->curr_sym->ref_sym_set.size : 0;
 
+  //
+  // Get whether the variable is explicitly initialized.  Given:
+  //
+  //      struct c_int {
+  //        int _n;
+  //      };
+  //
+  //      struct cxx_int {
+  //        cxx_int( int n ) : _n{ n } { }
+  //        int _n;
+  //      };
+  //
+  // then for these cases:
+  //                                    // NumArgs  is_init?
+  //      int i = 0;                    //  -1        true
+  //      c_int c = { 42 };             //  -1        true
+  //      cxx_int x;                    //   0        false
+  //      cxx_int y{ 42 };              //   1        true
+  //
   CXCursor const init_csr = tidy_Cursor_getFirstExprChild( var_decl_csr );
-  bool const has_init_args =
-    !tidy_Cursor_isInvalid( init_csr ) &&
-    clang_Cursor_getNumArguments( init_csr ) != 0;
+  bool const is_init = clang_Cursor_getNumArguments( init_csr ) != 0;
 
-  if ( !has_init_args ) {
+  if ( !is_init ) {
     tidy_ConstructorInfo ctor_info;
     if ( tidy_Cursor_getConstructorInfo( cls_csr, &ctor_info ) &&
-         !clang_Cursor_isNull( ctor_info.default_ctor_csr ) ) {
-      cursor_add_ref( ctor_info.default_ctor_csr, svd );
+         !clang_Cursor_isNull( ctor_info.def_ctor_csr ) ) {
+      //
+      // Its class has a default constructor: add a reference to it.
+      //
+      cursor_add_ref( ctor_info.def_ctor_csr, svd );
     }
     else {
+      //
+      // Its class has no default constructor, but it might have members that
+      // have default constructors: add references to those, if any.
+      //
       clang_visitChildren( cls_csr, &cxx_field_add_def_ctor_ref_visitor, svd );
     }
   }
 
-  cxx_def_ctor_dtor( var_decl_csr, svd );
+  cxx_dtors_add_refs( var_decl_csr, svd );
 
   if ( svd->curr_sym == NULL )
     return;
 
-  bool const added_ref = svd->curr_sym->ref_sym_set.size > prev_ref_count;
-  if ( has_init_args || added_ref ) {
-    //
-    // Variables of types that have constructors must be marked as roots even
-    // if such variables are apparently unused since their constructors might
-    // have side effects (e.g., locking a mutex).
-    //
+  //
+  // If the variable was either explicity initialized or a reference was added
+  // to a default constructor, we have to mark the variable as a root even if
+  // it's apparently unused since its constructor might have side effects
+  // (e.g., locking a mutex).
+  //
+  if ( is_init || svd->curr_sym->ref_sym_set.size > prev_num_refs )
     svd->curr_sym->is_root = true;
-  }
 }
 
 ////////// extern functions ///////////////////////////////////////////////////

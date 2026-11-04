@@ -160,8 +160,8 @@ static enum CXChildVisitResult getConstructorInfo_visitor( CXCursor cursor,
 
     case CXCursor_Constructor:
       if ( clang_CXXConstructor_isDefaultConstructor( cursor ) ) {
-        if ( clang_Cursor_isNull( ctor_info->default_ctor_csr ) )
-          ctor_info->default_ctor_csr = cursor;
+        if ( clang_Cursor_isNull( ctor_info->def_ctor_csr ) )
+          ctor_info->def_ctor_csr = cursor;
       }
       else if ( !clang_CXXConstructor_isCopyConstructor( cursor ) &&
                 !clang_CXXConstructor_isMoveConstructor( cursor ) ) {
@@ -263,8 +263,8 @@ enum CXChildVisitResult getDefaultConstructor_visitor( CXCursor cursor,
 
   if ( clang_CXXConstructor_isDefaultConstructor( cursor ) ) {
     assert( data != NULL );
-    CXCursor *const default_ctor_csr = data;
-    *default_ctor_csr = cursor;
+    CXCursor *const def_ctor_csr = data;
+    *def_ctor_csr = cursor;
     return CXChildVisit_Break;
   }
 
@@ -469,12 +469,12 @@ bool tidy_Cursor_getConstructorInfo( CXCursor cursor,
     ctor_info = &local_info;
 
   *ctor_info = (tidy_ConstructorInfo){
-    .default_ctor_csr = clang_getNullCursor()
+    .def_ctor_csr = clang_getNullCursor()
   };
   clang_visitChildren( cls_csr, &getConstructorInfo_visitor, ctor_info );
 
   bool has_ctor =
-    !clang_Cursor_isNull( ctor_info->default_ctor_csr ) ||
+    !clang_Cursor_isNull( ctor_info->def_ctor_csr ) ||
     ctor_info->has_other_ctors;
 
   // Fall back to template declaration if cls_csr is a template specialization.
@@ -485,18 +485,18 @@ bool tidy_Cursor_getConstructorInfo( CXCursor cursor,
   }
 
   has_ctor =
-    !clang_Cursor_isNull( ctor_info->default_ctor_csr ) ||
+    !clang_Cursor_isNull( ctor_info->def_ctor_csr ) ||
     ctor_info->has_other_ctors;
   return has_ctor;
 }
 
 CXCursor tidy_Cursor_getDefaultConstructor( CXCursor cls_csr ) {
   cls_csr = clang_getCanonicalCursor( cls_csr );
-  CXCursor default_ctor_csr = clang_getNullCursor();
+  CXCursor def_ctor_csr = clang_getNullCursor();
   clang_visitChildren(
-    cls_csr, &getDefaultConstructor_visitor, &default_ctor_csr
+    cls_csr, &getDefaultConstructor_visitor, &def_ctor_csr
   );
-  return default_ctor_csr;
+  return def_ctor_csr;
 }
 
 CXCursor tidy_Cursor_getDestructor( CXCursor cls_csr ) {

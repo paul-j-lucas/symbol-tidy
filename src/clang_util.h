@@ -56,7 +56,7 @@ typedef struct tidy_ConstructorInfo tidy_ConstructorInfo;
  * Information returned by tidy_Cursor_getConstructorInfo().
  */
 struct tidy_ConstructorInfo {
-  CXCursor  default_ctor_csr;           ///< The default constructor, if any.
+  CXCursor  def_ctor_csr;               ///< The default constructor, if any.
   bool      has_other_ctors;            ///< True if other constructors exist.
 };
 
