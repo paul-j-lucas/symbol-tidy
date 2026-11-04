@@ -214,15 +214,6 @@ CXChildVisitResult cxx_field_add_dtor_ref_visitor( CXCursor cursor,
   return CXChildVisit_Continue;
 }
 
-static bool cxx_var_has_init_args( CXCursor var_decl_csr ) {
-  CXCursor const expr_csr = tidy_Cursor_getFirstExprChild( var_decl_csr );
-  if ( tidy_Cursor_isInvalid( expr_csr ) )
-    return false;
-
-  int const num_args = clang_Cursor_getNumArguments( expr_csr );
-  return num_args != 0;
-}
-
 /**
  * A helper function for visit_VarDecl() that adds a reference to each base
  * class's destructor.
@@ -1652,7 +1643,10 @@ static void visit_VarDecl( CXCursor var_decl_csr, symbols_visit_data *svd ) {
   unsigned const prev_ref_count =
     svd->curr_sym != NULL ? svd->curr_sym->ref_sym_set.size : 0;
 
-  bool const has_init_args = cxx_var_has_init_args( var_decl_csr );
+  CXCursor const init_csr = tidy_Cursor_getFirstExprChild( var_decl_csr );
+  bool const has_init_args =
+    !tidy_Cursor_isInvalid( init_csr ) &&
+    clang_Cursor_getNumArguments( init_csr ) != 0;
 
   if ( !has_init_args ) {
     tidy_ConstructorInfo ctor_info;
