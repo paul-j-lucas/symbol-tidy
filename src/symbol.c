@@ -1651,6 +1651,9 @@ static void visit_VarDecl( CXCursor var_decl_csr, symbols_visit_data *svd ) {
   if ( !tidy_Cursor_isClassDecl( cls_csr ) )
     return;
 
+  tidy_ConstructorInfo ctor_info;
+  bool const has_ctor = tidy_Cursor_getConstructorInfo( cls_csr, &ctor_info );
+
   unsigned const prev_num_refs =
     svd->curr_sym != NULL ? svd->curr_sym->ref_sym_set.size : 0;
 
@@ -1667,19 +1670,18 @@ static void visit_VarDecl( CXCursor var_decl_csr, symbols_visit_data *svd ) {
   //      };
   //
   // then for these cases:
-  //                                    // NumArgs  is_init?
-  //      int i = 0;                    //  -1        true
-  //      c_int c = { 42 };             //  -1        true
-  //      cxx_int x;                    //   0        false
-  //      cxx_int y{ 42 };              //   1        true
+  //                                    // has_ctor? num_args is_init_explicit?
+  //      c_int c = { 42 };             //   false     -1       false
+  //      cxx_int x;                    //   true       0       false
+  //      cxx_int y{ 42 };              //   true       1       true
+  //      cxx_int z = cxx_int{ 42 };    //   true      -1       true
   //
   CXCursor const init_csr = tidy_Cursor_getFirstExprChild( var_decl_csr );
-  bool const is_init = clang_Cursor_getNumArguments( init_csr ) != 0;
+  int const num_args = clang_Cursor_getNumArguments( init_csr );
+  bool const is_init_explicit = has_ctor && num_args != 0;
 
-  if ( !is_init ) {
-    tidy_ConstructorInfo ctor_info;
-    if ( tidy_Cursor_getConstructorInfo( cls_csr, &ctor_info ) &&
-         !clang_Cursor_isNull( ctor_info.def_ctor_csr ) ) {
+  if ( !is_init_explicit ) {
+    if ( has_ctor && !clang_Cursor_isNull( ctor_info.def_ctor_csr ) ) {
       //
       // Its class has a default constructor: add a reference to it.
       //
@@ -1694,19 +1696,20 @@ static void visit_VarDecl( CXCursor var_decl_csr, symbols_visit_data *svd ) {
     }
   }
 
-  cxx_dtors_add_refs( var_decl_csr, svd );
-
-  if ( svd->curr_sym == NULL )
-    return;
-
   //
   // If the variable was either explicity initialized or a reference was added
   // to a default constructor, we have to mark the variable as a root even if
   // it's apparently unused since its constructor might have side effects
   // (e.g., locking a mutex).
   //
-  if ( is_init || svd->curr_sym->ref_sym_set.size > prev_num_refs )
+  if ( is_init_explicit || svd->curr_sym->ref_sym_set.size > prev_num_refs )
     svd->curr_sym->is_root = true;
+
+  //
+  // Add references to the variable's class's destructor and its base class
+  // destructors, if any.
+  //
+  cxx_dtors_add_refs( var_decl_csr, svd );
 }
 
 ////////// extern functions ///////////////////////////////////////////////////
