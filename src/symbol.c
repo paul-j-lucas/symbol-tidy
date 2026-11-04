@@ -338,42 +338,9 @@ static void cxx_def_ctor_dtor( CXCursor decl_csr, symbols_visit_data *svd ) {
   if ( !tidy_Cursor_isClassDecl( cls_csr ) )
     return;
 
-  unsigned const prev_ref_count =
-    svd->curr_sym != NULL ? svd->curr_sym->ref_sym_set.size : 0;
-
-  enum CXCursorKind const kind = clang_getCursorKind( decl_csr );
-  if ( kind == CXCursor_VarDecl ) {
-    if ( !cxx_var_has_init_args( decl_csr ) ) {
-      tidy_ConstructorInfo ctor_info;
-      if ( tidy_Cursor_getConstructorInfo( cls_csr, &ctor_info ) &&
-           !clang_Cursor_isNull( ctor_info.default_ctor_csr ) ) {
-        tidy_symbol *const def_ctor_sym =
-          symbol_add( ctor_info.default_ctor_csr, svd->source );
-        if ( def_ctor_sym != NULL )
-          symbol_add_ref( svd->curr_sym, def_ctor_sym );
-      }
-      else {
-        clang_visitChildren( cls_csr, &cxx_field_add_def_ctor_ref_visitor, svd );
-      }
-    }
-  }
-
   cxx_dtor_add_ref( cls_csr, svd );
   clang_visitChildren( cls_csr, &cxx_base_dtor_add_ref_visitor, svd );
   clang_visitChildren( cls_csr, &cxx_field_add_dtor_ref_visitor, svd );
-
-  if ( kind == CXCursor_VarDecl && svd->curr_sym != NULL ) {
-    bool const has_init_args = cxx_var_has_init_args( decl_csr );
-    bool const added_ref = svd->curr_sym->ref_sym_set.size > prev_ref_count;
-    if ( has_init_args || added_ref ) {
-      //
-      // Variables of types that have constructors must be marked as roots even
-      // if such variables are apparently unused since their constructors might
-      // have side effects (e.g., locking a mutex).
-      //
-      svd->curr_sym->is_root = true;
-    }
-  }
 }
 
 /**
@@ -1675,8 +1642,46 @@ static void visit_OverloadedDeclRef( CXCursor overloaded_csr,
  * @param svd The symbols_visit_data to use.
  */
 static void visit_VarDecl( CXCursor var_decl_csr, symbols_visit_data *svd ) {
-  if ( svd->source->lang == CXLanguage_CPlusPlus )
-    cxx_def_ctor_dtor( var_decl_csr, svd );
+  if ( svd->source->lang != CXLanguage_CPlusPlus )
+    return;
+
+  CXCursor const cls_csr = tidy_Cursor_getTypeDecl( var_decl_csr );
+  if ( !tidy_Cursor_isClassDecl( cls_csr ) )
+    return;
+
+  unsigned const prev_ref_count =
+    svd->curr_sym != NULL ? svd->curr_sym->ref_sym_set.size : 0;
+
+  bool const has_init_args = cxx_var_has_init_args( var_decl_csr );
+
+  if ( !has_init_args ) {
+    tidy_ConstructorInfo ctor_info;
+    if ( tidy_Cursor_getConstructorInfo( cls_csr, &ctor_info ) &&
+         !clang_Cursor_isNull( ctor_info.default_ctor_csr ) ) {
+      tidy_symbol *const def_ctor_sym =
+        symbol_add( ctor_info.default_ctor_csr, svd->source );
+      if ( def_ctor_sym != NULL )
+        symbol_add_ref( svd->curr_sym, def_ctor_sym );
+    }
+    else {
+      clang_visitChildren( cls_csr, &cxx_field_add_def_ctor_ref_visitor, svd );
+    }
+  }
+
+  cxx_def_ctor_dtor( var_decl_csr, svd );
+
+  if ( svd->curr_sym == NULL )
+    return;
+
+  bool const added_ref = svd->curr_sym->ref_sym_set.size > prev_ref_count;
+  if ( has_init_args || added_ref ) {
+    //
+    // Variables of types that have constructors must be marked as roots even
+    // if such variables are apparently unused since their constructors might
+    // have side effects (e.g., locking a mutex).
+    //
+    svd->curr_sym->is_root = true;
+  }
 }
 
 ////////// extern functions ///////////////////////////////////////////////////
