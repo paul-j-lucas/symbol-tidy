@@ -199,6 +199,11 @@ static void cxx_field_add_dtor_ref( CXCursor field_csr,
 
 /**
  * TODO.
+ *
+ * @param cursor The cursor to visit.
+ * @param parent Not used.
+ * @param data The symbols_visit_data to use.
+ * @return Returns `CXChildVisit_Continue`.
  */
 static enum
 CXChildVisitResult cxx_field_add_dtor_ref_visitor( CXCursor cursor,
