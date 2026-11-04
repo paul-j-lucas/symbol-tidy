@@ -188,15 +188,6 @@ static void cxx_field_add_def_ctor_ref( CXCursor field_csr,
   }
 }
 
-static void cxx_field_add_dtor_ref( CXCursor field_csr,
-                                        symbols_visit_data *svd ) {
-  assert( svd->source->lang == CXLanguage_CPlusPlus );
-
-  CXCursor const cls_csr = tidy_Cursor_getTypeDecl( field_csr );
-  if ( tidy_Cursor_isClassDecl( cls_csr ) )
-    cxx_dtor_add_ref( cls_csr, svd );
-}
-
 /**
  * TODO.
  *
@@ -213,8 +204,11 @@ CXChildVisitResult cxx_field_add_dtor_ref_visitor( CXCursor cursor,
 
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
   if ( kind == CXCursor_FieldDecl ) {
-    symbols_visit_data *const svd = data;
-    cxx_field_add_dtor_ref( cursor, svd );
+    CXCursor const cls_csr = tidy_Cursor_getTypeDecl( cursor );
+    if ( tidy_Cursor_isClassDecl( cls_csr ) ) {
+      symbols_visit_data *const svd = data;
+      cxx_dtor_add_ref( cls_csr, svd );
+    }
   }
   return CXChildVisit_Continue;
 }
