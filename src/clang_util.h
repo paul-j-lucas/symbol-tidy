@@ -109,11 +109,21 @@ CXCursor tidy_Cursor_getDestructor( CXCursor cls_csr );
  * Gets the element cursor for \a cursor if it's an array.
  *
  * @param cursor The cursor for possibly an array.
- * @return If \a cursor is an array, return the cursor for the element;
+ * @return If \a cursor is an array, returns the cursor for the element;
  * otherwise returns \a cursor.
  */
 NODISCARD
 CXCursor tidy_Cursor_getElementIfArray( CXCursor cursor );
+
+/**
+ * Gets whether \a field_csr is initialized, either via an expression or a
+ * constructor's mem-initializer list.
+ *
+ * @param field_csr The cursor of the field to check.
+ * @return Returns TODO.
+ */
+NODISCARD
+CXCursor tidy_Cursor_getFieldInitializer( CXCursor field_csr );
 
 /**
  * Gets the first expression child cursor of \a cursor, if any.
@@ -155,6 +165,15 @@ char* tidy_Cursor_getScopedDisplayName( CXCursor cursor );
  */
 NODISCARD
 char* tidy_Cursor_getScopedSpelling( CXCursor cursor );
+
+/**
+ * Gets the cursor for the type of \a cursor.
+ *
+ * @param cursor The cursor to get the type cursor for.
+ * @return Returns the cursor for the type of \a cursor or an invalid cursor.
+ */
+NODISCARD
+CXCursor tidy_Cursor_getTypeDecl( CXCursor cursor );
 
 /**
  * Gets whether \a cursor is a class, class template, structure, or union.
@@ -205,16 +224,6 @@ bool tidy_Cursor_isExternalGlobalFunction( CXCursor cursor );
  */
 NODISCARD
 bool tidy_Cursor_isExternalLinkage( CXCursor cursor );
-
-/**
- * Gets whether \a field_csr is initialized, either via an expression or a
- * constructor's mem-initializer list.
- *
- * @param field_csr The cursor of the field to check.
- * @return Returns `true` only if \a field_csr is explicitly initialized.
- */
-NODISCARD
-bool tidy_Cursor_isFieldInitialized( CXCursor field_csr );
 
 /**
  * Gets whether \a cursor is either null or invalid.

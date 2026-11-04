@@ -2,6 +2,10 @@ EXPECTED_EXIT=1
 
 test_symbol_tidy $TIDY_TEST_CXXFLAGS $TIDY_TEST_OPTIONS \
   $TIDY_TEST_CONFIG \
-  constructors-implicit.cpp
+  constructors-1.cpp
+
+test_symbol_tidy $TIDY_TEST_CXXFLAGS $TIDY_TEST_OPTIONS \
+  $TIDY_TEST_CONFIG \
+  constructors-2.cpp
 
 # vim:set syntax=bash et sw=2 ts=2:
