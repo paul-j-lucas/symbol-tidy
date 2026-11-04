@@ -1,5 +1,6 @@
 2026-11-03  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * symbol.c: Eliminated cxx_field_add_dtor_ref.
    * symbol.c: Eliminated cxx_var_has_init_args().
    * symbol.c: Moved VarDecl-specific parts of cxx_def_ctor_dtor out -- back
      into visit_VarDecl.
