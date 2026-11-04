@@ -48,7 +48,7 @@ TESTS+=	tests/config-bad-semantics-1.test \
 	tests/config-ignore-symbols.test
 
 # C++ tests.
-TESTS+=	tests/constructors-implicit.test \
+TESTS+=	tests/constructors.test \
 	tests/destructors.test \
 	tests/functor.test \
 	tests/range-for.test \
