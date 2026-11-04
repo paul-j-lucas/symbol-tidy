@@ -116,11 +116,11 @@ NODISCARD
 CXCursor tidy_Cursor_getElementIfArray( CXCursor cursor );
 
 /**
- * Gets whether \a field_csr is initialized, either via an expression or a
- * constructor's mem-initializer list.
+ * For C++ only, gets the cursor that initializes \a field_csr, either an
+ * expression or a constructor.
  *
- * @param field_csr The cursor of the field to check.
- * @return Returns TODO.
+ * @param field_csr The cursor to get the initializer of.
+ * @return Returns the initializer of \a field_csr or the null cursor if none.
  */
 NODISCARD
 CXCursor tidy_Cursor_getFieldInitializer( CXCursor field_csr );
@@ -167,13 +167,15 @@ NODISCARD
 char* tidy_Cursor_getScopedSpelling( CXCursor cursor );
 
 /**
- * Gets the cursor for the type of \a cursor.
+ * Gets the cursor for the underlying type of \a cursor by stripping arrays and
+ * references from the type.
  *
  * @param cursor The cursor to get the type cursor for.
- * @return Returns the cursor for the type of \a cursor or an invalid cursor.
+ * @return Returns the cursor for the underlying type of \a cursor or an
+ * invalid cursor.
  */
 NODISCARD
-CXCursor tidy_Cursor_getTypeDecl( CXCursor cursor );
+CXCursor tidy_Cursor_getUnderlyingTypeDecl( CXCursor cursor );
 
 /**
  * Gets whether \a cursor is a class, class template, structure, or union.

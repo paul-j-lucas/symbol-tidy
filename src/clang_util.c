@@ -384,7 +384,7 @@ static char* getScopedName_thunk( CXCursor cursor, getCursorName_fn name_fn ) {
  * a field is mem-initialized by a constructor.
  *
  * @param cursor The cursor being visited.
- * @param parent Not used.
+ * @param parent The parent of \a cursor.
  * @param data The getFieldInitializer_data to use.
  * @return Returns either `CXChildVisit_Break` or `CXChildVisit_Continue`.
  */
@@ -569,7 +569,7 @@ char* tidy_Cursor_getScopedSpelling( CXCursor cursor ) {
   return getScopedName_thunk( cursor, &clang_getCursorSpelling );
 }
 
-CXCursor tidy_Cursor_getTypeDecl( CXCursor cursor ) {
+CXCursor tidy_Cursor_getUnderlyingTypeDecl( CXCursor cursor ) {
   if ( tidy_Cursor_isInvalid( cursor ) )
     return cursor;
 
