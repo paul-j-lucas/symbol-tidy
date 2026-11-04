@@ -1697,19 +1697,19 @@ static void visit_VarDecl( CXCursor var_decl_csr, symbols_visit_data *svd ) {
   }
 
   //
-  // If the variable was either explicity initialized or a reference was added
-  // to a default constructor, we have to mark the variable as a root even if
-  // it's apparently unused since its constructor might have side effects
-  // (e.g., locking a mutex).
-  //
-  if ( is_init_explicit || svd->curr_sym->ref_sym_set.size > prev_num_refs )
-    svd->curr_sym->is_root = true;
-
-  //
   // Add references to the variable's class's destructor and its base class
   // destructors, if any.
   //
   cxx_dtors_add_refs( var_decl_csr, svd );
+
+  //
+  // If the variable was either explicity initialized or a reference was added
+  // to a default constructor or destructor, we have to mark the variable as a
+  // root even if it's apparently unused since its constructor or destructor
+  // might have side effects (e.g., locking a mutex).
+  //
+  if ( is_init_explicit || svd->curr_sym->ref_sym_set.size > prev_num_refs )
+    svd->curr_sym->is_root = true;
 }
 
 ////////// extern functions ///////////////////////////////////////////////////
