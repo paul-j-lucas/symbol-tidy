@@ -1,5 +1,7 @@
 2026-11-05  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * src/Makefile.am, cxx_symbol.c, cxx_symbol.h, symbol.c, symbol.h: Split C++
+     symbol code into cxx_symbol.[hc].
    * symbol.c, test/Makefile.am, new-delete.cpp, new-delete.out,
      new-delete.test: Now handling C++ overloaded operator new/delete.
    * clang_util.c: Now checking for NULL.
