@@ -51,6 +51,7 @@ TESTS+=	tests/config-bad-semantics-1.test \
 TESTS+=	tests/constructors.test \
 	tests/destructors.test \
 	tests/functor.test \
+	tests/new-delete.test \
 	tests/range-for.test \
 	tests/std-exclude.test \
 	tests/template-ctor.test \

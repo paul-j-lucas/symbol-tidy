@@ -65,6 +65,7 @@
 /// @cond DOXYGEN_IGNORE
 typedef struct svd_cxx_constructor  svd_cxx_constructor;
 typedef struct svd_cxx_for_range    svd_cxx_for_range;
+typedef struct svd_cxx_operator     svd_cxx_operator;
 typedef struct symbols_visit_data   symbols_visit_data;
 /// @endcond
 
@@ -93,13 +94,32 @@ struct symbols_visit_data {
     CXCursor          end_csr;          ///< Found `end()` cursor, if any.
     bool              is_const;         ///< Is the range-for `const`?
   } cxx_for_range;
+
+  /**
+   * Additional data for cxx_operator_add_refs().
+   */
+  struct svd_cxx_operator {
+    char const       *name;             ///< Name, e.g., `operator new`.
+    char const       *array_name;       ///< Array name, e.g., `operator new[]`.
+    bool              found;            ///< Found at least one operator?
+  } cxx_operator;
 };
 
 ////////// local functions ////////////////////////////////////////////////////
 
+PJL_DISCARD
+static bool cxx_operator_add_refs( CXCursor, char const*, char const*,
+                                    symbols_visit_data* );
+
 static void cxx_dtor_add_ref( CXCursor, symbols_visit_data* );
 static void cxx_field_add_def_ctor_ref( CXCursor, symbols_visit_data* );
+
+static enum CXChildVisitResult
+            cxx_operator_add_refs_visitor( CXCursor, CXCursor, CXClientData ),
+            cxx_operator_base_visitor( CXCursor, CXCursor, CXClientData );
+
 static void symbol_add_ref( tidy_symbol*, tidy_symbol* );
+
 
 NODISCARD
 static int  symbol_cmp( tidy_symbol const*, tidy_symbol const* );
@@ -110,6 +130,7 @@ static void visit_Constructor( CXCursor, symbols_visit_data* );
 static void visit_CXXDeleteExpr( CXCursor, symbols_visit_data* );
 static void visit_CXXForRangeStmt( CXCursor, symbols_visit_data* );
 static void visit_CXXMethod( CXCursor, symbols_visit_data* );
+static void visit_CXXNewExpr( CXCursor, symbols_visit_data* );
 static void visit_FieldDecl( CXCursor, symbols_visit_data* );
 static void visit_MacroDefinition( CXCursor, symbols_visit_data* );
 static void visit_most_Ref( CXCursor, symbols_visit_data* );
@@ -547,6 +568,9 @@ static enum CXChildVisitResult cxx_DeleteExpr_visitor( CXCursor cursor,
   if ( tidy_Cursor_isClassDecl( cls_csr ) ) {
     symbols_visit_data *const svd = data;
     cxx_dtor_add_ref( cls_csr, svd );
+    cxx_operator_add_refs(
+      cls_csr, "operator delete", "operator delete[]", svd
+    );
     return CXChildVisit_Break;
   }
 
@@ -741,6 +765,110 @@ static void cxx_member_add_def_ctor_ref( CXCursor member_csr,
     symbol_add( ctor_info.def_ctor_csr, svd->source );
   if ( def_ctor_sym != NULL )
     symbol_add_ref( member_sym, def_ctor_sym );
+}
+
+/**
+ * Adds references to the member operators of \a cls_csr named either \a name
+ * or \a array_name.  Like C++ name lookup, base classes are searched only if
+ * \a cls_csr declares none.
+ *
+ * @param cls_csr The class's cursor.
+ * @param name The operator's name, e.g., `"operator new"`.
+ * @param array_name The array operator's name, e.g., `"operator new[]"`.
+ * @param svd The symbols_visit_data to use.
+ * @return Returns `true` only if at least one reference was added.
+ */
+static bool cxx_operator_add_refs( CXCursor cls_csr, char const *name,
+                                   char const *array_name,
+                                   symbols_visit_data *svd ) {
+  assert( svd != NULL );
+
+  svd_cxx_operator const prev_svd_cxx_operator = svd->cxx_operator;
+  svd->cxx_operator = (svd_cxx_operator){
+    .name = name,
+    .array_name = array_name
+  };
+
+  clang_visitChildren( cls_csr, &cxx_operator_add_refs_visitor, svd );
+  if ( !svd->cxx_operator.found )
+    clang_visitChildren( cls_csr, &cxx_operator_base_visitor, svd );
+
+  bool const found = svd->cxx_operator.found;
+  svd->cxx_operator = prev_svd_cxx_operator;
+  return found;
+}
+
+/**
+ * Helper function for cxx_operator_add_refs() that adds a reference to every
+ * member operator whose name matches.
+ *
+ * @param cursor The cursor being visited.
+ * @param parent Not used.
+ * @param data The symbols_visit_data to use.
+ * @return Always returns `CXChildVisit_Continue`.
+ */
+static
+enum CXChildVisitResult cxx_operator_add_refs_visitor( CXCursor cursor,
+                                                       CXCursor parent,
+                                                       CXClientData data ) {
+  (void)parent;
+  assert( data != NULL );
+  symbols_visit_data *const svd = data;
+
+  switch ( clang_getCursorKind( cursor ) ) {
+    case CXCursor_CXXMethod:
+    case CXCursor_FunctionTemplate:;
+      int const found = tidy_Cursor_isSpellingEqualToAny(
+        cursor, svd->cxx_operator.name, svd->cxx_operator.array_name
+      );
+      if ( found >= 0 ) {
+        cursor_add_ref( cursor, svd );
+        svd->cxx_operator.found = true;
+      }
+      break;
+    default:
+      /* suppress warning */;
+  } // switch
+
+  return CXChildVisit_Continue;
+}
+
+/**
+ * Helper function for cxx_operator_add_refs() that recurses into each
+ * base class.
+ *
+ * @param cursor The cursor being visited.
+ * @param parent Not used.
+ * @param data The symbols_visit_data to use.
+ * @return Always returns `CXChildVisit_Continue`.
+ */
+static enum CXChildVisitResult cxx_operator_base_visitor( CXCursor cursor,
+                                                          CXCursor parent,
+                                                          CXClientData data ) {
+  (void)parent;
+  assert( data != NULL );
+  symbols_visit_data *const svd = data;
+
+  enum CXCursorKind const kind = clang_getCursorKind( cursor );
+  if ( kind != CXCursor_CXXBaseSpecifier )
+    goto skip;
+
+  CXCursor const base_csr =
+    clang_getTypeDeclaration( clang_getCursorType( cursor ) );
+  if ( !tidy_Cursor_isClassDecl( base_csr ) )
+    goto skip;
+
+  //
+  // Copy the names first since the recursive call replaces (then restores)
+  // svd->cxx_operator.
+  //
+  char const *const name = svd->cxx_operator.name;
+  char const *const array_name = svd->cxx_operator.array_name;
+  if ( cxx_operator_add_refs( base_csr, name, array_name, svd ) )
+    svd->cxx_operator.found = true;
+
+skip:
+  return CXChildVisit_Continue;
 }
 
 /**
@@ -1252,6 +1380,10 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       visit_CXXForRangeStmt( cursor, svd );
       break;
 
+    case CXCursor_CXXNewExpr:
+      visit_CXXNewExpr( cursor, svd );
+      break;
+
     case CXCursor_EnumConstantDecl:
     case CXCursor_FieldDecl:
     case CXCursor_LabelStmt:
@@ -1550,6 +1682,30 @@ static void visit_CXXMethod( CXCursor method_csr, symbols_visit_data *svd ) {
     default:
       /* suppress warning */;
   } // switch
+}
+
+/**
+ * Visits a `CXCursor_CXXNewExpr` kind of cursor.
+ *
+ * @remarks The class's `operator new` is called implicitly, so libclang's C
+ * API gives no reference to it.  `operator delete` is also marked since it is
+ * called if the constructor throws.
+ *
+ * @param new_csr The `new` cursor to visit.
+ * @param svd The symbols_visit_data to use.
+ */
+static void visit_CXXNewExpr( CXCursor new_csr, symbols_visit_data *svd ) {
+  CXType type = clang_getCursorType( new_csr );
+  type = clang_getCanonicalType( type );
+  if ( type.kind != CXType_Pointer )
+    return;
+
+  CXType pointee_type = clang_getPointeeType( type );
+         pointee_type = clang_getCanonicalType( pointee_type );
+
+  CXCursor const cls_csr = clang_getTypeDeclaration( pointee_type );
+  if ( tidy_Cursor_isClassDecl( cls_csr ) )
+    cxx_operator_add_refs( cls_csr, "operator new", "operator new[]", svd );
 }
 
 /**
