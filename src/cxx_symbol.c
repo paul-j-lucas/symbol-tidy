@@ -51,6 +51,7 @@
 ////////// local functions ////////////////////////////////////////////////////
 
 static void cxx_dtor_add_ref( CXCursor, symbols_visit_data* );
+static void cxx_type_template_args_add_dtor_ref( CXType, symbols_visit_data* );
 
 ////////// local functions ////////////////////////////////////////////////////
 
@@ -125,6 +126,9 @@ CXChildVisitResult cxx_field_add_dtor_ref_visitor( CXCursor cursor,
     if ( tidy_Cursor_isClassDecl( cls_csr ) ) {
       symbols_visit_data *const svd = data;
       cxx_dtor_add_ref( cls_csr, svd );
+      CXType  type = clang_getCursorType( cursor );
+              type = tidy_Type_getUnderlyingType( type );
+      cxx_type_template_args_add_dtor_ref( type, svd );
     }
   }
   return CXChildVisit_Continue;
@@ -201,6 +205,41 @@ static enum CXChildVisitResult cxx_operator_base_visitor( CXCursor cursor,
 
 skip:
   return CXChildVisit_Continue;
+}
+
+/**
+ * Adds a reference to the destructor of every class-type template argument of
+ * \a type, recursively.
+ *
+ * @remarks Such a destructor is called from within the template (e.g.,
+ * `std::default_delete<T>::operator()`), but libclang's C API doesn't expose
+ * template instantiation bodies, so we have to infer the call.
+ *
+ * @param type The type to check.
+ * @param svd The symbols_visit_data to use.
+ */
+static void cxx_type_template_args_add_dtor_ref( CXType type,
+                                                 symbols_visit_data *svd ) {
+  int num_args = clang_Type_getNumTemplateArguments( type );
+  if ( num_args <= 0 ) {
+    type = clang_getCanonicalType( type );
+    num_args = clang_Type_getNumTemplateArguments( type );
+    if ( num_args <= 0 )
+      return;
+  }
+
+  for ( unsigned i = 0; i < STATIC_CAST( unsigned, num_args ); ++i ) {
+    CXType arg_type = clang_Type_getTemplateArgumentAsType( type, i );
+    if ( arg_type.kind == CXType_Invalid )
+      continue;                         // non-type argument
+
+    arg_type = tidy_Type_getUnderlyingType( arg_type );
+    CXCursor const arg_cls_csr = clang_getTypeDeclaration( arg_type );
+    if ( tidy_Cursor_isClassDecl( arg_cls_csr ) )
+      cxx_dtor_add_ref( arg_cls_csr, svd );
+
+    cxx_type_template_args_add_dtor_ref( arg_type, svd );
+  } // for
 }
 
 ////////// extern functions ///////////////////////////////////////////////////
@@ -293,6 +332,11 @@ void cxx_dtors_add_refs( CXCursor decl_csr, symbols_visit_data *svd ) {
     return;
 
   cxx_dtor_add_ref( cls_csr, svd );
+
+  CXType  decl_type = clang_getCursorType( decl_csr );
+          decl_type = tidy_Type_getUnderlyingType( decl_type );
+  cxx_type_template_args_add_dtor_ref( decl_type, svd );
+
   clang_visitChildren( cls_csr, &cxx_base_add_dtor_ref_visitor, svd );
   clang_visitChildren( cls_csr, &cxx_field_add_dtor_ref_visitor, svd );
 }
