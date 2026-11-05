@@ -141,11 +141,12 @@ static void cursor_add_ref( CXCursor to_csr, symbols_visit_data *svd ) {
 }
 
 /**
- * Gets whether \a cursor is nested, at any depth, within a class that is
- * ignored via the `ignore-symbols` key.
+ * Gets whether \a cursor is nested, at any depth, within a class (or
+ * enumeration) that is ignored via the `ignore-symbols` key.
  *
  * @param cursor The cursor to check.
- * @return Returns `true` only if \a cursor is within an ignored class.
+ * @return Returns `true` only if \a cursor is within an ignored class (or
+ * enumeration).
  */
 NODISCARD
 static bool cursor_in_ignored_class( CXCursor cursor ) {
@@ -156,7 +157,7 @@ static bool cursor_in_ignored_class( CXCursor cursor ) {
     if ( kind == CXCursor_TranslationUnit )
       break;
 
-    if ( tidy_Cursor_isClassDecl( scope_csr ) ) {
+    if ( tidy_Cursor_isClassDecl( scope_csr ) || kind == CXCursor_EnumDecl ) {
       CXFile const  scope_file = tidy_getCursorLocation_File( scope_csr );
       char *const   scope_name = tidy_Cursor_getScopedSpelling( scope_csr );
       bool          is_ignored = false;
@@ -244,12 +245,16 @@ static bool cursor_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
     case CXCursor_ClassDecl:
     case CXCursor_ClassTemplate:
     case CXCursor_ClassTemplatePartialSpecialization:
+    case CXCursor_EnumConstantDecl:
+    case CXCursor_EnumDecl:
+    case CXCursor_FieldDecl:
     case CXCursor_FunctionDecl:
     case CXCursor_MacroDefinition:
     case CXCursor_StructDecl:
     case CXCursor_TypeAliasDecl:
     case CXCursor_TypedefDecl:
     case CXCursor_UnionDecl:
+    case CXCursor_VarDecl:
       is_excluded = ignored;
       break;
 
