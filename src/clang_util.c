@@ -569,39 +569,6 @@ CXCursor tidy_Cursor_getDestructor( CXCursor cls_csr ) {
   return dtor_csr;
 }
 
-CXCursor tidy_Cursor_getElementIfArray( CXCursor cursor ) {
-  if ( tidy_Cursor_isInvalid( cursor ) )
-    return cursor;
-
-  CXType type = clang_getCursorType( cursor );
-         type = clang_getCanonicalType( type );
-
-  bool is_array = false;
-  for ( bool done = false; !done; ) {
-    switch ( type.kind ) {
-      case CXType_ConstantArray:
-      case CXType_DependentSizedArray:
-      case CXType_IncompleteArray:
-      case CXType_VariableArray:
-        type = clang_getElementType( type );
-        type = clang_getCanonicalType( type );
-        is_array = true;
-        break;
-      default:
-        done = true;
-        break;
-    }
-  } // for
-
-  if ( is_array ) {
-    CXCursor const elem_csr = clang_getTypeDeclaration( type );
-    if ( !tidy_Cursor_isInvalid( elem_csr ) )
-      return elem_csr;
-  }
-
-  return cursor;
-}
-
 CXCursor tidy_Cursor_getFieldInitializer( CXCursor field_csr ) {
   CXCursor const init_csr = tidy_Cursor_getFirstExprChild( field_csr );
   if ( !tidy_Cursor_isInvalid( init_csr ) )
@@ -634,10 +601,8 @@ CXCursor tidy_Cursor_getUnderlyingTypeDecl( CXCursor cursor ) {
   if ( tidy_Cursor_isInvalid( cursor ) )
     return cursor;
 
-  CXCursor const  obj_csr = tidy_Cursor_getElementIfArray( cursor );
-  CXType          type = clang_getCursorType( obj_csr );
-                  type = clang_getCanonicalType( type );
-                  type = clang_getNonReferenceType( type );
+  CXType  type = clang_getCursorType( cursor );
+          type = tidy_Type_getUnderlyingType( type );
 
   return clang_getTypeDeclaration( type );
 }
@@ -1106,6 +1071,27 @@ int tidy_Token_isSpellingEqualToAny_impl( CXTranslationUnit tu, CXToken token,
 
   clang_disposeString( cxs );
   return equal_idx;
+}
+
+CXType tidy_Type_getUnderlyingType( CXType type ) {
+  type = clang_getCanonicalType( type );
+  type = clang_getNonReferenceType( type );
+
+  for ( bool done = false; !done; ) {
+    switch ( type.kind ) {
+      case CXType_ConstantArray:
+      case CXType_DependentSizedArray:
+      case CXType_IncompleteArray:
+      case CXType_VariableArray:
+        type = clang_getElementType( type );
+        type = clang_getCanonicalType( type );
+        break;
+      default:
+        done = true;
+    } // switch
+  } // for
+
+  return type;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

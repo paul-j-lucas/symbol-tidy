@@ -106,16 +106,6 @@ NODISCARD
 CXCursor tidy_Cursor_getDestructor( CXCursor cls_csr );
 
 /**
- * Gets the element cursor for \a cursor if it's an array.
- *
- * @param cursor The cursor for possibly an array.
- * @return If \a cursor is an array, returns the cursor for the element;
- * otherwise returns \a cursor.
- */
-NODISCARD
-CXCursor tidy_Cursor_getElementIfArray( CXCursor cursor );
-
-/**
  * For C++ only, gets the cursor that initializes \a field_csr, either an
  * expression or a constructor.
  *
@@ -611,6 +601,16 @@ bool tidy_Token_isSpellingEqualTo( CXTranslationUnit tu, CXToken token,
 NODISCARD
 int tidy_Token_isSpellingEqualToAny_impl( CXTranslationUnit tu, CXToken token,
                                           char const *values[] );
+
+/**
+ * Gets the canonical, underlying type of \a type.
+ *
+ * @param type The type to get the underlying type for.
+ * @return Returns the underlying type.  If \a type is an array, returns the
+ * underlying type of the array element.
+ */
+NODISCARD
+CXType tidy_Type_getUnderlyingType( CXType type );
 
 ///////////////////////////////////////////////////////////////////////////////
 
