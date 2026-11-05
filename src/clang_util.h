@@ -177,6 +177,17 @@ char* tidy_Cursor_getScopedSpelling( CXCursor cursor );
 NODISCARD
 CXCursor tidy_Cursor_getUnderlyingTypeDecl( CXCursor cursor );
 
+
+/**
+ * Gets whether \a cursor is, or is nested at any depth within, an anonymous
+ * structure, union, or class.
+ *
+ * @param cursor The cursor to check.
+ * @return Returns `true` only if \a cursor is within an anonymous class.
+ */
+NODISCARD
+bool tidy_Cursor_inAnonymousClass( CXCursor cursor );
+
 /**
  * Gets whether \a cursor is a class, class template, structure, or union.
  *

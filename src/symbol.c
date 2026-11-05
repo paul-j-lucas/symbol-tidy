@@ -999,6 +999,9 @@ static bool symbol_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
 
   assert( source != NULL );
 
+  if ( tidy_Cursor_inAnonymousClass( sym_csr ) )
+    return true;
+
   //
   // We can't use clang_getCursorLanguage() because libclang doesn't initially
   // set what it thinks the current language is until it encounters something

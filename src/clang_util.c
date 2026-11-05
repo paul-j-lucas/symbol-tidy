@@ -581,6 +581,21 @@ CXCursor tidy_Cursor_getUnderlyingTypeDecl( CXCursor cursor ) {
   return clang_getTypeDeclaration( type );
 }
 
+bool tidy_Cursor_inAnonymousClass( CXCursor cursor ) {
+  while ( !tidy_Cursor_isInvalid( cursor ) ) {
+    enum CXCursorKind const kind = clang_getCursorKind( cursor );
+    if ( kind == CXCursor_TranslationUnit )
+      break;
+    if ( tidy_Cursor_isClassDecl( cursor ) &&
+         clang_Cursor_isAnonymous( cursor ) ) {
+      return true;
+    }
+    cursor = clang_getCursorSemanticParent( cursor );
+  } // while
+
+  return false;
+}
+
 bool tidy_Cursor_isClassDecl( CXCursor cursor ) {
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
   switch ( kind ) {
