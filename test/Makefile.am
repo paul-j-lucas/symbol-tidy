@@ -53,7 +53,8 @@ TESTS+=	tests/constructors.test \
 	tests/functor.test \
 	tests/range-for.test \
 	tests/std-exclude.test \
-	tests/template-ctor.test
+	tests/template-ctor.test \
+	tests/template-omanip.test
 
 # Miscellaneous tests.
 TESTS+=	tests/c-cxx-1.test \

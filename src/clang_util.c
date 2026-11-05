@@ -55,6 +55,7 @@ typedef struct callsBaseConstructor_data  callsBaseConstructor_data;
 typedef struct getCursorByName_data       getCursorByName_data;
 typedef struct getFieldInitializer_data   getFieldInitializer_data;
 typedef CXString                        (*getCursorName_fn)( CXCursor );
+typedef CXCursor                        (*getCursorParent_fn)( CXCursor );
 
 ////////// structs ////////////////////////////////////////////////////////////
 
@@ -436,6 +437,66 @@ enum CXChildVisitResult getFieldInitializer_visitor( CXCursor cursor,
 
 skip:
   return CXChildVisit_Continue;
+}
+
+/**
+ * Helper function for tidy_Cursor_isOrInClassTemplate() that gets whether \a
+ * cursor is, or is nested within, a class template, or a specialization of
+ * one.
+ *
+ * @param cursor The cursor to check.
+ * @param parent_fn The libclang function to use to get the parent of \a
+ * cursor.
+ * @return Returns `true` only if \a cursor is, or is nested within, a class
+ * template.
+ */
+NODISCARD
+static bool isOrInClassTemplate_impl( CXCursor cursor,
+                                      getCursorParent_fn parent_fn ) {
+  assert( parent_fn != NULL );
+
+  for ( cursor = (*parent_fn)( cursor ); !tidy_Cursor_isInvalid( cursor );
+        cursor = (*parent_fn)( cursor ) ) {
+    enum CXCursorKind const kind = clang_getCursorKind( cursor );
+    switch ( kind ) {
+      case CXCursor_ClassDecl:
+      case CXCursor_StructDecl:
+      case CXCursor_UnionDecl:;
+        CXCursor const sct_csr = clang_getSpecializedCursorTemplate( cursor );
+        if ( !tidy_Cursor_isInvalid( sct_csr ) )
+          return true;
+        break;
+
+      case CXCursor_ClassTemplate:
+      case CXCursor_ClassTemplatePartialSpecialization:
+        return true;
+
+      case CXCursor_TranslationUnit:
+        return false;
+
+      default:
+        /* suppress warning */;
+    } // switch
+  } // for
+
+  return false;
+}
+
+/**
+ * Gets whether \a cursor is, or is nested within, a class template, or a
+ * specialization of one.
+ *
+ * @remarks Such cursors can't be matched via `clang_getCursorUSR()` since an
+ * instantiation's USR is different from its declaration's.
+ *
+ * @param cursor The cursor to check.
+ * @return Returns `true` only if \a cursor is, or is nested within, a class
+ * template.
+ */
+NODISCARD
+static bool tidy_Cursor_isOrInClassTemplate( CXCursor cursor ) {
+  return  isOrInClassTemplate_impl( cursor, &clang_getCursorSemanticParent ) ||
+          isOrInClassTemplate_impl( cursor, &clang_getCursorLexicalParent  );
 }
 
 ////////// extern functions ///////////////////////////////////////////////////
@@ -842,15 +903,18 @@ CXFile tidy_getCursorLocation_File( CXCursor cursor ) {
 
 char* tidy_getCursorUSR( CXCursor cursor ) {
   cursor = clang_getCanonicalCursor( cursor );
-  CXString const usr_cxs = clang_getCursorUSR( cursor );
-  char const *const usr_cs = clang_getCString( usr_cxs );
-  char *usr = NULL;
-  if ( usr_cs != NULL && usr_cs[0] != '\0' )
-    usr = strdup_or_exit( usr_cs );
-  clang_disposeString( usr_cxs );
 
-  if ( usr != NULL )
-    return usr;
+  char *usr = NULL;
+
+  if ( !tidy_Cursor_isOrInClassTemplate( cursor ) ) {
+    CXString const    usr_cxs = clang_getCursorUSR( cursor );
+    char const *const usr_cs = clang_getCString( usr_cxs );
+    if ( usr_cs != NULL && usr_cs[0] != '\0' )
+      usr = strdup_or_exit( usr_cs );
+    clang_disposeString( usr_cxs );
+    if ( usr != NULL )
+      return usr;
+  }
 
   //
   // For some cursor kinds, libclang returns an empty string for its USR.  But
