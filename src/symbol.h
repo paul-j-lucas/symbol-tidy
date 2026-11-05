@@ -47,7 +47,11 @@
 
 ////////// typedefs ///////////////////////////////////////////////////////////
 
-typedef struct tidy_symbol tidy_symbol;
+typedef struct svd_cxx_constructor  svd_cxx_constructor;
+typedef struct svd_cxx_for_range    svd_cxx_for_range;
+typedef struct svd_cxx_operator     svd_cxx_operator;
+typedef struct symbols_visit_data   symbols_visit_data;
+typedef struct tidy_symbol          tidy_symbol;
 
 ////////// structs ////////////////////////////////////////////////////////////
 
@@ -133,7 +137,54 @@ struct tidy_symbol {
   bool          is_used;                ///< Is this symbol used?
 };
 
+/**
+ * Additional data passed to symbols_visitor().
+ */
+struct symbols_visit_data {
+  tidy_source const  *source;           ///< Source file being tidied.
+  tidy_symbol        *curr_sym;         ///< Current symbol, if any.
+
+  /**
+   * Additional data for visit_Constructor().
+   */
+  struct svd_cxx_constructor {
+    CXCursor          ctor_csr;         ///< Constructor's cursor.
+  } cxx_constructor;
+
+  /**
+   * Additional data for visit_CXXForRangeStmt().
+   */
+  struct svd_cxx_for_range {
+    CXCursor          cls_csr;          ///< Class being iterated over.
+    CXCursor          begin_csr;        ///< Found `begin()` cursor, if any.
+    CXCursor          end_csr;          ///< Found `end()` cursor, if any.
+    bool              is_const;         ///< Is the range-for `const`?
+  } cxx_for_range;
+
+  /**
+   * Additional data for cxx_operator_add_refs().
+   */
+  struct svd_cxx_operator {
+    char const       *name;             ///< Name, e.g., `operator new`.
+    char const       *array_name;       ///< Array name, e.g., `operator new[]`.
+    bool              found;            ///< Found at least one operator?
+  } cxx_operator;
+};
+
 ////////// extern functions ///////////////////////////////////////////////////
+
+/**
+ * Adds a reference from \ref symbols_visit_data::curr_sym "curr_sym" to the
+ * symbol for \a to_csr, or mark the latter as a \ref tidy_symbol::is_root
+ * "root".
+ *
+ * @param to_csr The cursor whose symbol to add a reference to or be marked as
+ * a \ref tidy_symbol::is_root "root".
+ * @param svd The symbols_visit_data to use.
+ *
+ * @sa symbol_add_ref()
+ */
+void cursor_add_ref( CXCursor to_csr, symbols_visit_data *svd );
 
 /**
  * Adds a symbol to symbol_set unless it already exists.
@@ -145,6 +196,19 @@ struct tidy_symbol {
  */
 NODISCARD
 tidy_symbol* symbol_add( CXCursor sym_csr, tidy_source const *source );
+
+/**
+ * Adds a reference from \a from_sym to \a to_sym, or mark \a to_sym as a \ref
+ * tidy_symbol::is_root "root".
+ *
+ * @param from_sym The symbol to add a reference from. If NULL, \a to_sym is
+ * marked as a \ref tidy_symbol::is_root "root".
+ * @param to_sym The symbol to add a reference to or be marked as a \ref
+ * tidy_symbol::is_root "root".
+ *
+ * @sa cursor_add_ref()
+ */
+void symbol_add_ref( tidy_symbol *from_sym, tidy_symbol *to_sym );
 
 /**
  * Initializes the internal set of all symbols in the translation unit.
