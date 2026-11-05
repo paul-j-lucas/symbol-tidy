@@ -1,5 +1,8 @@
 2026-11-04  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * clang_util.c, test/Makefile.am, omanip.cpp, omanip.hpp,
+     template-omanip.out, template-omanip.test: Fixed template instantiation
+     symbols.
    * symbol.c: Added missing cursor kinds to cursor_is_excluded().
    * clang_util.c, clang_util.h, symbol.c: Added
      tidy_Cursor_inAnonymousClass().
