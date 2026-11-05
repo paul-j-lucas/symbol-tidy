@@ -794,12 +794,14 @@ int tidy_Cursor_isSpellingEqualToAny_impl( CXCursor cursor,
 
   int equal_idx = -1;
 
-  for ( int i = 0; values[i] != NULL; ++i ) {
-    if ( strcmp( cs, values[i] ) == 0 ) {
-      equal_idx = i;
-      break;
-    }
-  } // for
+  if ( cs != NULL ) {
+    for ( int i = 0; values[i] != NULL; ++i ) {
+      if ( strcmp( cs, values[i] ) == 0 ) {
+        equal_idx = i;
+        break;
+      }
+    } // for
+  }
 
   clang_disposeString( cxs );
   return equal_idx;
