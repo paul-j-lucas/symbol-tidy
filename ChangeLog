@@ -1,5 +1,7 @@
 2026-11-04  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * clang_util.c, clang_util.h, symbol.c: Added
+     tidy_Cursor_inAnonymousClass().
    * symbol.c, ignore-symbols.cpp, ignore-symbols.toml: If an ignored symbol is
      a class, now also ignores everything inside that class.
    * symbol.c, test/Makefile.am, template-ctor.cpp, template-ctor.out,
