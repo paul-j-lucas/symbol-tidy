@@ -1,7 +1,8 @@
 [symbol-tidy]
 ignore-symbols = [
   "*::pointer",
-  "reference"
+  "reference",
+  "*::iterator"
 ]
 
 [ignore-symbols.cpp]

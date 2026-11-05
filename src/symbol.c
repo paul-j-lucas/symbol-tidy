@@ -925,6 +925,45 @@ static ht_hash_val_t symbol_hash( tidy_symbol const *sym ) {
 }
 
 /**
+ * Gets whether \a sym_csr is nested, at any depth, within a class that is
+ * ignored via the `ignore-symbols` key.
+ *
+ * @param sym_csr The symbol's cursor to check.
+ * @return Returns `true` only if \a sym_csr is within an ignored class.
+ */
+NODISCARD
+static bool symbol_in_ignored_class( CXCursor sym_csr ) {
+  CXCursor scope_csr = clang_getCursorSemanticParent( sym_csr );
+
+  while ( !tidy_Cursor_isInvalid( scope_csr ) ) {
+    enum CXCursorKind const kind = clang_getCursorKind( scope_csr );
+    if ( kind == CXCursor_TranslationUnit )
+      break;
+
+    if ( tidy_Cursor_isClassDecl( scope_csr ) ) {
+      CXFile const  scope_file = tidy_getCursorLocation_File( scope_csr );
+      char *const   scope_name = tidy_Cursor_getScopedSpelling( scope_csr );
+      bool          is_ignored = false;
+
+      if ( scope_file != NULL && scope_name != NULL && scope_name[0] != '\0' ) {
+        CXString const    path_cxs = clang_getFileName( scope_file );
+        char const *const path_cs = clang_getCString( path_cxs );
+        is_ignored = config_symbol_is_ignored( scope_name, path_cs );
+        clang_disposeString( path_cxs );
+      }
+      free( scope_name );
+
+      if ( is_ignored )
+        return true;
+    }
+
+    scope_csr = clang_getCursorSemanticParent( scope_csr );
+  } // while
+
+  return false;
+}
+
+/**
  * Gets whether \a sym is within a scope that is ununsed.
  *
  * @param sym The symbol to check.
@@ -975,6 +1014,9 @@ static bool symbol_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
   if ( sym_scoped_name == NULL )
     goto done;
   if ( strcmp( sym_scoped_name, TIDY_COMPILER_ID ) == 0 )
+    goto done;
+
+  if ( symbol_in_ignored_class( sym_csr ) )
     goto done;
 
   is_excluded = false;

@@ -10,6 +10,10 @@ struct S {
   typedef char& reference;
   typedef char const& const_reference;
 
+  struct iterator {
+    iterator() { }
+  };
+
   S() { }
 };
 
