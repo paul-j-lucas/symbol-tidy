@@ -538,8 +538,8 @@ bool tidy_Cursor_getConstructorInfo( CXCursor cursor,
     !clang_Cursor_isNull( ctor_info->def_ctor_csr ) ||
     ctor_info->has_other_ctors;
 
-  // Fall back to template declaration if cls_csr is a template specialization.
   if ( !has_ctor ) {
+    // If cls_csr is a template specialization, try again.
     CXCursor const tmpl_csr = clang_getSpecializedCursorTemplate( cls_csr );
     if ( !tidy_Cursor_isInvalid( tmpl_csr ) )
       clang_visitChildren( tmpl_csr, &getConstructorInfo_visitor, ctor_info );
@@ -566,6 +566,14 @@ CXCursor tidy_Cursor_getDestructor( CXCursor cls_csr ) {
   cls_csr = clang_getCanonicalCursor( cls_csr );
   CXCursor dtor_csr = clang_getNullCursor();
   clang_visitChildren( cls_csr, &getDestructor_visitor, &dtor_csr );
+
+  if ( clang_Cursor_isNull( dtor_csr ) ) {
+    // If cls_csr is a template specialization, try again.
+    CXCursor const tmpl_csr = clang_getSpecializedCursorTemplate( cls_csr );
+    if ( !tidy_Cursor_isInvalid( tmpl_csr ) )
+      clang_visitChildren( tmpl_csr, &getDestructor_visitor, &dtor_csr );
+  }
+
   return dtor_csr;
 }
 
