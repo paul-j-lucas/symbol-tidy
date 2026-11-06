@@ -2,6 +2,10 @@ EXPECTED_EXIT=0
 
 test_symbol_tidy $TIDY_TEST_CXXFLAGS $TIDY_TEST_OPTIONS \
   $TIDY_TEST_CONFIG \
-  destructors.cpp
+  destructors-1.cpp
+
+test_symbol_tidy $TIDY_TEST_CXXFLAGS $TIDY_TEST_OPTIONS \
+  $TIDY_TEST_CONFIG \
+  destructors-2.cpp
 
 # vim:set syntax=bash et sw=2 ts=2:

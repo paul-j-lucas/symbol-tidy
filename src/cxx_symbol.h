@@ -81,8 +81,22 @@ enum CXChildVisitResult cxx_DeleteExpr_visitor( CXCursor cursor,
 void cxx_dtors_add_refs( CXCursor decl_csr, symbols_visit_data *svd );
 
 /**
- * For C++ only, adds a reference from a field to its initializer if it's a
- * constructor.
+ * Adds references from the destructor \a dtor_csr to the destructors of its
+ * class's fields and base classes, if any.
+ *
+ * @remarks A destructor implicitly calls the destructors of its class's fields
+ * and base classes, but libclang puts nothing into the AST for those calls.
+ * The references must be added from the destructor's own symbol (not from
+ * whatever destroys the object) so that they're reachable only if the
+ * destructor itself is.
+ *
+ * @param dtor_csr The destructor's cursor.
+ * @param svd The symbols_visit_data to use.
+ */
+void cxx_dtor_member_add_refs( CXCursor dtor_csr, symbols_visit_data *svd );
+
+/**
+ * Adds a reference from a field to its initializer if it's a constructor.
  *
  * @param field_csr The field to add the reference from.
  * @param svd The symbols_visit_data to use.

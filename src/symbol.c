@@ -1009,6 +1009,14 @@ static void visit_CXXMethod( CXCursor method_csr, symbols_visit_data *svd ) {
       }
       break;
 
+    case CXCursor_Destructor:
+      //
+      // A destructor implicitly calls its fields' and base classes'
+      // destructors, but libclang's C API gives no reference for them.
+      //
+      cxx_dtor_member_add_refs( method_csr, svd );
+      break;
+
     default:
       /* suppress warning */;
   } // switch
