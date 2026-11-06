@@ -179,6 +179,15 @@ NODISCARD
 bool tidy_Cursor_inAnonymousClass( CXCursor cursor );
 
 /**
+ * Gets whether \a cursor is within a function.
+ *
+ * @param cursor The cursor to check.
+ * @return Returns `true` only if \a cursor is within a function.
+ */
+NODISCARD
+bool tidy_Cursor_inFunctionScope( CXCursor cursor );
+
+/**
  * Gets whether \a cursor is a class, class template, structure, or union.
  *
  * @remarks This function is a subset of tidy_Cursor_isEnclosingScope().

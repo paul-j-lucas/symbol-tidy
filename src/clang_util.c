@@ -630,6 +630,22 @@ bool tidy_Cursor_inAnonymousClass( CXCursor cursor ) {
   return false;
 }
 
+bool tidy_Cursor_inFunctionScope( CXCursor cursor ) {
+  cursor = clang_getCursorSemanticParent( cursor );
+  enum CXCursorKind const kind = clang_getCursorKind( cursor );
+  switch ( kind ) {
+    case CXCursor_Constructor:
+    case CXCursor_ConversionFunction:
+    case CXCursor_CXXMethod:
+    case CXCursor_Destructor:
+    case CXCursor_FunctionDecl:
+    case CXCursor_FunctionTemplate:
+      return true;
+    default:
+      return false;
+  } // switch
+}
+
 bool tidy_Cursor_isClassDecl( CXCursor cursor ) {
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
   switch ( kind ) {
