@@ -1,5 +1,17 @@
+2026-11-06  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * symbol.h: Removed typedef -- not needed.
+   * clang_util.c, clang_util.h, cxx_symbol.c, cxx_symbol.h, symbol.c,
+     symbol.h, test/Makefile.am, ostream_iterator.cpp, template-adl.out,
+     template-adl.test: Now handling ADL.
+   * hash_table.c: s/==/!=/
+   * hash_table.c: ht_table_find now checks buckets == NULL.
+   * cxx_symbol.c: Iterating over signed num_args makes more sense.
+
 2026-11-05  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * clang_util.c, clang_util.h, symbol.c: Now only adding references to from
+     functions to local variables; only global variables are roots.
    * cxx_symbol.c, symbol.c, destructors-3.cpp, destructors.out,
      destructors.test: Yet better destructor handling.
    * cxx_symbol.c: Remove unnecessary clang_visitChildren() calls.
