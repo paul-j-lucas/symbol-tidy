@@ -164,7 +164,7 @@ ht_entry_t* ht_table_find( hash_table_t const *table, void const *data ) {
   assert( table != NULL );
   assert( data != NULL );
 
-  if ( table->buckets == NULL ) {
+  if ( table->buckets != NULL ) {
     ht_hash_val_t const hash = (*table->hash_fn)( data );
     ht_hash_val_t const b = hash % HT_PRIME[ table->prime_idx ];
 
