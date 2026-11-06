@@ -1102,8 +1102,19 @@ static void visit_FieldDecl( CXCursor field_csr, symbols_visit_data *svd ) {
   clang_disposeTokens( tu, tokens, token_count );
 
   if ( svd->source->lang == CXLanguage_CPlusPlus ) {
+    unsigned const prev_num_refs = svd->curr_sym->ref_sym_set.size;
+
     cxx_field_def_ctor_add_ref( field_csr, svd );
     cxx_dtors_add_refs( field_csr, svd );
+
+    //
+    // If a reference was added to a constructor or destructor of the field's
+    // type, either might have side effects, so the field must be considered
+    // used if its class is.
+    //
+    tidy_symbol *const cls_sym = svd->curr_sym->parent_sym;
+    if ( cls_sym != NULL && svd->curr_sym->ref_sym_set.size > prev_num_refs )
+      symbol_add_ref( cls_sym, svd->curr_sym );
   }
 }
 

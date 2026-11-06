@@ -144,6 +144,18 @@ static void cxx_dtor_add_ref( CXCursor cls_csr, symbols_visit_data *svd ) {
   clang_visitChildren( cls_csr, &cxx_field_dtor_add_ref_visitor, svd );
   clang_visitChildren( cls_csr, &cxx_base_dtor_add_ref_visitor, svd );
 
+  //
+  // An implicit instantiation exposes no children, so also visit the template
+  // it was instantiated from.  Fields and bases whose types are concrete
+  // (e.g., Foo f;) resolve there; those that depend on a template parameter
+  // (e.g., T f;) are skipped since they aren't class declarations.
+  //
+  CXCursor const tmpl_csr = clang_getSpecializedCursorTemplate( cls_csr );
+  if ( !tidy_Cursor_isInvalid( tmpl_csr ) ) {
+    clang_visitChildren( tmpl_csr, &cxx_field_dtor_add_ref_visitor, svd );
+    clang_visitChildren( tmpl_csr, &cxx_base_dtor_add_ref_visitor, svd );
+  }
+
   svd->cxx_dtor.top = frame.prev;
 }
 
