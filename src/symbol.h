@@ -48,7 +48,9 @@
 ////////// typedefs ///////////////////////////////////////////////////////////
 
 typedef struct svd_cxx_constructor  svd_cxx_constructor;
+typedef struct svd_cxx_dtor         svd_cxx_dtor;
 typedef struct svd_cxx_for_range    svd_cxx_for_range;
+typedef struct svd_cxx_member       svd_cxx_member;
 typedef struct svd_cxx_operator     svd_cxx_operator;
 typedef struct symbols_visit_data   symbols_visit_data;
 typedef struct tidy_symbol          tidy_symbol;
@@ -152,6 +154,13 @@ struct symbols_visit_data {
   } cxx_constructor;
 
   /**
+   * Additional data for cxx_dtor_add_ref().
+   */
+  struct svd_cxx_dtor {
+    struct cxx_dtor_frame const *top;   ///< TODO.
+  } cxx_dtor;
+
+  /**
    * Additional data for visit_CXXForRangeStmt().
    */
   struct svd_cxx_for_range {
@@ -160,6 +169,14 @@ struct symbols_visit_data {
     CXCursor          end_csr;          ///< Found `end()` cursor, if any.
     bool              is_const;         ///< Is the range-for `const`?
   } cxx_for_range;
+
+  /**
+   * Additional data for cxx_member_add_refs_by_name().
+   */
+  struct svd_cxx_member {
+    char const       *name;             ///< Member name to match.
+    bool              found;            ///< Found at least one member?
+  } cxx_member;
 
   /**
    * Additional data for cxx_operator_add_refs().

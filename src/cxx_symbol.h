@@ -155,6 +155,13 @@ void cxx_member_add_def_ctor_ref( CXCursor member_csr, tidy_symbol *member_sym,
                                   symbols_visit_data const *svd );
 
 /**
+ * TODO.
+ *
+ * @param member_csr The member cursor to visit.
+ */
+void cxx_member_add_ref( CXCursor member_csr, symbols_visit_data *svd );
+
+/**
  * Adds references to the member operators of \a cls_csr named either \a name
  * or \a array_name.  Like C++ name lookup, base classes are searched only if
  * \a cls_csr declares none.

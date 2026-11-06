@@ -48,7 +48,8 @@ TESTS+=	tests/config-bad-semantics-1.test \
 	tests/config-ignore-symbols.test
 
 # C++ tests.
-TESTS+=	tests/constructors.test \
+TESTS+=	tests/auto_delete_pool.test \
+	tests/constructors.test \
 	tests/destructors.test \
 	tests/functor.test \
 	tests/new-delete.test \

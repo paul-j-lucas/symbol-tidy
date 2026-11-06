@@ -48,12 +48,29 @@
  * @{
  */
 
+////////// typedefs ///////////////////////////////////////////////////////////
+
+typedef struct cxx_dtor_frame cxx_dtor_frame;
+
+////////// structs ////////////////////////////////////////////////////////////
+
+/**
+ * A class whose implicit destructor is being expanded; used to break cycles.
+ */
+struct cxx_dtor_frame {
+  CXCursor              cls_csr;        ///< TODO.
+  cxx_dtor_frame const *prev;           ///< TODO.
+};
+
 ////////// local functions ////////////////////////////////////////////////////
 
 static void cxx_dtor_add_ref( CXCursor, symbols_visit_data* );
 
 static enum CXChildVisitResult
-            cxx_field_add_dtor_ref_visitor( CXCursor, CXCursor, CXClientData );
+            cxx_field_add_dtor_ref_visitor( CXCursor, CXCursor, CXClientData ),
+            cxx_member_add_refs_by_name_visitor( CXCursor, CXCursor,
+                                                 CXClientData ),
+            cxx_member_by_name_base_visitor( CXCursor, CXCursor, CXClientData );
 
 static void cxx_type_template_args_add_dtor_ref( CXType, symbols_visit_data* );
 
@@ -108,12 +125,26 @@ static void cxx_dtor_add_ref( CXCursor cls_csr, symbols_visit_data *svd ) {
   CXCursor const dtor_csr = tidy_Cursor_getDestructor( cls_csr );
   if ( !tidy_Cursor_isInvalid( dtor_csr ) ) {
     cursor_add_ref( dtor_csr, svd );
+    return;
   }
-  else {
-    // Implicit destructor calls member and base destructors.
-    clang_visitChildren( cls_csr, &cxx_field_add_dtor_ref_visitor, svd );
-    clang_visitChildren( cls_csr, &cxx_base_add_dtor_ref_visitor, svd );
-  }
+
+  cls_csr = clang_getCanonicalCursor( cls_csr );
+  for ( cxx_dtor_frame const *frame = svd->cxx_dtor.top; frame != NULL;
+        frame = frame->prev ) {
+    if ( clang_equalCursors( frame->cls_csr, cls_csr ) )
+      return;
+  } // for
+  cxx_dtor_frame const frame = {
+    .cls_csr = cls_csr,
+    .prev = svd->cxx_dtor.top
+  };
+  svd->cxx_dtor.top = &frame;
+
+  // Implicit destructor calls member and base destructors.
+  clang_visitChildren( cls_csr, &cxx_field_add_dtor_ref_visitor, svd );
+  clang_visitChildren( cls_csr, &cxx_base_add_dtor_ref_visitor, svd );
+
+  svd->cxx_dtor.top = frame.prev;
 }
 
 /**
@@ -141,6 +172,134 @@ CXChildVisitResult cxx_field_add_dtor_ref_visitor( CXCursor cursor,
       cxx_type_template_args_add_dtor_ref( type, svd );
     }
   }
+  return CXChildVisit_Continue;
+}
+
+/**
+ * Adds a reference to every member of \a cls_csr whose name is \a name; or, if
+ * there are none, then of its base classes.
+ *
+ * @remarks This is for a member access whose base expression has a dependent
+ * type, such as `pool_->add( this )` inside a class template.  libclang can't
+ * resolve such an access, so we have to match by name.  All overloads are
+ * referenced since the argument types can't be resolved either.
+ *
+ * @param cls_csr The cursor of the class to search.
+ * @param name The member's name.
+ * @param svd The symbols_visit_data to use.
+ * @return Returns `true` only if at least one member having \a name was found.
+ */
+PJL_DISCARD
+static bool cxx_member_add_refs_by_name( CXCursor cls_csr, char const *name,
+                                         symbols_visit_data *svd ) {
+  assert( name != NULL );
+  assert( svd != NULL );
+
+  if ( tidy_Cursor_isInvalid( cls_csr ) || name[0] == '\0' )
+    return false;
+
+  svd_cxx_member const prev_svd_cxx_member = svd->cxx_member;
+  svd->cxx_member = (svd_cxx_member){ .name = name };
+
+  clang_visitChildren( cls_csr, &cxx_member_add_refs_by_name_visitor, svd );
+
+  //
+  // If cls_csr is an implicit instantiation, libclang doesn't expose its
+  // members, so look in the template it was instantiated from.
+  //
+  if ( !svd->cxx_member.found ) {
+    CXCursor const tmpl_csr = clang_getSpecializedCursorTemplate( cls_csr );
+    if ( !tidy_Cursor_isInvalid( tmpl_csr ) ) {
+      clang_visitChildren(
+        tmpl_csr, &cxx_member_add_refs_by_name_visitor, svd
+      );
+    }
+  }
+
+  //
+  // Per C++ name hiding, a member found in the class hides the same name in
+  // its bases, so look in the bases only if nothing was found.
+  //
+  if ( !svd->cxx_member.found )
+    clang_visitChildren( cls_csr, &cxx_member_by_name_base_visitor, svd );
+
+  bool const found = svd->cxx_member.found;
+  svd->cxx_member = prev_svd_cxx_member;
+  return found;
+}
+
+
+/**
+ * Helper function for cxx_member_add_refs_by_name() that adds a reference to
+ * every data member, member function, member function template, or static
+ * data member whose name matches.
+ *
+ * @param cursor The cursor being visited.
+ * @param parent Not used.
+ * @param data The symbols_visit_data to use.
+ * @return Returns `CXChildVisit_Continue`.
+ */
+static enum
+CXChildVisitResult cxx_member_add_refs_by_name_visitor( CXCursor cursor,
+                                                        CXCursor parent,
+                                                        CXClientData data ) {
+  (void)parent;
+  assert( data != NULL );
+  symbols_visit_data *const svd = data;
+
+  enum CXCursorKind const kind = clang_getCursorKind( cursor );
+  switch ( kind ) {
+    case CXCursor_CXXMethod:
+    case CXCursor_FieldDecl:
+    case CXCursor_FunctionTemplate:
+    case CXCursor_VarDecl:              // static data member
+      if ( tidy_Cursor_isSpellingEqualTo( cursor,
+                                          svd->cxx_member.name ) ) {
+        cursor_add_ref( cursor, svd );
+        svd->cxx_member.found = true;
+      }
+      break;
+    default:
+      /* suppress warning */;
+  } // switch
+
+  return CXChildVisit_Continue;
+}
+
+/**
+ * Helper function for cxx_member_add_refs_by_name() that recurses into each
+ * base class.
+ *
+ * @param cursor The cursor being visited.
+ * @param parent Not used.
+ * @param data The symbols_visit_data to use.
+ * @return Always returns `CXChildVisit_Continue`.
+ */
+static enum
+CXChildVisitResult cxx_member_by_name_base_visitor( CXCursor cursor,
+                                                    CXCursor parent,
+                                                    CXClientData data ) {
+  (void)parent;
+  assert( data != NULL );
+  symbols_visit_data *const svd = data;
+
+  if ( clang_getCursorKind( cursor ) != CXCursor_CXXBaseSpecifier )
+    goto skip;
+
+  CXCursor const base_csr =
+    clang_getTypeDeclaration( clang_getCursorType( cursor ) );
+  if ( !tidy_Cursor_isClassDecl( base_csr ) )
+    goto skip;                          // e.g., "struct S : T" with T a param
+
+  //
+  // Copy the name first since the recursive call replaces (then restores)
+  // svd->cxx_member.
+  //
+  char const *const name = svd->cxx_member.name;
+  if ( cxx_member_add_refs_by_name( base_csr, name, svd ) )
+    svd->cxx_member.found = true;
+
+skip:
   return CXChildVisit_Continue;
 }
 
@@ -519,6 +678,58 @@ void cxx_member_add_def_ctor_ref( CXCursor member_csr, tidy_symbol *member_sym,
     symbol_add( ctor_info.def_ctor_csr, svd->source );
   if ( def_ctor_sym != NULL )
     symbol_add_ref( member_sym, def_ctor_sym );
+}
+
+void cxx_member_add_ref( CXCursor member_csr, symbols_visit_data *svd ) {
+  CXCursor const base_csr = tidy_Cursor_getFirstExprChild( member_csr );
+  if ( clang_Cursor_isNull( base_csr ) )
+    return;
+
+  CXType type = clang_getCanonicalType( clang_getCursorType( base_csr ) );
+         type = clang_getNonReferenceType( type );
+  if ( type.kind == CXType_Pointer ) {
+    type = clang_getPointeeType( type );
+    type = clang_getCanonicalType( type );
+  }
+
+  CXCursor const cls_csr = clang_getTypeDeclaration( type );
+  if ( !tidy_Cursor_isClassDecl( cls_csr ) )
+    return;                             // e.g., bare template parameter
+
+  //
+  // clang_getCursorSpelling() returns "" for a dependent member, so get the
+  // member's name from the tokens: it's the first identifier after the last
+  // "." or "->".  If there's neither (an implicit "this->"), it's the first
+  // identifier.
+  //
+  CXTranslationUnit const tu = clang_Cursor_getTranslationUnit( member_csr );
+  CXSourceRange const     range = tidy_getCursorExtent( member_csr );
+
+  CXToken *tokens;
+  unsigned token_count;
+  clang_tokenize( tu, range, &tokens, &token_count );
+  if ( token_count == 0 )
+    return;                             // LCOV_EXCL_LINE
+
+  unsigned start_idx = 0;
+  for ( unsigned i = 0; i < token_count; ++i ) {
+    if ( clang_getTokenKind( tokens[i] ) != CXToken_Punctuation )
+      continue;
+    if ( tidy_Token_isSpellingEqualToAny( tu, tokens[i], ".", "->" ) >= 0 )
+      start_idx = i + 1;
+  } // for
+
+  for ( unsigned i = start_idx; i < token_count; ++i ) {
+    if ( clang_getTokenKind( tokens[i] ) != CXToken_Identifier )
+      continue;
+    CXString const    name_cxs = clang_getTokenSpelling( tu, tokens[i] );
+    char const *const name = clang_getCString( name_cxs );
+    cxx_member_add_refs_by_name( cls_csr, name, svd );
+    clang_disposeString( name_cxs );
+    break;
+  } // for
+
+  clang_disposeTokens( tu, tokens, token_count );
 }
 
 bool cxx_operator_add_refs( CXCursor cls_csr, char const *name,

@@ -1168,8 +1168,14 @@ static void visit_most_Ref( CXCursor cursor, symbols_visit_data *svd ) {
   assert( svd != NULL );
 
   CXCursor const ref_csr = clang_getCursorReferenced( cursor );
-  if ( unlikely( tidy_Cursor_isInvalid( ref_csr ) ) )
+  if ( tidy_Cursor_isInvalid( ref_csr ) ) {
+    if ( svd->source->lang == CXLanguage_CPlusPlus ) {
+      enum CXCursorKind const kind = clang_getCursorKind( cursor );
+      if ( kind == CXCursor_MemberRefExpr )
+        cxx_member_add_ref( cursor, svd );
+    }
     return;
+  }
 
   tidy_symbol *const ref_sym = symbol_add( ref_csr, svd->source );
   if ( ref_sym != NULL ) {
