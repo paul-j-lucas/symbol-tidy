@@ -506,22 +506,22 @@ static void print_statistics( void ) {
     "  adl-name set:\n"
   );
   verbose_printf(
-    "    adln-load-factor = " TIDY_STAT_LF_FMT "\n",
+    "    adlns-load-factor = " TIDY_STAT_LF_FMT "\n",
                             ht_table_load_factor( &cxx_adl_name_set )
   );
   verbose_printf(
-    "    adln-size = %u\n", cxx_adl_name_set.size
+    "    adlns-size = %u\n", cxx_adl_name_set.size
   );
 
   verbose_printf(
     "  adl-type set:\n"
   );
   verbose_printf(
-    "    adlt-load-factor = " TIDY_STAT_LF_FMT "\n",
+    "    adlts-load-factor = " TIDY_STAT_LF_FMT "\n",
                             ht_table_load_factor( &cxx_adl_type_set )
   );
   verbose_printf(
-    "    adlt-size = %u\n", cxx_adl_type_set.size
+    "    adlts-size = %u\n", cxx_adl_type_set.size
   );
 }
 
