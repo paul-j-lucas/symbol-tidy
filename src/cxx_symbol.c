@@ -51,6 +51,10 @@
 ////////// local functions ////////////////////////////////////////////////////
 
 static void cxx_dtor_add_ref( CXCursor, symbols_visit_data* );
+
+static enum CXChildVisitResult
+            cxx_field_add_dtor_ref_visitor( CXCursor, CXCursor, CXClientData );
+
 static void cxx_type_template_args_add_dtor_ref( CXType, symbols_visit_data* );
 
 ////////// local functions ////////////////////////////////////////////////////
@@ -102,8 +106,14 @@ static void cxx_dtor_add_ref( CXCursor cls_csr, symbols_visit_data *svd ) {
   assert( svd != NULL );
 
   CXCursor const dtor_csr = tidy_Cursor_getDestructor( cls_csr );
-  if ( !tidy_Cursor_isInvalid( dtor_csr ) )
+  if ( !tidy_Cursor_isInvalid( dtor_csr ) ) {
     cursor_add_ref( dtor_csr, svd );
+  }
+  else {
+    // Implicit destructor calls member and base destructors.
+    clang_visitChildren( cls_csr, &cxx_field_add_dtor_ref_visitor, svd );
+    clang_visitChildren( cls_csr, &cxx_base_add_dtor_ref_visitor, svd );
+  }
 }
 
 /**
