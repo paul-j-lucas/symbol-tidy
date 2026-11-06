@@ -47,6 +47,7 @@
 
 ////////// typedefs ///////////////////////////////////////////////////////////
 
+typedef struct cxx_dtor_frame       cxx_dtor_frame;
 typedef struct svd_cxx_constructor  svd_cxx_constructor;
 typedef struct svd_cxx_dtor         svd_cxx_dtor;
 typedef struct svd_cxx_for_range    svd_cxx_for_range;
@@ -69,6 +70,36 @@ struct tidy_symbol {
   unsigned      col;                    ///< Column defined at.
   tidy_symbol  *parent_sym;             ///< Parent symbol, if any.
   hash_table_t  ref_sym_set;            ///< Symbol(s) referenced from this.
+
+  /**
+   * For C++ functions only, USRs of user-defined classes and enumerations that
+   * appear in the parameter types of this function.
+   *
+   * @remarks
+   * @parblock
+   * Templates in standard headers can call a user's functions that are found
+   * only by argument-dependent lookup (ADL) at the point of instantiation,
+   * e.g., a user-defined `operator<<` called from within
+   * `std::ostream_iterator<T>::operator=()`.
+   *
+   * Libclang's C API neither visits template instantiations nor records ADL
+   * candidates for dependent calls, so no reference to such a function is ever
+   * seen.
+   *
+   * This set and the global sets in `symbol.c` are used to decide whether such
+   * a function can be found by ADL from standard template code, and, if so, to
+   * mark it as a \ref is_root "root".
+   *
+   * Unlike other hash tables used in **symbol-tidy**, this one is lazily
+   * initialized: it's empty (and allocates nothing) for every symbol that
+   * isn't a C++ template function with at least one user-defined class among
+   * its parameter types.
+   * @endparblock
+   *
+   * @sa https://en.cppreference.com/cpp/language/adl
+   * @sa https://en.wikipedia.org/wiki/Argument-dependent_name_lookup
+   */
+  hash_table_t  cxx_adl_usr_set;
 
   /**
    * Is this a "root" symbol?
@@ -157,7 +188,7 @@ struct symbols_visit_data {
    * Additional data for cxx_dtor_add_ref().
    */
   struct svd_cxx_dtor {
-    struct cxx_dtor_frame const *top;   ///< TODO.
+    cxx_dtor_frame const *top;          ///< The top destructor frame.
   } cxx_dtor;
 
   /**
@@ -204,7 +235,7 @@ struct symbols_visit_data {
 void cursor_add_ref( CXCursor to_csr, symbols_visit_data *svd );
 
 /**
- * Adds a symbol to symbol_set unless it already exists.
+ * Adds a symbol to tidy_symbol_set unless it already exists.
  *
  * @param sym_csr The cursor for the symbol to add.
  * @param source The tidy_source \a sym_csr is from.
@@ -247,6 +278,10 @@ unsigned symbols_print_unused( void );
  * @param source The source file to visit.
  */
 void symbols_visit( tidy_source *source );
+
+////////// extern variables ///////////////////////////////////////////////////
+
+extern hash_table_t tidy_symbol_set;    ///< Set of symbols.
 
 ///////////////////////////////////////////////////////////////////////////////
 

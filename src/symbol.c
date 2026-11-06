@@ -74,14 +74,20 @@ static void visit_CXXForRangeStmt( CXCursor, symbols_visit_data* );
 static void visit_CXXMethod( CXCursor, symbols_visit_data* );
 static void visit_CXXNewExpr( CXCursor, symbols_visit_data* );
 static void visit_FieldDecl( CXCursor, symbols_visit_data* );
+static void visit_FunctionDecl( CXCursor, symbols_visit_data* );
 static void visit_MacroDefinition( CXCursor, symbols_visit_data* );
 static void visit_most_Ref( CXCursor, symbols_visit_data* );
-static void visit_OverloadedDeclRef( CXCursor, symbols_visit_data* );
+static void visit_OverloadedDeclRef( CXCursor, bool, symbols_visit_data* );
 static void visit_VarDecl( CXCursor, symbols_visit_data* );
 
-////////// local variables ////////////////////////////////////////////////////
+////////// extern variables ///////////////////////////////////////////////////
 
-static hash_table_t symbol_set;         ///< Set of symbols.
+/// @cond DOXYGEN_IGNORE
+/// Otherwise Doxygen generates two entries.
+
+hash_table_t tidy_symbol_set;
+
+/// @endcond
 
 ////////// local functions ////////////////////////////////////////////////////
 
@@ -230,26 +236,25 @@ static bool cursor_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
 
     case CXCursor_Namespace:
       //
-      // Namespaces first declared in system headers (e.g., "std") should be
+      // Namespaces first declared in standard headers (e.g., "std") should be
       // excluded even if re-opened in user code.
       //
       sym_csr = clang_getCanonicalCursor( sym_csr );
-      CXSourceLocation const loc = clang_getCursorLocation( sym_csr );
-      return clang_Location_isInSystemHeader( loc );
+      return tidy_Cursor_isInSystemHeader( sym_csr );
 
     case CXCursor_NonTypeTemplateParameter:
     case CXCursor_TemplateTemplateParameter:
     case CXCursor_TemplateTypeParameter:
       //
       // These are local to the template definition, so don't need to be added
-      // to symbol_set.
+      // to tidy_symbol_set.
       //
       return true;
 
     case CXCursor_ParmDecl:
       //
       // These are local to a function, so don't need to be added to
-      // symbol_set.
+      // tidy_symbol_set.
       //
       return true;
 
@@ -436,10 +441,10 @@ static void print_statistics( void ) {
   );
   verbose_printf(
     "    ss-load-factor = " TIDY_STAT_LF_FMT "\n",
-                          ht_table_load_factor( &symbol_set )
+                          ht_table_load_factor( &tidy_symbol_set )
   );
   verbose_printf(
-    "    ss-size = %u\n", symbol_set.size
+    "    ss-size = %u\n", tidy_symbol_set.size
   );
 
   tidy_symbol const *max_sym = NULL;
@@ -447,7 +452,7 @@ static void print_statistics( void ) {
 
   // Find the symbol having the ref_sym_set with the largest load factor.
   ht_iterator_t iter;
-  ht_iterator_init( &iter, &symbol_set );
+  ht_iterator_init( &iter, &tidy_symbol_set );
   for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
     if ( sym->is_dead )
       continue;
@@ -494,6 +499,7 @@ static void symbol_cleanup( tidy_symbol *sym ) {
     FREE( sym->name );
     FREE( sym->display_name );
     FREE( sym->path );
+    ht_table_cleanup( &sym->cxx_adl_usr_set, /*free_fn=*/NULL );
     ht_table_cleanup( &sym->ref_sym_set, /*free_fn=*/NULL );
   }
 }
@@ -602,7 +608,7 @@ static void symbol_mark_used( tidy_symbol *sym ) {
 static void symbols_cleanup( void ) {
   print_statistics();
   ht_table_cleanup(
-    &symbol_set, POINTER_CAST( ht_free_fn_t, &symbol_cleanup )
+    &tidy_symbol_set, POINTER_CAST( ht_free_fn_t, &symbol_cleanup )
   );
 }
 
@@ -613,16 +619,18 @@ static void symbols_cleanup( void ) {
  * @return Returns the number of unused, alive symbols.
  */
 static unsigned symbols_mark_used( void ) {
+  cxx_symbols_mark_adl_roots();
+
   ht_iterator_t iter;
 
-  ht_iterator_init( &iter, &symbol_set );
+  ht_iterator_init( &iter, &tidy_symbol_set );
   for ( tidy_symbol *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
     if ( sym->is_root )
       symbol_mark_used( sym );
   } // for
 
   unsigned unused = 0;
-  ht_iterator_init( &iter, &symbol_set );
+  ht_iterator_init( &iter, &tidy_symbol_set );
   for ( tidy_symbol *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
     if ( sym->path == NULL || sym->line == 0 ||
          symbol_in_unused_scope( sym ) ) {
@@ -656,12 +664,12 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
 
   if ( is_in_system_header ) {
     //
-    // Symbols in system headers can be skipped entirely in C.
+    // Symbols in standard headers can be skipped entirely in C.
     //
     if ( svd->source->lang == CXLanguage_C )
       goto skip;
     //
-    // In C++, they can't be skipped because template code in system headers
+    // In C++, they can't be skipped because template code in standard headers
     // calls back into user code, so we need it to mark the user code as used.
     //
   }
@@ -673,6 +681,16 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
 
   bool is_definition = false;
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
+
+  if ( svd->source->lang == CXLanguage_CPlusPlus && !is_in_system_header &&
+       (clang_isDeclaration( kind ) || clang_isExpression( kind )) ) {
+    //
+    // Remember the user-defined classes used as template arguments so we can
+    // later tell which user functions ADL could find from standard templates.
+    //
+    CXType const type = clang_getCursorType( cursor );
+    cxx_adl_type_set_add( type );
+  }
 
   switch ( kind ) {
     case CXCursor_CallExpr:
@@ -732,7 +750,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       break;
 
     case CXCursor_OverloadedDeclRef:
-      visit_OverloadedDeclRef( cursor, svd );
+      visit_OverloadedDeclRef( cursor, is_in_system_header, svd );
       break;
 
     default:
@@ -747,8 +765,9 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
 
       if ( is_in_system_header ) {
         //
-        // As mentioned above, in C++, template code in system headers calls
-        // back into user code, so mark all symbols in system headers as roots.
+        // As mentioned above, in C++, template code in standard headers calls
+        // back into user code, so mark all symbols in standard headers as
+        // roots.
         //
         sym->is_root = true;
       }
@@ -835,6 +854,11 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
 
         case CXCursor_FieldDecl:
           visit_FieldDecl( cursor, svd );
+          break;
+
+        case CXCursor_FunctionDecl:
+          if ( !is_in_system_header )
+            visit_FunctionDecl( cursor, svd );
           break;
 
         case CXCursor_MacroDefinition:
@@ -1119,6 +1143,32 @@ static void visit_FieldDecl( CXCursor field_csr, symbols_visit_data *svd ) {
 }
 
 /**
+ * Visits a `CXCursor_FunctionDecl` kind of cursor in user code.
+ *
+ * @remarks For C++ only, records the user-defined classes among the function's
+ * parameter types so that cxx_symbols_mark_adl_roots() can later determine
+ * whether template code in a standard header could call the function via ADL.
+ *
+ * @param fn_csr The function's cursor to visit.
+ * @param svd The symbols_visit_data to use.
+ */
+static void visit_FunctionDecl( CXCursor fn_csr, symbols_visit_data *svd ) {
+  assert( svd != NULL );
+
+  if ( svd->source->lang != CXLanguage_CPlusPlus || svd->curr_sym == NULL )
+    return;
+
+  CXType const fn_type = clang_getCursorType( fn_csr );
+  int const num_params = clang_getNumArgTypes( fn_type );
+  for ( int i = 0; i < num_params; ++i ) {
+    CXType const arg_type = clang_getArgType( fn_type, (unsigned)i );
+    cxx_adl_collect_classes(
+      arg_type, /*skip_top=*/false, &svd->curr_sym->cxx_adl_usr_set
+    );
+  } // for
+}
+
+/**
  * Visits a `CXCursor_MacroDefinition` kind of cursor.
  *
  * @remarks
@@ -1226,11 +1276,29 @@ static void visit_most_Ref( CXCursor cursor, symbols_visit_data *svd ) {
  * invalid or null cursor.
  *
  * @param overloaded_csr The overloaded definition's cursor to visit.
+ * @param is_in_system_header `true` only if \a overloaded_csr is in a standard
+ * header.
  * @param svd The symbols_visit_data to use.
  */
 static void visit_OverloadedDeclRef( CXCursor overloaded_csr,
+                                     bool is_in_system_header,
                                      symbols_visit_data *svd ) {
   assert( svd != NULL );
+  assert( svd->source->lang == CXLanguage_CPlusPlus );
+
+  if ( is_in_system_header ) {
+    //
+    // This is (likely) a dependent call in a standard template.  Its callee
+    // may be found by ADL at instantiation time among user functions that
+    // we'll never see referenced; remember its name.  See
+    // cxx_symbols_mark_adl_roots().
+    //
+    CXString const    name_cxs = clang_getCursorSpelling( overloaded_csr );
+    char const *const name = clang_getCString( name_cxs );
+    if ( name != NULL && name[0] != '\0' )
+      cxx_adl_name_set_add( name );
+    clang_disposeString( name_cxs );
+  }
 
   unsigned const num_decls = clang_getNumOverloadedDecls( overloaded_csr );
   for ( unsigned i = 0; i < num_decls; ++i ) {
@@ -1366,7 +1434,7 @@ tidy_symbol* symbol_add( CXCursor sym_csr, tidy_source const *source ) {
   };
   key = NULL;                           // new_sym owns this now
   ht_insert_rv_t const hti =
-    ht_table_insert( &symbol_set, &new_sym, sizeof new_sym );
+    ht_table_insert( &tidy_symbol_set, &new_sym, sizeof new_sym );
   tidy_symbol *const sym = HT_DINT( hti.entry );
   if ( !hti.inserted ) {
     symbol_cleanup( &new_sym );
@@ -1410,10 +1478,11 @@ void symbol_add_ref( tidy_symbol *from_sym, tidy_symbol *to_sym ) {
 void symbols_init( void ) {
   ASSERT_RUN_ONCE();
   ht_table_init(
-    &symbol_set, HT_DINT, 2.0, 16384,
+    &tidy_symbol_set, HT_DINT, 2.0, 16384,
     POINTER_CAST( ht_cmp_fn_t, &symbol_cmp ),
     POINTER_CAST( ht_hash_fn_t, &symbol_hash )
   );
+  cxx_symbols_init();
   ATEXIT( &symbols_cleanup );
 }
 
@@ -1426,7 +1495,7 @@ unsigned symbols_print_unused( void ) {
   array_reserve( &symbol_array, unused );
 
   ht_iterator_t iter;
-  ht_iterator_init( &iter, &symbol_set );
+  ht_iterator_init( &iter, &tidy_symbol_set );
   for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
     if ( !sym->is_used && !sym->is_dead )
       *(tidy_symbol*)array_push_back( &symbol_array ) = *sym;

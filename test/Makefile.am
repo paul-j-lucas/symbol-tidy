@@ -55,6 +55,7 @@ TESTS+=	tests/auto_delete_pool.test \
 	tests/new-delete.test \
 	tests/range-for.test \
 	tests/std-exclude.test \
+	tests/template-adl.test \
 	tests/template-ctor.test \
 	tests/template-omanip.test \
 	tests/unique_ptr.test

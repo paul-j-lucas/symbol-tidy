@@ -28,6 +28,7 @@
 
 // local
 #include "pjl_config.h"
+#include "hash_table.h"
 #include "symbol.h"
 
 // libclang
@@ -43,6 +44,37 @@
  */
 
 ////////// extern functions ///////////////////////////////////////////////////
+
+/**
+ * Adds the USRs of the user-defined classes (and enumerations) in \a type to
+ * \a set, descending through pointers, references, arrays, and, recursively,
+ * template arguments.
+ *
+ * @remarks Classes in standard headers are never added: a user's function
+ * can't be found by ADL through `std` (or any other standard namespace) alone.
+ *
+ * @param type The type to collect from.
+ * @param skip_top If `true`, the outermost class itself is not added (but its
+ * template arguments are considered).
+ * @param set The set to add to.
+ */
+void cxx_adl_collect_classes( CXType type, bool skip_top, hash_table_t *set );
+
+/**
+ * Adds \a name to the global argument-dependent lookup (ADL) name set.
+ *
+ * @param name The name to add.
+ */
+void cxx_adl_name_set_add( char const *name );
+
+/**
+ * Adds the USRs of user-defined classes appearing as template arguments of
+ * \a type to cxx_adl_type_set.  If \a type is a function type, its result and
+ * parameter types are considered.
+ *
+ * @param type The type to collect from.
+ */
+void cxx_adl_type_set_add( CXType type );
 
 /**
  * A helper function for visit_Constructor() that visits all base classes of \a
@@ -132,6 +164,7 @@ enum CXChildVisitResult cxx_find_begin_end_visitor( CXCursor cursor,
  * TODO.
  *
  * @param member_csr The member cursor to visit.
+ * @param svd The symbols_visit_data to use.
  */
 void cxx_member_add_ref( CXCursor member_csr, symbols_visit_data *svd );
 
@@ -189,6 +222,33 @@ void cxx_member_def_ctor_add_ref( CXCursor member_csr, tidy_symbol *member_sym,
 PJL_DISCARD
 bool cxx_operator_add_refs( CXCursor cls_csr, char const *name,
                             char const *array_name, symbols_visit_data *svd );
+
+/**
+ * Initializes the internal set of all C++ symbols.
+ *
+ * @note This function must be called exactly once.
+ */
+void cxx_symbols_init( void );
+
+/**
+ * Marks as roots all user-defined free functions that template code in
+ * standard headers can call via ADL.
+ *
+ * @remarks
+ * @parblock
+ * A function is marked only if _both_ are true:
+ *
+ *  1. Its (unqualified) name was referenced by a dependent call in a standard
+ *     header, e.g., `operator<<`.
+ *
+ *  2. At least one user-defined class in its parameter types is also a
+ *     template argument of some type used in user code.
+ *
+ * Condition 2 is what prevents every user `operator<<` from being marked
+ * merely because some standard header shifts a dependent integer.
+ * @endparblock
+ */
+void cxx_symbols_mark_adl_roots( void );
 
 /**
  * Recursively checks the template arguments of a variable's type and adds

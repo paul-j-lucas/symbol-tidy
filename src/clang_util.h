@@ -238,6 +238,18 @@ NODISCARD
 bool tidy_Cursor_isExternalLinkage( CXCursor cursor );
 
 /**
+ * Gets whether \a cursor is in a system header.
+ *
+ * @param cursor The cursor to check.
+ * @return Returns `true` only if \a cursor is in a system header.
+ */
+NODISCARD
+inline bool tidy_Cursor_isInSystemHeader( CXCursor cursor ) {
+  CXSourceLocation const loc = clang_getCursorLocation( cursor );
+  return clang_Location_isInSystemHeader( loc );
+}
+
+/**
  * Gets whether \a cursor is either null or invalid.
  *
  * @param cursor The cursor to check.

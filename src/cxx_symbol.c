@@ -26,10 +26,15 @@
 // local
 #include "pjl_config.h"
 #include "cxx_symbol.h"
+#include "cxx_util.h"
 #include "clang_util.h"
+#include "fnv1a.h"
+#include "hash_table.h"
 #include "source.h"
 #include "symbol.h"
+#include "symbol-tidy.h"
 #include "util.h"
+#include "verbose.h"
 
 /// @cond DOXYGEN_IGNORE
 
@@ -40,6 +45,8 @@
 #include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
 
 /// @endcond
 
@@ -48,18 +55,14 @@
  * @{
  */
 
-////////// typedefs ///////////////////////////////////////////////////////////
-
-typedef struct cxx_dtor_frame cxx_dtor_frame;
-
 ////////// structs ////////////////////////////////////////////////////////////
 
 /**
- * A class whose implicit destructor is being expanded; used to break cycles.
+ * Additional data for cxx_dtor_add_ref().
  */
 struct cxx_dtor_frame {
-  CXCursor              cls_csr;        ///< TODO.
-  cxx_dtor_frame const *prev;           ///< TODO.
+  CXCursor              cls_csr;        ///< Class with implicit destructor.
+  cxx_dtor_frame const *prev_frame;     ///< The previous frame, if any.
 };
 
 ////////// local functions ////////////////////////////////////////////////////
@@ -73,6 +76,29 @@ static enum CXChildVisitResult
             cxx_member_by_name_base_visitor( CXCursor, CXCursor, CXClientData );
 
 static void cxx_type_template_args_dtor_add_ref( CXType, symbols_visit_data* );
+static void print_statistics( void );
+static void str_set_insert( hash_table_t*, char const* );
+
+////////// local variables ////////////////////////////////////////////////////
+
+/**
+ * Set of names of functions referenced via an `OverloadedDeclRef` from within
+ * standard headers, e.g., `operator<<`.  Such a reference is a dependent call
+ * that may find user-defined functions by ADL when instantiated.
+ *
+ * @remarks Lazily initialized.  Entries are strings stored internally.
+ */
+static hash_table_t cxx_adl_name_set;
+
+/**
+ * Set of USRs of user-defined classes and enumerations that appear, at any
+ * depth, as template arguments of types seen in user code.  These are the
+ * classes that can make a user's function visible to ADL from within an
+ * instantiation of a standard template.
+ *
+ * @remarks Lazily initialized.  Entries are strings stored internally.
+ */
+static hash_table_t cxx_adl_type_set;
 
 ////////// local functions ////////////////////////////////////////////////////
 
@@ -124,23 +150,62 @@ static void cxx_dtor_add_ref( CXCursor cls_csr, symbols_visit_data *svd ) {
 
   CXCursor const dtor_csr = tidy_Cursor_getDestructor( cls_csr );
   if ( !tidy_Cursor_isInvalid( dtor_csr ) ) {
+    //
+    // The class has an explicit destructor, so add a reference to it and we're
+    // done.
+    //
     cursor_add_ref( dtor_csr, svd );
     return;
   }
 
+  //
+  // If we've been called on this cls_csr before, bail out.  Given:
+  //
+  //      struct Tree {
+  //        // ...
+  //        std::unique_ptr<Tree> left, right;
+  //      };
+  //
+  //      int main() {
+  //        Tree t;
+  //      }
+  //
+  // Note that Tree has no used-defined explicit destructor, so the compiler
+  // will synthesize an implicit default constructor.  When `Tree t` is
+  // visited, the following happend:
+  //
+  //  1. cxx_dtor_add_ref( Tree ) is called. Since Tree has no explicit
+  //     destructor, tidy_Cursor_getDestructor() returns an invalid cursor.
+  //     The frame list is empty, so a frame F1 { Tree } is pushed on the stack
+  //     and top = &F1.
+  //
+  //  2. The cxx_field_dtor_add_ref_visitor() visits `left`.  The type
+  //     unique_ptr<Tree> has an explicit destructor, so cxx_dtor_add_ref()
+  //     adds a reference to it and returns.
+  //
+  //  3. Next, cxx_type_template_args_dtor_add_ref( unique_ptr<Tree> ) is
+  //     called by the visitor. Its argument is Tree, so it calls
+  //     cxx_dtor_add_ref( Tree ) again.
+  //
+  //  4. Since Tree has no explicit destructor, the code walks top -> F1, finds
+  //     clang_equalCursors( F1.cls_csr, Tree ) is true, and returns.  Without
+  //     the frame, this step would re-push Tree and repeat steps 2–3 until the
+  //     stack overflowed.
+  //
   cls_csr = clang_getCanonicalCursor( cls_csr );
   for ( cxx_dtor_frame const *frame = svd->cxx_dtor.top; frame != NULL;
-        frame = frame->prev ) {
+        frame = frame->prev_frame ) {
     if ( clang_equalCursors( frame->cls_csr, cls_csr ) )
       return;
   } // for
+
   cxx_dtor_frame const frame = {
     .cls_csr = cls_csr,
-    .prev = svd->cxx_dtor.top
+    .prev_frame = svd->cxx_dtor.top
   };
   svd->cxx_dtor.top = &frame;
 
-  // Implicit destructor calls member and base destructors.
+  // Implicit destructor calls field and base destructors.
   clang_visitChildren( cls_csr, &cxx_field_dtor_add_ref_visitor, svd );
   clang_visitChildren( cls_csr, &cxx_base_dtor_add_ref_visitor, svd );
 
@@ -156,7 +221,7 @@ static void cxx_dtor_add_ref( CXCursor cls_csr, symbols_visit_data *svd ) {
     clang_visitChildren( tmpl_csr, &cxx_base_dtor_add_ref_visitor, svd );
   }
 
-  svd->cxx_dtor.top = frame.prev;
+  svd->cxx_dtor.top = frame.prev_frame;
 }
 
 /**
@@ -388,6 +453,15 @@ skip:
 }
 
 /**
+ * Cleans-up all C++ symbols.
+ */
+static void cxx_symbols_cleanup( void ) {
+  print_statistics();
+  ht_table_cleanup( &cxx_adl_name_set, /*free_fn=*/NULL );
+  ht_table_cleanup( &cxx_adl_type_set, /*free_fn=*/NULL );
+}
+
+/**
  * Adds a reference to the destructor of every class-type template argument of
  * \a type, recursively.
  *
@@ -421,7 +495,124 @@ static void cxx_type_template_args_dtor_add_ref( CXType type,
   } // for
 }
 
+/**
+ * Prints statistics for C++ ADL hash tables if requested.
+ */
+static void print_statistics( void ) {
+  if ( !verbose_print_statistics() )
+    return;
+
+  verbose_printf(
+    "  adl-name set:\n"
+  );
+  verbose_printf(
+    "    adln-load-factor = " TIDY_STAT_LF_FMT "\n",
+                            ht_table_load_factor( &cxx_adl_name_set )
+  );
+  verbose_printf(
+    "    adln-size = %u\n", cxx_adl_name_set.size
+  );
+
+  verbose_printf(
+    "  adl-type set:\n"
+  );
+  verbose_printf(
+    "    adlt-load-factor = " TIDY_STAT_LF_FMT "\n",
+                            ht_table_load_factor( &cxx_adl_type_set )
+  );
+  verbose_printf(
+    "    adlt-size = %u\n", cxx_adl_type_set.size
+  );
+}
+
+/**
+ * Inserts a string to a lazily initialized string set.
+ *
+ * @param set The set to add to.  If its buckets are NULL, it's initialized
+ * first.
+ * @param s The string to add.  It is copied.
+ */
+static void str_set_insert( hash_table_t *set, char const *s ) {
+  assert( set != NULL );
+  assert( s != NULL );
+
+  if ( set->buckets == NULL ) {
+    ht_table_init(
+      set, HT_DINT, 2.0, 10,
+      POINTER_CAST( ht_cmp_fn_t, &strcmp ),
+      POINTER_CAST( ht_hash_fn_t, &fnv1a_s )
+    );
+  }
+  ht_table_insert( set, CONST_CAST( char*, s ), strlen( s ) + 1/*'\0'*/ );
+}
+
 ////////// extern functions ///////////////////////////////////////////////////
+
+void cxx_adl_collect_classes( CXType type, bool skip_top, hash_table_t *set ) {
+  assert( set != NULL );
+
+  type = clang_getCanonicalType( type );
+  for (;;) {
+    CXType inner = clang_getPointeeType( type );
+    if ( inner.kind == CXType_Invalid )
+      inner = clang_getArrayElementType( type );
+    if ( inner.kind == CXType_Invalid )
+      break;
+    type = clang_getCanonicalType( inner );
+  } // for
+
+  if ( type.kind == CXType_Invalid )
+    return;
+
+  if ( !skip_top ) {
+    CXCursor decl_csr = clang_getTypeDeclaration( type );
+    enum CXCursorKind kind = clang_getCursorKind( decl_csr );
+    if ( kind == CXCursor_EnumDecl || tidy_Cursor_isClassDecl( decl_csr ) ) {
+      //
+      // Use the primary template, if any, so that vec<int> and vec<T> have the
+      // same key.
+      //
+      CXCursor const tmpl_csr = clang_getSpecializedCursorTemplate( decl_csr );
+      if ( !clang_Cursor_isNull( tmpl_csr ) )
+        decl_csr = tmpl_csr;
+
+      if ( !tidy_Cursor_isInSystemHeader( decl_csr ) ) {
+        char *const usr = tidy_getCursorUSR( decl_csr );
+        if ( usr != NULL ) {
+          str_set_insert( set, usr );
+          free( usr );
+        }
+      }
+    }
+  }
+
+  int const num_args = clang_Type_getNumTemplateArguments( type );
+  for ( int i = 0; i < num_args; ++i ) {
+    CXType const arg_type =
+      clang_Type_getTemplateArgumentAsType( type, (unsigned)i );
+    cxx_adl_collect_classes( arg_type, /*skip_top=*/false, set );
+  } // for
+}
+
+void cxx_adl_name_set_add( char const *name ) {
+  str_set_insert( &cxx_adl_name_set, name );
+}
+
+void cxx_adl_type_set_add( CXType type ) {
+  type = clang_getCanonicalType( type );
+  if ( type.kind == CXType_FunctionProto ) {
+    CXType const res_type = clang_getResultType( type );
+    cxx_adl_collect_classes( res_type, /*skip_top=*/true, &cxx_adl_type_set );
+    int const num_args = clang_getNumArgTypes( type );
+    for ( int i = 0; i < num_args; ++i ) {
+      CXType const arg_type = clang_getArgType( type, (unsigned)i );
+      cxx_adl_collect_classes( arg_type, /*skip_top=*/true, &cxx_adl_type_set );
+    } // for
+  }
+  else {
+    cxx_adl_collect_classes( type, /*skip_top=*/true, &cxx_adl_type_set );
+  }
+}
 
 enum CXChildVisitResult cxx_def_ctor_add_ref_visitor( CXCursor cursor,
                                                       CXCursor parent,
@@ -800,6 +991,36 @@ void cxx_var_template_args_def_ctor_add_ref( CXType type,
     // recursively.
     //
     cxx_var_template_args_def_ctor_add_ref( arg_type, svd );
+  } // for
+}
+
+void cxx_symbols_init( void ) {
+  ASSERT_RUN_ONCE();
+  ATEXIT( &cxx_symbols_cleanup );
+}
+
+void cxx_symbols_mark_adl_roots( void ) {
+  if ( cxx_adl_name_set.size == 0 || cxx_adl_type_set.size == 0 )
+    return;
+
+  ht_iterator_t sym_iter;
+  ht_iterator_init( &sym_iter, &tidy_symbol_set );
+  for ( tidy_symbol *sym; (sym = ht_iterator_next( &sym_iter )) != NULL; ) {
+    if ( sym->is_root || sym->cxx_adl_usr_set.size == 0 )
+      continue;
+
+    char const *const unqual_name = cxx_unqual_name( sym->name );
+    if ( ht_table_find( &cxx_adl_name_set, unqual_name ) == NULL )
+      continue;
+
+    ht_iterator_t usr_iter;
+    ht_iterator_init( &usr_iter, &sym->cxx_adl_usr_set );
+    for ( char const *usr; (usr = ht_iterator_next( &usr_iter )) != NULL; ) {
+      if ( ht_table_find( &cxx_adl_type_set, usr ) != NULL ) {
+        sym->is_root = true;
+        break;
+      }
+    } // for
   } // for
 }
 

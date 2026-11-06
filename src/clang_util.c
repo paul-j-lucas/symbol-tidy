@@ -1124,6 +1124,7 @@ CXType tidy_Type_getUnderlyingType( CXType type ) {
 
 /// @cond DOXYGEN_IGNORE
 
+extern inline bool tidy_Cursor_isInSystemHeader( CXCursor );
 extern inline bool tidy_Cursor_isInvalid( CXCursor );
 extern inline CXFile tidy_getFileLocation_File( CXSourceLocation );
 extern inline CXFile tidy_getSpellingLocation_File( CXSourceLocation );
