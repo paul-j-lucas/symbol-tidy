@@ -504,9 +504,6 @@ void cxx_dtors_add_refs( CXCursor decl_csr, symbols_visit_data *svd ) {
   CXType  decl_type = clang_getCursorType( decl_csr );
           decl_type = tidy_Type_getUnderlyingType( decl_type );
   cxx_type_template_args_dtor_add_ref( decl_type, svd );
-
-  clang_visitChildren( cls_csr, &cxx_field_dtor_add_ref_visitor, svd );
-  clang_visitChildren( cls_csr, &cxx_base_dtor_add_ref_visitor, svd );
 }
 
 void cxx_dtor_member_add_refs( CXCursor dtor_csr, symbols_visit_data *svd ) {
