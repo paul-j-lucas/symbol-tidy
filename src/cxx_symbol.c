@@ -404,12 +404,11 @@ static void cxx_type_template_args_dtor_add_ref( CXType type,
   if ( num_args <= 0 ) {
     type = clang_getCanonicalType( type );
     num_args = clang_Type_getNumTemplateArguments( type );
-    if ( num_args <= 0 )
-      return;
   }
 
-  for ( unsigned i = 0; i < STATIC_CAST( unsigned, num_args ); ++i ) {
-    CXType arg_type = clang_Type_getTemplateArgumentAsType( type, i );
+  for ( int i = 0; i < num_args; ++i ) {
+    CXType arg_type =
+      clang_Type_getTemplateArgumentAsType( type, STATIC_CAST( unsigned, i ) );
     if ( arg_type.kind == CXType_Invalid )
       continue;                         // non-type argument
 
@@ -776,17 +775,16 @@ void cxx_var_template_args_def_ctor_add_ref( CXType type,
   if ( num_args <= 0 ) {
     type = clang_getCanonicalType( type );
     num_args = clang_Type_getNumTemplateArguments( type );
-    if ( num_args <= 0 )
-      return;
   }
 
-  for ( unsigned i = 0; i < STATIC_CAST( unsigned, num_args ); ++i ) {
-    CXType const arg_type = clang_Type_getTemplateArgumentAsType( type, i );
+  for ( int i = 0; i < num_args; ++i ) {
+    CXType arg_type =
+      clang_Type_getTemplateArgumentAsType( type, STATIC_CAST( unsigned, i ) );
     if ( arg_type.kind == CXType_Invalid )
       continue;
 
-    CXType const    canon_arg_type = clang_getCanonicalType( arg_type );
-    CXCursor const  arg_cls_csr = clang_getTypeDeclaration( canon_arg_type );
+    arg_type = clang_getCanonicalType( arg_type );
+    CXCursor const arg_cls_csr = clang_getTypeDeclaration( arg_type );
 
     if ( tidy_Cursor_isClassDecl( arg_cls_csr ) ) {
       tidy_ConstructorInfo ctor_info;
