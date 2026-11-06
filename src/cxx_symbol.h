@@ -87,17 +87,17 @@ void cxx_dtors_add_refs( CXCursor decl_csr, symbols_visit_data *svd );
  * @param field_csr The field to add the reference from.
  * @param svd The symbols_visit_data to use.
  */
-void cxx_field_add_def_ctor_ref( CXCursor field_csr, symbols_visit_data *svd );
+void cxx_field_def_ctor_add_ref( CXCursor field_csr, symbols_visit_data *svd );
 
 /**
- * A helper function for cxx_field_add_def_ctor_ref().
+ * A helper function for cxx_field_def_ctor_add_ref().
  *
  * @param cursor The cursor to visit.
  * @param parent Not used.
  * @param data The symbols_visit_data to use.
  * @return Returns `CXChildVisit_Continue`.
  */
-enum CXChildVisitResult cxx_field_add_def_ctor_ref_visitor( CXCursor cursor,
+enum CXChildVisitResult cxx_field_def_ctor_add_ref_visitor( CXCursor cursor,
                                                             CXCursor parent,
                                                             CXClientData data );
 
@@ -113,6 +113,13 @@ enum CXChildVisitResult cxx_field_add_def_ctor_ref_visitor( CXCursor cursor,
 enum CXChildVisitResult cxx_find_begin_end_visitor( CXCursor cursor,
                                                     CXCursor parent,
                                                     CXClientData data );
+
+/**
+ * TODO.
+ *
+ * @param member_csr The member cursor to visit.
+ */
+void cxx_member_add_ref( CXCursor member_csr, symbols_visit_data *svd );
 
 /**
  * Adds a reference from \a member_sym for either a non-static member function
@@ -151,15 +158,8 @@ enum CXChildVisitResult cxx_find_begin_end_visitor( CXCursor cursor,
  * @param member_sym The member symbol to add a reference from.
  * @param svd The symbols_visit_data to use.
  */
-void cxx_member_add_def_ctor_ref( CXCursor member_csr, tidy_symbol *member_sym,
+void cxx_member_def_ctor_add_ref( CXCursor member_csr, tidy_symbol *member_sym,
                                   symbols_visit_data const *svd );
-
-/**
- * TODO.
- *
- * @param member_csr The member cursor to visit.
- */
-void cxx_member_add_ref( CXCursor member_csr, symbols_visit_data *svd );
 
 /**
  * Adds references to the member operators of \a cls_csr named either \a name
@@ -183,7 +183,7 @@ bool cxx_operator_add_refs( CXCursor cls_csr, char const *name,
  * @param type The type to check for template arguments.
  * @param svd The symbols_visit_data to use.
  */
-void cxx_var_template_args_add_def_ctor_ref( CXType type,
+void cxx_var_template_args_def_ctor_add_ref( CXType type,
                                              symbols_visit_data *svd );
 
 ///////////////////////////////////////////////////////////////////////////////

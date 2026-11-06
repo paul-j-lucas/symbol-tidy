@@ -991,7 +991,7 @@ static void visit_CXXMethod( CXCursor method_csr, symbols_visit_data *svd ) {
 
   clang_disposeOverriddenCursors( overridden_csrs );
 
-  cxx_member_add_def_ctor_ref( method_csr, svd->curr_sym, svd );
+  cxx_member_def_ctor_add_ref( method_csr, svd->curr_sym, svd );
 
   enum CXCursorKind const kind = clang_getCursorKind( method_csr );
   switch ( kind ) {
@@ -1094,7 +1094,7 @@ static void visit_FieldDecl( CXCursor field_csr, symbols_visit_data *svd ) {
   clang_disposeTokens( tu, tokens, token_count );
 
   if ( svd->source->lang == CXLanguage_CPlusPlus ) {
-    cxx_field_add_def_ctor_ref( field_csr, svd );
+    cxx_field_def_ctor_add_ref( field_csr, svd );
     cxx_dtors_add_refs( field_csr, svd );
   }
 }
@@ -1181,7 +1181,7 @@ static void visit_most_Ref( CXCursor cursor, symbols_visit_data *svd ) {
   if ( ref_sym != NULL ) {
     symbol_add_ref( svd->curr_sym, ref_sym );
     if ( svd->source->lang == CXLanguage_CPlusPlus )
-      cxx_member_add_def_ctor_ref( ref_csr, ref_sym, svd );
+      cxx_member_def_ctor_add_ref( ref_csr, ref_sym, svd );
   }
 
   if ( svd->curr_sym == NULL )
@@ -1282,7 +1282,7 @@ static void visit_VarDecl( CXCursor var_decl_csr, symbols_visit_data *svd ) {
       // Its class has no default constructor, but it might have members that
       // have default constructors: add references to those, if any.
       //
-      clang_visitChildren( cls_csr, &cxx_field_add_def_ctor_ref_visitor, svd );
+      clang_visitChildren( cls_csr, &cxx_field_def_ctor_add_ref_visitor, svd );
     }
   }
 
@@ -1291,7 +1291,7 @@ static void visit_VarDecl( CXCursor var_decl_csr, symbols_visit_data *svd ) {
   // add default constructor references for any template type arguments.
   //
   CXType const var_type = clang_getCursorType( var_decl_csr );
-  cxx_var_template_args_add_def_ctor_ref( var_type, svd );
+  cxx_var_template_args_def_ctor_add_ref( var_type, svd );
 
   //
   // Add references to the variable's class's destructor and its base class
