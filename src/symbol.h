@@ -49,7 +49,6 @@
 
 typedef struct cxx_dtor_frame       cxx_dtor_frame;
 typedef struct svd_cxx_constructor  svd_cxx_constructor;
-typedef struct svd_cxx_dtor         svd_cxx_dtor;
 typedef struct svd_cxx_for_range    svd_cxx_for_range;
 typedef struct svd_cxx_member       svd_cxx_member;
 typedef struct svd_cxx_operator     svd_cxx_operator;
