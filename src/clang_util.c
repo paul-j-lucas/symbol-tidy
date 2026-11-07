@@ -63,8 +63,8 @@ typedef CXCursor                        (*getCursorParent_fn)( CXCursor );
  * Additional data passed to callsBaseConstructor_visitor().
  */
 struct callsBaseConstructor_data {
-  CXCursor  base_cls_csr;               ///< The base class cursor.
-  bool      found_explicit_call;        ///< Called base constructor explicitly?
+  CXCursor  find_base_cls_csr;          ///< The base class cursor to find.
+  bool      explicitly_calls_base_ctor; ///< Explicitly calls base constructor?
 };
 
 /**
@@ -120,8 +120,8 @@ enum CXChildVisitResult callsBaseConstructor_visitor( CXCursor cursor,
 
   assert( data != NULL );
   callsBaseConstructor_data *const cbcd = data;
-  if ( clang_equalCursors( sem_parent, cbcd->base_cls_csr ) ) {
-    cbcd->found_explicit_call = true;
+  if ( clang_equalCursors( sem_parent, cbcd->find_base_cls_csr ) ) {
+    cbcd->explicitly_calls_base_ctor = true;
     return CXChildVisit_Break;
   }
 
@@ -504,10 +504,10 @@ static bool tidy_Cursor_isOrInClassTemplate( CXCursor cursor ) {
 bool tidy_Cursor_callsBaseConstructor( CXCursor ctor_csr,
                                        CXCursor base_cls_csr ) {
   callsBaseConstructor_data cbcd = {
-    .base_cls_csr = clang_getCanonicalCursor( base_cls_csr )
+    .find_base_cls_csr = clang_getCanonicalCursor( base_cls_csr )
   };
   clang_visitChildren( ctor_csr, &callsBaseConstructor_visitor, &cbcd );
-  return cbcd.found_explicit_call;
+  return cbcd.explicitly_calls_base_ctor;
 }
 
 bool tidy_Cursor_getConstructorInfo( CXCursor cursor,

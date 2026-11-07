@@ -728,7 +728,7 @@ void cxx_field_def_ctor_add_ref( CXCursor field_csr, symbols_visit_data *svd ) {
     enum CXCursorKind const kind = clang_getCursorKind( init_csr );
     if ( kind == CXCursor_Constructor ) {
       //
-      // The field is initialized explicitly via a constructor's mem-
+      // The field is explicitly initialized via a constructor's mem-
       // initializer.
       //
       tidy_symbol *const ctor_sym = symbol_add( init_csr, svd->source );
@@ -736,7 +736,7 @@ void cxx_field_def_ctor_add_ref( CXCursor field_csr, symbols_visit_data *svd ) {
         symbol_add_ref( svd->curr_sym, ctor_sym );
     }
     //
-    // Otherwise the field is initialized explicitly via an in-class
+    // Otherwise the field is explicitly initialized via an in-class
     // assignment.
     //
     return;
@@ -754,7 +754,7 @@ void cxx_field_def_ctor_add_ref( CXCursor field_csr, symbols_visit_data *svd ) {
   if ( tidy_Cursor_getConstructorInfo( cls_csr, &ctor_info ) &&
        !clang_Cursor_isNull( ctor_info.def_ctor_csr ) ) {
     //
-    // The field is initialized implicitly via a default constructor.
+    // The field is implicitly initialized via a default constructor.
     //
     cursor_add_ref( ctor_info.def_ctor_csr, svd );
   }

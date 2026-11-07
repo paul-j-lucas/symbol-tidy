@@ -63,12 +63,12 @@ struct tidy_ConstructorInfo {
 ////////// extern functions ///////////////////////////////////////////////////
 
 /**
- * Gets whether a constructor calls a constructor of a base class explicitly.
+ * Gets whether a constructor explicitly calls a constructor of a base class.
  *
  * @param ctor_csr The constructor.
  * @param base_cls_csr The base class.
- * @return Returns `true` only if the constructor calls a constructor of a base
- * class explicitly.
+ * @return Returns `true` only if the constructor explicitly calls a
+ * constructor of a base class.
  */
 NODISCARD
 bool tidy_Cursor_callsBaseConstructor( CXCursor ctor_csr,

@@ -1060,7 +1060,7 @@ static void visit_CXXMethod( CXCursor method_csr, symbols_visit_data *svd ) {
 /**
  * Visits a `CXCursor_CXXNewExpr` kind of cursor.
  *
- * @remarks The class's `operator new` is called implicitly, so libclang's C
+ * @remarks The class's `operator new` is implicitly called, so libclang's C
  * API gives no reference to it.  `operator delete` is also marked since it is
  * called if the constructor throws.
  *
