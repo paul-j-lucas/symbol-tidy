@@ -375,6 +375,16 @@ CXCursor tidy_getCursorByNameToken( CXTranslationUnit tu, CXToken token,
                                     CXCursor scope_csr );
 
 /**
+ * Similar to `clang_getCursorDefinition()` except if the definition is
+ * invalid, returns \a cursor.
+ *
+ * @param cursor The cursor to get the definition for.
+ * @return Returns the cursor for the definition of \a cursor or \a cursor.
+ */
+NODISCARD
+CXCursor tidy_getCursorDefinition( CXCursor cursor );
+
+/**
  * Similar to `clang_getCursorExtent()` except that it works better when macros
  * are involved.
  *

@@ -951,7 +951,8 @@ static void visit_CXXForRangeStmt( CXCursor range_stmt_csr,
   //
   // Try looking for T::{ begin | end }() [const] member functions first.
   //
-  clang_visitChildren( cls_csr, &cxx_find_begin_end_visitor, svd );
+  CXCursor const cls_def_csr = tidy_getCursorDefinition( cls_csr );
+  clang_visitChildren( cls_def_csr, &cxx_find_begin_end_visitor, svd );
 
   //
   // If either is not found, try looking for { begin | end }(T [const]&)
@@ -1380,7 +1381,10 @@ static void visit_VarDecl( CXCursor var_decl_csr, symbols_visit_data *svd ) {
       // Its class has no default constructor, but it might have members that
       // have default constructors: add references to those, if any.
       //
-      clang_visitChildren( cls_csr, &cxx_field_def_ctor_add_ref_visitor, svd );
+      CXCursor const cls_def_csr = tidy_getCursorDefinition( cls_csr );
+      clang_visitChildren(
+        cls_def_csr, &cxx_field_def_ctor_add_ref_visitor, svd
+      );
     }
   }
 

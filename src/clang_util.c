@@ -220,8 +220,10 @@ static enum CXChildVisitResult getCursorByName_visitor( CXCursor cursor,
         CXType const type = clang_getCursorType( cursor );
         base_cls_csr = clang_getTypeDeclaration( type );
       }
-      if ( !tidy_Cursor_isInvalid( base_cls_csr ) )
-        clang_visitChildren( base_cls_csr, &getCursorByName_visitor, data );
+      if ( !tidy_Cursor_isInvalid( base_cls_csr ) ) {
+        CXCursor const cls_def_csr = tidy_getCursorDefinition( base_cls_csr );
+        clang_visitChildren( cls_def_csr, &getCursorByName_visitor, data );
+      }
       break;
 
     default:
@@ -532,7 +534,8 @@ bool tidy_Cursor_getConstructorInfo( CXCursor cursor,
   *ctor_info = (tidy_ConstructorInfo){
     .def_ctor_csr = clang_getNullCursor()
   };
-  clang_visitChildren( cls_csr, &getConstructorInfo_visitor, ctor_info );
+  CXCursor const cls_def_csr = tidy_getCursorDefinition( cls_csr );
+  clang_visitChildren( cls_def_csr, &getConstructorInfo_visitor, ctor_info );
 
   bool has_ctor =
     !clang_Cursor_isNull( ctor_info->def_ctor_csr ) ||
@@ -540,9 +543,11 @@ bool tidy_Cursor_getConstructorInfo( CXCursor cursor,
 
   if ( !has_ctor ) {
     // If cls_csr is a template specialization, try again.
-    CXCursor const tmpl_csr = clang_getSpecializedCursorTemplate( cls_csr );
-    if ( !tidy_Cursor_isInvalid( tmpl_csr ) )
+    CXCursor tmpl_csr = clang_getSpecializedCursorTemplate( cls_csr );
+    if ( !tidy_Cursor_isInvalid( tmpl_csr ) ) {
+      tmpl_csr = tidy_getCursorDefinition( tmpl_csr );
       clang_visitChildren( tmpl_csr, &getConstructorInfo_visitor, ctor_info );
+    }
   }
 
   has_ctor =
@@ -552,26 +557,26 @@ bool tidy_Cursor_getConstructorInfo( CXCursor cursor,
 }
 
 CXCursor tidy_Cursor_getDefaultConstructor( CXCursor cls_csr ) {
-  cls_csr = clang_getCanonicalCursor( cls_csr );
+  cls_csr = tidy_getCursorDefinition( cls_csr );
   CXCursor def_ctor_csr = clang_getNullCursor();
-  clang_visitChildren(
-    cls_csr, &getDefaultConstructor_visitor, &def_ctor_csr
-  );
+  clang_visitChildren( cls_csr, &getDefaultConstructor_visitor, &def_ctor_csr );
   return def_ctor_csr;
 }
 
 CXCursor tidy_Cursor_getDestructor( CXCursor cls_csr ) {
   if ( tidy_Cursor_isInvalid( cls_csr ) )
     return cls_csr;
-  cls_csr = clang_getCanonicalCursor( cls_csr );
+  CXCursor const cls_def_csr = tidy_getCursorDefinition( cls_csr );
   CXCursor dtor_csr = clang_getNullCursor();
-  clang_visitChildren( cls_csr, &getDestructor_visitor, &dtor_csr );
+  clang_visitChildren( cls_def_csr, &getDestructor_visitor, &dtor_csr );
 
   if ( clang_Cursor_isNull( dtor_csr ) ) {
     // If cls_csr is a template specialization, try again.
-    CXCursor const tmpl_csr = clang_getSpecializedCursorTemplate( cls_csr );
-    if ( !tidy_Cursor_isInvalid( tmpl_csr ) )
+    CXCursor tmpl_csr = clang_getSpecializedCursorTemplate( cls_csr );
+    if ( !tidy_Cursor_isInvalid( tmpl_csr ) ) {
+      tmpl_csr = tidy_getCursorDefinition( tmpl_csr );
       clang_visitChildren( tmpl_csr, &getDestructor_visitor, &dtor_csr );
+    }
   }
 
   return dtor_csr;
@@ -612,7 +617,8 @@ CXCursor tidy_Cursor_getUnderlyingTypeDecl( CXCursor cursor ) {
   CXType  type = clang_getCursorType( cursor );
           type = tidy_Type_getUnderlyingType( type );
 
-  return clang_getTypeDeclaration( type );
+  cursor = clang_getTypeDeclaration( type );
+  return tidy_getCursorDefinition( cursor );
 }
 
 bool tidy_Cursor_inAnonymousClass( CXCursor cursor ) {
@@ -848,6 +854,15 @@ CXCursor tidy_getCursorByNameToken( CXTranslationUnit tu, CXToken token,
 
   clang_disposeString( token_cxs );
   return rv_csr;
+}
+
+CXCursor tidy_getCursorDefinition( CXCursor cursor ) {
+  if ( !tidy_Cursor_isInvalid( cursor ) ) {
+    CXCursor const def_csr = clang_getCursorDefinition( cursor );
+    if ( !tidy_Cursor_isInvalid( def_csr ) )
+      return def_csr;
+  }
+  return cursor;
 }
 
 CXSourceRange tidy_getCursorExtent( CXCursor cursor ) {
