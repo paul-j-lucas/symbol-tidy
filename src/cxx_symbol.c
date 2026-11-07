@@ -980,8 +980,7 @@ void cxx_var_template_args_def_ctor_add_ref( CXType type,
     if ( tidy_Cursor_isClassDecl( arg_cls_csr ) ) {
       tidy_ConstructorInfo ctor_info;
       if ( tidy_Cursor_getConstructorInfo( arg_cls_csr, &ctor_info ) &&
-           !clang_Cursor_isNull( ctor_info.def_ctor_csr ) &&
-           !ctor_info.has_other_ctors ) {
+           !clang_Cursor_isNull( ctor_info.def_ctor_csr ) ) {
         cursor_add_ref( ctor_info.def_ctor_csr, svd );
       }
     }

@@ -8,4 +8,8 @@ test_symbol_tidy $TIDY_TEST_CXXFLAGS $TIDY_TEST_OPTIONS \
   $TIDY_TEST_CONFIG \
   constructors-2.cpp
 
+test_symbol_tidy $TIDY_TEST_CXXFLAGS $TIDY_TEST_OPTIONS \
+  $TIDY_TEST_CONFIG \
+  constructors-3.cpp
+
 # vim:set syntax=bash et sw=2 ts=2:
