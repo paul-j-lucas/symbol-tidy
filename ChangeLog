@@ -1,5 +1,15 @@
+2026-11-07  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * cxx_symbol.c, constructors-4.cpp, constructors.out, constructors.test:
+     More aggressively check to see whether a template type is constructed.
+
 2026-11-06  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * clang_util.c: Now using clang_getSpecializedCursorTemplate in
+     tidy_getCursorUSR().
+   * cxx_symbol.c, constructors-3.cpp, constructors.out, constructors.test:
+     Fixed default constructor handling when other constructors are present.
+   * symbol.c, type_traits.h, util.h: Added statistics for cxx_adl_usr_set.
    * symbol.h: Removed typedef -- not needed.
    * clang_util.c, clang_util.h, cxx_symbol.c, cxx_symbol.h, symbol.c,
      symbol.h, test/Makefile.am, ostream_iterator.cpp, template-adl.out,
