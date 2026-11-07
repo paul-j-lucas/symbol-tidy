@@ -895,6 +895,17 @@ CXFile tidy_getCursorLocation_File( CXCursor cursor ) {
 char* tidy_getCursorUSR( CXCursor cursor ) {
   cursor = clang_getCanonicalCursor( cursor );
 
+  //
+  // For a member of an implicit class template instantiation, use the member
+  // of the template it was instantiated from so that both have the same key.
+  //
+  for (;;) {
+    CXCursor const tmpl_csr = clang_getSpecializedCursorTemplate( cursor );
+    if ( tidy_Cursor_isInvalid( tmpl_csr ) )
+      break;
+    cursor = clang_getCanonicalCursor( tmpl_csr );
+  } // for
+
   char *usr = NULL;
 
   if ( !tidy_Cursor_isOrInClassTemplate( cursor ) ) {
