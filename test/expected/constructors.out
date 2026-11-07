@@ -14,3 +14,8 @@ $ symbol-tidy -std=c++20 -Xtidy --directory=data -Xtidy --no-config-layers const
     6,12 | "S::S(const char *)"
 symbol-tidy: 1 unused symbol
 
+$ symbol-tidy -std=c++20 -Xtidy --directory=data -Xtidy --no-config-layers constructors-4.cpp
+"constructors-4.cpp": warning: unused symbols:
+   30, 3 | "query_node::query_node()"
+symbol-tidy: 1 unused symbol
+

@@ -55,6 +55,11 @@
  * @{
  */
 
+////////// typedefs ///////////////////////////////////////////////////////////
+
+typedef struct cxx_tmpl_ctors_visitor_data  cxx_tmpl_ctors_visitor_data;
+typedef struct cxx_tmpl_param_visitor_data  cxx_tmpl_param_visitor_data;
+
 ////////// structs ////////////////////////////////////////////////////////////
 
 /**
@@ -65,6 +70,24 @@ struct cxx_dtor_frame {
   cxx_dtor_frame const *prev_frame;     ///< The previous frame, if any.
 };
 
+/**
+ * Additional data for cxx_tmpl_ctors_visitor().
+ */
+struct cxx_tmpl_ctors_visitor_data {
+  char const *find_param_name;          ///< Parameter name to find.
+  bool        is_param_constructed;     ///< Is the parameter constructed?
+};
+
+/**
+ * Additional data for cxx_tmpl_param_visitor().
+ */
+struct cxx_tmpl_param_visitor_data {
+  unsigned  find_idx;                   ///< Index of parameter to find.
+  unsigned  curr_idx;                   ///< Current index.
+  CXCursor  found_csr;                  ///< Found template type cursor.
+  bool      found_tmpl_type_param;      ///< Found it?
+};
+
 ////////// local functions ////////////////////////////////////////////////////
 
 static void cxx_dtor_add_ref( CXCursor, symbols_visit_data* );
@@ -73,7 +96,12 @@ static enum CXChildVisitResult
             cxx_field_dtor_add_ref_visitor( CXCursor, CXCursor, CXClientData ),
             cxx_member_add_refs_by_name_visitor( CXCursor, CXCursor,
                                                  CXClientData ),
-            cxx_member_by_name_base_visitor( CXCursor, CXCursor, CXClientData );
+            cxx_member_by_name_base_visitor( CXCursor, CXCursor, CXClientData ),
+            cxx_tmpl_ctors_visitor( CXCursor, CXCursor, CXClientData ),
+            cxx_tmpl_param_visitor( CXCursor, CXCursor, CXClientData );
+
+NODISCARD
+static bool cxx_type_ctors_param( CXType, char const*, unsigned );
 
 static void cxx_type_template_args_dtor_add_ref( CXType, symbols_visit_data* );
 static void print_statistics( void );
@@ -459,6 +487,246 @@ static void cxx_symbols_cleanup( void ) {
   print_statistics();
   ht_table_cleanup( &cxx_adl_name_set, /*free_fn=*/NULL );
   ht_table_cleanup( &cxx_adl_type_set, /*free_fn=*/NULL );
+}
+
+/**
+ * Gets whether the class template that \a spec_csr is a specialization of
+ * might construct a `T` for its \a param_idx-th template parameter.
+ *
+ * @remarks
+ * @parblock
+ * Libclang neither visits template instantiations nor resolves dependent
+ * expressions, so whether a template constructs its parameter can't be
+ * observed directly.  Instead, this function decides as follows:
+ *
+ *  + If the template is declared in a system header, its code is invisible to
+ *    us and (as for `std::vector<T>`) it's assumed to construct its parameter.
+ *
+ *  + Otherwise, the template's own declaration is scanned for evidence that it
+ *    constructs its corresponding template type parameter, `T`: a variable or
+ *    field of type `T`, an array of `T`, a `T` base class, `T()` or `T{}`,
+ *    `new T`, or a type that has `T` as a template parameter (e.g.,
+ *    `std::vector<T>`).
+ *
+ *  + If it can't be determined (because \a spec_csr isn't a specialization,
+ *    the template is a partial specialization, or the argument corresponds to
+ *    a parameter pack, a non-type parameter, or a template template
+ *    parameter), it's assumed that the template does construct its argument.
+ *    This errs on the side of not reporting a false positive.
+ *
+ * This is used by cxx_var_template_args_def_ctor_add_ref() to decide whether
+ * to add a reference to the default constructor of a class used as a template
+ * parameter.
+ * @endparblock
+ *
+ * @param spec_csr The cursor for the template specialization.
+ * @param param_idx The zero-based index of the template parameter
+ * corresponding to the argument of \a spec_csr to check.
+ * @return Returns `true` if the template is in a system header (its code is
+ * invisible to libclang), if we can't tell (to err on the side of not
+ * reporting a false positive), or if the template's own code shows evidence of
+ * constructing its argument; `false` only if user code shows no evidence.
+ *
+ * @sa cxx_var_template_args_def_ctor_add_ref()
+ */
+NODISCARD
+static bool cxx_tmpl_ctors_param( CXCursor spec_csr, unsigned param_idx ) {
+  CXCursor const tmpl_csr = clang_getSpecializedCursorTemplate( spec_csr );
+  if ( tidy_Cursor_isInvalid( tmpl_csr ) )
+    return true;
+  if ( tidy_Cursor_isInSystemHeader( tmpl_csr ) )
+    return true;
+  enum CXCursorKind kind = clang_getCursorKind( tmpl_csr );
+  if ( kind != CXCursor_ClassTemplate )
+    return true;                        // partial specialization: can't tell
+
+  cxx_tmpl_param_visitor_data tpvd = { .find_idx = param_idx };
+  clang_visitChildren( tmpl_csr, &cxx_tmpl_param_visitor, &tpvd );
+  if ( !tpvd.found_tmpl_type_param )
+    return true;                        // pack, out of range, etc.: can't tell
+
+  bool              is_param_constructed = true;
+  CXString const    name_cxs = clang_getCursorSpelling( tpvd.found_csr );
+  char const *const name = clang_getCString( name_cxs );
+
+  if ( name != NULL && name[0] != '\0' ) {
+    cxx_tmpl_ctors_visitor_data tcvd = { .find_param_name = name };
+    clang_visitChildren( tmpl_csr, &cxx_tmpl_ctors_visitor, &tcvd );
+    is_param_constructed = tcvd.is_param_constructed;
+  }
+
+  clang_disposeString( name_cxs );
+  return is_param_constructed;
+}
+
+/**
+ * A helper function for cxx_tmpl_ctors_param() that visits everything inside a
+ * class template looking for evidence that it constructs its type parameter.
+ *
+ * @param cursor The cursor being visited.
+ * @param parent Not used.
+ * @param data The cxx_tmpl_ctors_visitor_data to use.
+ * @return Returns `CXChildVisit_Break` or `CXChildVisit_Recurse`.
+ */
+static enum CXChildVisitResult cxx_tmpl_ctors_visitor( CXCursor cursor,
+                                                       CXCursor parent,
+                                                       CXClientData data ) {
+  (void)parent;
+
+  enum CXCursorKind kind = clang_getCursorKind( cursor );
+  CXType            type = clang_getCursorType( cursor );
+
+  switch ( kind ) {
+    case CXCursor_CallExpr:;            // T{} (dependent -> unresolved)
+      CXCursor const ref_csr = clang_getCursorReferenced( cursor );
+      if ( !tidy_Cursor_isInvalid( ref_csr ) )
+        goto skip;                      // a resolved call, not a construction
+      break;
+
+    case CXCursor_CXXBaseSpecifier:     // struct S : T { };
+    case CXCursor_FieldDecl:            // struct S { T f; };
+    case CXCursor_VarDecl:              // T x; T a[N]; std::vector<T> v;
+      break;
+
+    case CXCursor_CXXNewExpr:           // new T; new T[n]
+      type = clang_getPointeeType( type );
+      break;
+
+    default:
+      goto skip;
+  } // switch
+
+  assert( data != NULL );
+  cxx_tmpl_ctors_visitor_data *const tcvd = data;
+  if ( cxx_type_ctors_param( type, tcvd->find_param_name, /*depth=*/0 ) ) {
+    tcvd->is_param_constructed = true;
+    return CXChildVisit_Break;
+  }
+
+skip:
+  return CXChildVisit_Recurse;
+}
+
+/**
+ * A helper function for cxx_tmpl_ctors_param() that visits a template's direct
+ * children looking for its i-th template parameter.
+ *
+ * @param cursor The cursor being visited.
+ * @param parent Not used.
+ * @param data The cxx_tmpl_param_visitor_data to use.
+ * @return Returns `CXChildVisit_Break` or `CXChildVisit_Continue`.
+ */
+static enum CXChildVisitResult cxx_tmpl_param_visitor( CXCursor cursor,
+                                                       CXCursor parent,
+                                                       CXClientData data ) {
+  (void)parent;
+
+  enum CXCursorKind kind = clang_getCursorKind( cursor );
+  switch ( kind ) {
+    case CXCursor_NonTypeTemplateParameter:
+    case CXCursor_TemplateTemplateParameter:
+    case CXCursor_TemplateTypeParameter:;
+      cxx_tmpl_param_visitor_data *const tpvd = data;
+      if ( tpvd->curr_idx == tpvd->find_idx ) {
+        if ( kind == CXCursor_TemplateTypeParameter ) {
+          tpvd->found_csr = cursor;
+          tpvd->found_tmpl_type_param = true;
+        }
+        return CXChildVisit_Break;
+      }
+      ++tpvd->curr_idx;
+      break;
+    default:
+      /* suppress warning */;
+  } // switch
+
+  return CXChildVisit_Continue;
+}
+
+/**
+ * Gets whether a variable, array, field, or base class of \a type would cause
+ * an object of the parameterized type named \a param_name to be constructed.
+ *
+ * @remarks For a template that has parameterized types (e.g., `std::set<T>`,
+ * where `T` is a template parameter as opposed to `std::set<MyClass>` where
+ * `MyClass` is a concrete type), it's assumed that the template might
+ * construct objects of the types, so its parameterized types are checked
+ * recursively.
+ *
+ * @param type The type to check.
+ * @param find_param_name The name of the parameterized type to find, e.g.,
+ * `T`.
+ * @param depth The current recursion depth.  The initial call should pass 0.
+ * Recursion stops (returning `false`) past a fixed limit to guard against
+ * pathological types.
+ * @return Returns `true` only if \a type constructs an object of the
+ * parameterized type named \a find_param_name.
+ *
+ * @sa cxx_tmpl_constructs_param()
+ */
+NODISCARD
+static bool cxx_type_ctors_param( CXType type, char const *find_param_name,
+                                  unsigned depth ) {
+  assert( find_param_name != NULL );
+
+  if ( unlikely( depth > 16 ) )
+    return false;                       // guard against runaway recursion
+
+  CXCursor decl_csr;
+
+  for (;;) {
+    switch ( type.kind ) {
+      case CXType_ConstantArray:
+      case CXType_DependentSizedArray:
+      case CXType_IncompleteArray:
+      case CXType_VariableArray:
+        type = clang_getArrayElementType( type );
+        continue;
+
+      case CXType_Elaborated:
+        type = clang_Type_getNamedType( type );
+        continue;
+
+      case CXType_FunctionNoProto:
+      case CXType_FunctionProto:
+      case CXType_Invalid:
+      case CXType_LValueReference:
+      case CXType_MemberPointer:
+      case CXType_Pointer:
+      case CXType_RValueReference:
+        return false;
+
+      case CXType_Typedef:
+        decl_csr = clang_getTypeDeclaration( type );
+        type = clang_getTypedefDeclUnderlyingType( decl_csr );
+        continue;
+
+      default:
+        /* suppress warning */;
+    } // switch
+    break;
+  } // for
+
+  decl_csr = clang_getTypeDeclaration( type );
+  enum CXCursorKind kind = clang_getCursorKind( decl_csr );
+
+  if ( kind == CXCursor_TemplateTypeParameter ) {
+    CXString const    name_cxs = clang_getCursorSpelling( decl_csr );
+    char const *const name = clang_getCString( name_cxs );
+    bool const found = name != NULL && strcmp( name, find_param_name ) == 0;
+    clang_disposeString( name_cxs );
+    return found;
+  }
+
+  int const num_args = clang_Type_getNumTemplateArguments( type );
+  for ( int i = 0; i < num_args; ++i ) {
+    CXType const arg_type =
+      clang_Type_getTemplateArgumentAsType( type, STATIC_CAST( unsigned, i ) );
+    if ( cxx_type_ctors_param( arg_type, find_param_name, depth + 1 ) )
+      return true;
+  } // for
+
+  return false;
 }
 
 /**
@@ -968,6 +1236,9 @@ void cxx_var_template_args_def_ctor_add_ref( CXType type,
     num_args = clang_Type_getNumTemplateArguments( type );
   }
 
+  CXType const canon_type = clang_getCanonicalType( type );
+  CXCursor const canon_csr = clang_getTypeDeclaration( canon_type );
+
   for ( int i = 0; i < num_args; ++i ) {
     CXType arg_type =
       clang_Type_getTemplateArgumentAsType( type, STATIC_CAST( unsigned, i ) );
@@ -977,7 +1248,8 @@ void cxx_var_template_args_def_ctor_add_ref( CXType type,
     arg_type = clang_getCanonicalType( arg_type );
     CXCursor const arg_cls_csr = clang_getTypeDeclaration( arg_type );
 
-    if ( tidy_Cursor_isClassDecl( arg_cls_csr ) ) {
+    if ( tidy_Cursor_isClassDecl( arg_cls_csr ) &&
+         cxx_tmpl_ctors_param( canon_csr, STATIC_CAST( unsigned, i ) ) ) {
       tidy_ConstructorInfo ctor_info;
       if ( tidy_Cursor_getConstructorInfo( arg_cls_csr, &ctor_info ) &&
            !clang_Cursor_isNull( ctor_info.def_ctor_csr ) ) {
