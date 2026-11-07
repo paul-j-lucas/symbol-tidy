@@ -210,6 +210,23 @@
   )
 
 /**
+ * Converts \a EXPR (a pointer expression) to a pointer to `char` preserving
+ * `const`-ness.
+ *
+ * @param EXPR A pointer expression.
+ * @return Returns:
+ *  + `(char*)(EXPR)` only if \a EXPR is a pointer to non-`const`; or:
+ *  + `(char const*)(EXPR)` only if \a EXPR is a pointer to `const`.
+ *
+ * @sa #TO_VOID_PTR_EXPR()
+ */
+#define TO_CHAR_PTR_EXPR(EXPR)          \
+  _Generic( TO_VOID_PTR_EXPR(EXPR),     \
+    void*       : (char      *)(EXPR),  \
+    const void* : (char const*)(EXPR)   \
+  )
+
+/**
  * Casts the result of \a N to an unsigned type whose size is
  * <code>sizeof(</code>\a N<code>)</code>.
  *
@@ -232,6 +249,8 @@
  * @return Returns:
  *  + `(void*)(EXPR)` only if \a EXPR is a pointer to non-`const`; or:
  *  + `(void const*)(EXPR)` only if \a EXPR is a pointer to `const`.
+ *
+ * @sa #TO_CHAR_PTR_EXPR()
  */
 #define TO_VOID_PTR_EXPR(EXPR)    (1 ? (EXPR) : (void*)(EXPR))
 

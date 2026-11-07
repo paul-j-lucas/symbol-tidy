@@ -430,6 +430,54 @@ CXCursor macro_Token_getScopedNameCursor( CXTranslationUnit tu,
 }
 
 /**
+ * Prints statistics for a hash table that has the maximum load factor among
+ * all symbols.
+ *
+ * @param mbr_off The offset of the hash table (from `offsetof`).
+ * @param abbr The abbreviation to use.
+ */
+static void print_max_lf_stats( size_t mbr_off, char const *abbr ) {
+  tidy_symbol const *max_sym = NULL;
+  double max_lf = -1.0;
+
+  ht_iterator_t iter;
+  ht_iterator_init( &iter, &tidy_symbol_set );
+  for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
+    if ( sym->is_dead )
+      continue;
+    hash_table_t const *const set = PTR_TO_MBR( sym, mbr_off );
+    if ( set->size > 0 ) {
+      double const lf = ht_table_load_factor( set );
+      if ( lf > max_lf ) {
+        max_sym = sym;
+        max_lf = lf;
+      }
+    }
+  } // for
+
+  if ( max_sym != NULL ) {
+    verbose_printf(
+      "    %s-max-load-factor:\n", abbr
+    );
+    verbose_printf(
+      "      %s-name = \"%s\"\n", abbr,
+      max_sym->display_name ? max_sym->display_name : max_sym->name
+    );
+    if ( max_sym->path != NULL ) {
+      verbose_printf(
+        "      %s-path = \"%s\"\n", abbr, max_sym->path
+      );
+    }
+    verbose_printf(
+      "      %s-load-factor = " TIDY_STAT_LF_FMT "\n", abbr, max_lf
+    );
+    verbose_printf(
+      "      %s-size = %u\n", abbr, max_sym->ref_sym_set.size
+    );
+  }
+}
+
+/**
  * Prints statistics for symbols if requested.
  */
 static void print_statistics( void ) {
@@ -447,45 +495,8 @@ static void print_statistics( void ) {
     "    ss-size = %u\n", tidy_symbol_set.size
   );
 
-  tidy_symbol const *max_sym = NULL;
-  double max_lf = -1.0;
-
-  // Find the symbol having the ref_sym_set with the largest load factor.
-  ht_iterator_t iter;
-  ht_iterator_init( &iter, &tidy_symbol_set );
-  for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
-    if ( sym->is_dead )
-      continue;
-    double const lf = ht_table_load_factor( &sym->ref_sym_set );
-    if ( lf > max_lf ) {
-      max_sym = sym;
-      max_lf = lf;
-    }
-  } // for
-
-  if ( max_sym != NULL ) {
-    verbose_printf(
-      "    ss-max-load-factor:\n"
-    );
-    verbose_printf(
-      "      ss-name = \"%s\"\n",
-      max_sym->display_name ? max_sym->display_name : max_sym->name
-    );
-    if ( max_sym->path != NULL ) {
-      verbose_printf(
-        "      ss-path = \"%s\"\n", max_sym->path
-      );
-    }
-    verbose_printf(
-      "      ref. symbol set:\n"
-    );
-    verbose_printf(
-      "        rss-load-factor = " TIDY_STAT_LF_FMT "\n", max_lf
-    );
-    verbose_printf(
-      "        rss-size = %u\n", max_sym->ref_sym_set.size
-    );
-  }
+  print_max_lf_stats( offsetof( tidy_symbol, ref_sym_set ), "ss-rss" );
+  print_max_lf_stats( offsetof( tidy_symbol, cxx_adl_usr_set ), "ss-adlus" );
 }
 
 /**
