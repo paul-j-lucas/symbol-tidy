@@ -506,22 +506,22 @@ static void print_statistics( void ) {
     "  adl-name set:\n"
   );
   verbose_printf(
-    "    adlns-load-factor = " TIDY_STAT_LF_FMT "\n",
-                            ht_table_load_factor( &cxx_adl_name_set )
+    "    adl-ns-load-factor = " TIDY_STAT_LF_FMT "\n",
+                              ht_table_load_factor( &cxx_adl_name_set )
   );
   verbose_printf(
-    "    adlns-size = %u\n", cxx_adl_name_set.size
+    "    adl-ns-size = %u\n", cxx_adl_name_set.size
   );
 
   verbose_printf(
     "  adl-type set:\n"
   );
   verbose_printf(
-    "    adlts-load-factor = " TIDY_STAT_LF_FMT "\n",
-                            ht_table_load_factor( &cxx_adl_type_set )
+    "    adl-ts-load-factor = " TIDY_STAT_LF_FMT "\n",
+                              ht_table_load_factor( &cxx_adl_type_set )
   );
   verbose_printf(
-    "    adlts-size = %u\n", cxx_adl_type_set.size
+    "    adl-ts-size = %u\n", cxx_adl_type_set.size
   );
 }
 
@@ -538,7 +538,7 @@ static void str_set_insert( hash_table_t *set, char const *s ) {
 
   if ( set->buckets == NULL ) {
     ht_table_init(
-      set, HT_DINT, 2.0, 10,
+      set, HT_DINT, 2.0, 256,
       POINTER_CAST( ht_cmp_fn_t, &strcmp ),
       POINTER_CAST( ht_hash_fn_t, &fnv1a_s )
     );
