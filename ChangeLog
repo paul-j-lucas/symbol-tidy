@@ -1,5 +1,8 @@
 2026-11-07  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * clang_util.c, clang_util.h, cxx_symbol.c, symbol.c: Added
+     tidy_Cursor_getBaseSpecifierClass() that properly handles base class
+     specifiers.
    * clang_util.c, clang_util.h, cxx_symbol.c, symbol.c: Added and now using
      tidy_getCursorDefinition().
    * cxx_symbol.c, constructors-4.cpp, constructors.out, constructors.test:
