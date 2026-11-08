@@ -28,6 +28,7 @@
 
 // local
 #include "pjl_config.h"
+#include "fnv1a.h"
 
 /// @cond DOXYGEN_IGNORE
 
@@ -37,6 +38,7 @@
 // standard
 #include <stdbool.h>
 #include <stddef.h>
+#include <string.h>                     /* for memcmp(3) */
 
 /// @endcond
 
@@ -356,6 +358,29 @@ NODISCARD
 CXString tidy_File_getRealPathName( CXFile file );
 
 /**
+ * Compares two CXFileUniqueID objects.
+ *
+ * @param i_id The first CXFileUniqueID.
+ * @param j_id The second CXFileUniqueID.
+ * @return Returns a number less than 0, 0, or greater than 0 if \a i_id is
+ * less than, equal to, or greater than \a j_id, respectively.
+ */
+NODISCARD
+inline int tidy_FileUniqueID_cmp( CXFileUniqueID const *i_id,
+                                  CXFileUniqueID const *j_id ) {
+  return memcmp( i_id->data, j_id->data, sizeof( i_id->data ) );
+}
+
+/**
+ * Calculates tha hash of \a fuid.
+ *
+ * @param fuid The CXFileUniqueID to hash.
+ * @return Returns said hash.
+ */
+NODISCARD
+fnv1a_t tidy_FileUniqueID_hash( CXFileUniqueID const *fuid );
+
+/**
  * Attempts to get the cursor for the identifier having \a name within \a
  * scope_csr.
  *
@@ -463,6 +488,17 @@ inline CXFile tidy_getFileLocation_File( CXSourceLocation loc ) {
   );
   return file;
 }
+
+/**
+ * Gets a unique ID for \a file.
+ *
+ * @note Unlike `clang_getFileUniqueID()`, this function never fails.
+ *
+ * @param file The file to get the unique ID for.
+ * @return Returns said unique ID.
+ */
+NODISCARD
+CXFileUniqueID tidy_getFileUniqueID( CXFile file );
 
 /**
  * Calls `clang_getSpellingLocation()` and returns only the file.

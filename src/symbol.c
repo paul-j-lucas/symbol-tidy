@@ -61,6 +61,31 @@
  * @{
  */
 
+////////// typedefs ///////////////////////////////////////////////////////////
+
+typedef struct tidy_header        tidy_header;
+typedef struct tidy_header_stats  tidy_header_stats;
+
+////////// structs ////////////////////////////////////////////////////////////
+
+/**
+ * A header included in a translation unit.
+ */
+struct tidy_header {
+  CXFileUniqueID      fuid;             ///< The file's unique ID.
+  enum CXLanguageKind lang;             ///< From tidy_source.
+  unsigned            tsid;             ///< From tidy_source.
+};
+
+/**
+ * Additional statistics for the set of headers that were included across all
+ * translation units.
+ */
+struct tidy_header_stats {
+  unsigned  revisit_count;              ///< Headers visited more than once.
+  unsigned  skipped_count;              ///< Headers skipped.
+};
+
 ////////// local functions ////////////////////////////////////////////////////
 
 NODISCARD
@@ -88,6 +113,11 @@ static void visit_VarDecl( CXCursor, symbols_visit_data* );
 hash_table_t tidy_symbol_set;
 
 /// @endcond
+
+////////// local variables ////////////////////////////////////////////////////
+
+static hash_table_t       header_set;   ///< The set of all header files.
+static tidy_header_stats  header_stats; ///< Statistics for \ref header_set.
 
 ////////// local functions ////////////////////////////////////////////////////
 
@@ -266,6 +296,55 @@ done:
   free( cls_name );
   free( sym_scoped_name );
   return is_excluded;
+}
+
+/**
+ * Gets whether the file for a top-level cursor can be skipped because it was
+ * already visted for an earlier translation unit of the same language.
+ *
+ * @remarks The first top-level cursor from a file registers it with the
+ * current TU's serial and is visted, as are the rest of that file's cursors in
+ * the same TU.  In later TUs, the serial differs, so they're skipped.
+ *
+ * @param file The cursor's file.
+ * @param svd The symbols_visit_data to use.
+ * @return Returns `true` only if the file was already seen.
+ */
+NODISCARD
+static bool file_previously_seen( CXFile file, symbols_visit_data *svd ) {
+  assert( svd != NULL );
+
+  if ( file == NULL || file == svd->source->file )
+    return false;                       // never skip the TU's own source
+
+  //
+  // Consecutive top-level cursors are usually from the same file: if so,
+  // return the last result.
+  //
+  if ( file == svd->fps.last_file )
+    return svd->fps.last_seen;
+
+  bool seen = false;
+
+  tidy_header find_header = {
+    .fuid = tidy_getFileUniqueID( file ),
+    .lang = svd->source->lang,
+    .tsid = svd->source->tsid
+  };
+  ht_insert_rv_t const hti =
+    ht_table_insert( &header_set, &find_header, sizeof find_header );
+  if ( !hti.inserted ) {
+    tidy_header const *const found_header = HT_DINT( hti.entry );
+    seen = found_header->tsid != svd->source->tsid;
+    if ( seen )
+      ++header_stats.skipped_count;
+    else
+      ++header_stats.revisit_count;
+  }
+
+  svd->fps.last_file = file;
+  svd->fps.last_seen = seen;
+  return seen;
 }
 
 /**
@@ -485,6 +564,24 @@ static void print_statistics( void ) {
     return;
 
   verbose_printf(
+    "  header set:\n"
+  );
+  verbose_printf(
+    "    hs-load-factor = " TIDY_STAT_LF_FMT "\n",
+                          ht_table_load_factor( &header_set )
+  );
+  verbose_printf(
+    "    hs-size = %u\n", header_set.size
+  );
+
+  verbose_printf(
+    "    hs-revisit-count = %u\n", header_stats.revisit_count
+  );
+  verbose_printf(
+    "    hs-skipped-count = %'u\n", header_stats.skipped_count
+  );
+
+  verbose_printf(
     "  symbol set:\n"
   );
   verbose_printf(
@@ -618,6 +715,7 @@ static void symbol_mark_used( tidy_symbol *sym ) {
  */
 static void symbols_cleanup( void ) {
   print_statistics();
+  ht_table_cleanup( &header_set, /*free_fn=*/NULL );
   ht_table_cleanup(
     &tidy_symbol_set, POINTER_CAST( ht_free_fn_t, &symbol_cleanup )
   );
@@ -666,7 +764,6 @@ static unsigned symbols_mark_used( void ) {
 static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
                                                 CXCursor parent,
                                                 CXClientData data ) {
-  (void)parent;
   assert( data != NULL );
   symbols_visit_data *const svd = data;
 
@@ -686,6 +783,19 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
   }
   else if ( IS_VERBOSE( CURSORS ) ) {
     verbose_print_cursor( cursor );     // LCOV_EXCL_LINE
+  }
+
+  if ( is_in_system_header /* || opt_skip_user_headers*/ ) {
+    enum CXCursorKind const parent_kind = clang_getCursorKind( parent );
+    if ( parent_kind == CXCursor_TranslationUnit ) {
+      //
+      // For a top-level cursor, skip it (and its whole subtree) if its file
+      // was already included by an earlier translation unit.
+      //
+      CXFile const sym_file = tidy_getFileLocation_File( sym_loc );
+      if ( file_previously_seen( sym_file, svd ) )
+        goto skip;
+    }
   }
 
   tidy_symbol *const prev_sym = svd->curr_sym;
@@ -892,6 +1002,41 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
 
 skip:
   return CXChildVisit_Continue;
+}
+
+/**
+ * Compares two tidy_header objects.
+ *
+ * @note The \ref tidy_header::tsid "tsid" field is intentionally not compared.
+ *
+ * @param i_hdr The first tidy_header.
+ * @param j_hdr The second tidy_header.
+ * @return Returns a number less than 0, 0, or greater than 0 if \a i_hdr is
+ * less than, equal to, or greater than \a j_hdr, respectively.
+ */
+NODISCARD
+static int tidy_header_cmp( tidy_header const *i_hdr,
+                            tidy_header const *j_hdr ) {
+  int const cmp = tidy_FileUniqueID_cmp( &i_hdr->fuid, &j_hdr->fuid );
+  if ( cmp != 0 )
+    return cmp;
+  return (i_hdr->lang > j_hdr->lang) - (i_hdr->lang < j_hdr->lang);
+}
+
+/**
+ * Calculates the hash of \a hdr.
+ *
+ * @note The \ref tidy_header::tsid "tsid" field is intentionally not part of
+ * the hash.
+ *
+ * @param hdr The tidy_header to calculate the hash for.
+ * @return Returns said hash.
+ */
+NODISCARD
+static ht_hash_val_t tidy_header_hash( tidy_header const *hdr ) {
+  fnv1a_t hash = tidy_FileUniqueID_hash( &hdr->fuid );
+  hash = FNV1A_PRIME * (hash ^ STATIC_CAST( fnv1a_t, hdr->lang ));
+  return STATIC_CAST( ht_hash_val_t, hash );
 }
 
 /**
@@ -1491,6 +1636,11 @@ void symbol_add_ref( tidy_symbol *from_sym, tidy_symbol *to_sym ) {
 
 void symbols_init( void ) {
   ASSERT_RUN_ONCE();
+  ht_table_init(
+    &header_set, HT_DINT, 2.0, 256,
+    POINTER_CAST( ht_cmp_fn_t, &tidy_header_cmp ),
+    POINTER_CAST( ht_hash_fn_t, &tidy_header_hash )
+  );
   ht_table_init(
     &tidy_symbol_set, HT_DINT, 2.0, 16384,
     POINTER_CAST( ht_cmp_fn_t, &symbol_cmp ),

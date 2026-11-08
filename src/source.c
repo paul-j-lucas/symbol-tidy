@@ -334,6 +334,9 @@ static void source_parse_impl( tidy_source *source ) {
       source_check_diagnostics( source );
       break;
   } // switch
+
+  static unsigned tsid;
+  source->tsid = ++tsid;
 }
 
 /**
@@ -366,8 +369,8 @@ void source_cleanup( tidy_source *source ) {
 void source_parse( tidy_source *source ) {
   assert( source != NULL );
   source_parse_impl( source );
-  CXFile const file = clang_getFile( source->tu, source->argv_path );
-  source_cpp_visit( source, file );
+  source->file = clang_getFile( source->tu, source->argv_path );
+  source_cpp_visit( source, source->file );
   clang_getInclusions( source->tu, &include_visitor, source );
 }
 

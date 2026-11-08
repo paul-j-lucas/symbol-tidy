@@ -177,6 +177,15 @@ struct symbols_visit_data {
   tidy_symbol        *curr_sym;         ///< Current symbol, if any.
 
   /**
+   * Mini file_previously_seen() result cache that allows cursors from header
+   * files we've already visited to be skipped.
+   */
+  struct {
+    CXFile            last_file;        ///< The file for the last cursor.
+    bool              last_seen;        ///< Saw \ref last_file?
+  } fps;
+
+  /**
    * Additional data for visit_Constructor().
    */
   struct svd_cxx_constructor {

@@ -26,6 +26,7 @@
 // local
 #include "pjl_config.h"
 #include "clang_util.h"
+#include "fnv1a.h"
 #include "path_util.h"
 #include "str_util.h"
 #include "strbuf.h"
@@ -50,6 +51,12 @@
  */
 
 ////////// typedefs ///////////////////////////////////////////////////////////
+
+#ifdef HAVE_TYPEOF
+typedef typeof( ((CXFileUniqueID*)0)->data[0] ) CXFileUniqueID_data_t;
+#else
+typedef unsigned long long CXFileUniqueID_data_t;
+#endif /* HAVE_TYPEOF */
 
 typedef struct callsBaseConstructor_data  callsBaseConstructor_data;
 typedef struct getCursorByName_data       getCursorByName_data;
@@ -833,6 +840,13 @@ CXString tidy_File_getRealPathName( CXFile file ) {
   return abs_path_cxs;
 }
 
+fnv1a_t tidy_FileUniqueID_hash( CXFileUniqueID const *fuid ) {
+  fnv1a_t hash = FNV1A_INIT;
+  for ( unsigned i = 0; i < ARRAY_SIZE( ((CXFileUniqueID*)0)->data ); ++i )
+    hash = FNV1A_PRIME * (hash ^ fuid->data[i]);
+  return hash;
+}
+
 CXCursor tidy_getCursorByName( char const *name, CXCursor scope_csr ) {
   assert( name != NULL );
 
@@ -969,6 +983,28 @@ char* tidy_getCursorUSR( CXCursor cursor ) {
   clang_disposeString( label_cxs );
   clang_disposeString( path_cxs );
   return usr;
+}
+
+CXFileUniqueID tidy_getFileUniqueID( CXFile file ) {
+  assert( file != NULL );
+
+  CXFileUniqueID fuid;
+  if ( unlikely( clang_getFileUniqueID( file, &fuid ) != 0 ) ) {
+    // LCOV_EXCL_START
+    // clang_getFileUniqueID() failed, but we still want an ID: get a hash of
+    // its full path.
+    CXString const    abs_path_cxs = tidy_File_getRealPathName( file );
+    char const *const abs_path = clang_getCString( abs_path_cxs );
+    fnv1a_t const     hash = fnv1a_s( abs_path );
+
+    clang_disposeString( abs_path_cxs );
+
+    fuid = (CXFileUniqueID){
+      .data = { STATIC_CAST( CXFileUniqueID_data_t, hash ) }
+    };
+    // LCOV_EXCL_STOP
+  }
+  return fuid;
 }
 
 bool tidy_isCursorDefinition( CXCursor cursor ) {
@@ -1174,6 +1210,8 @@ unsigned tidy_visitClassChildren( CXCursor cls_csr, CXCursorVisitor visitor,
 
 extern inline bool tidy_Cursor_isInSystemHeader( CXCursor );
 extern inline bool tidy_Cursor_isInvalid( CXCursor );
+extern inline int tidy_FileUniqueID_cmp( CXFileUniqueID const*,
+                                         CXFileUniqueID const* );
 extern inline CXFile tidy_getFileLocation_File( CXSourceLocation );
 extern inline CXFile tidy_getSpellingLocation_File( CXSourceLocation );
 extern inline unsigned tidy_getSpellingLocation_Line( CXSourceLocation );
