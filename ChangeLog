@@ -1,3 +1,13 @@
+2026-11-08  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * config_file.c, cxx_symbol.c, symbol.c, verbose.c, verbose.h:
+     verbose_print_statistics() now takes a pointer to the function that prints
+     statistics and also enables thousands separator printing using a temporary
+     locale.
+   * clang_util.c, clang_util.h, source.c, source.h, symbol.c, symbol.h: Now
+     keeping track of visited headers and skipping those visited before -- big
+     performance win.
+
 2026-11-07  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
    * symbol.c: Now skipping visit_XxxYyy calls if is_in_system_header.
