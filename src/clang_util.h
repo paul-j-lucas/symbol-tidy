@@ -75,6 +75,17 @@ bool tidy_Cursor_callsBaseConstructor( CXCursor ctor_csr,
                                        CXCursor base_cls_csr );
 
 /**
+ * Gets the cursor for the class that a `CXXBaseSpecifier` cursor specifies,
+ * seeing through type aliases and alias templates.
+ *
+ * @param spec_csr A `CXCursor_CXXBaseSpecifier` kind of cursor.
+ * @return Returns the cursor for the base class specified by \a spec_csr or a
+ * null cursor if it isn't a class.
+ */
+NODISCARD
+CXCursor tidy_Cursor_getBaseSpecifierClass( CXCursor spec_csr );
+
+/**
  * Gets whether \a cursor has a constructor, either directly, or indirectly
  * inherited from a base class.
  *
@@ -642,6 +653,20 @@ int tidy_Token_isSpellingEqualToAny_impl( CXTranslationUnit tu, CXToken token,
  */
 NODISCARD
 CXType tidy_Type_getUnderlyingType( CXType type );
+
+/**
+ * Similar to `clang_visitChildren()`, but visit the children of the class
+ * definition cursor of \a cursor.
+ *
+ * @param cls_csr The class cursor whose definition children to visit.
+ * @param visitor The visitor function to use.
+ * @param data Additional data passed to \a visitor.
+ * @return Returns a non-zero value if the traversal was terminated prematurely
+ * by the visitor returning `CXChildVisit_Break`.
+ */
+PJL_DISCARD
+unsigned tidy_visitClassChildren( CXCursor cls_csr, CXCursorVisitor visitor,
+                                  CXClientData data );
 
 ///////////////////////////////////////////////////////////////////////////////
 

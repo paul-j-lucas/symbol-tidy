@@ -148,7 +148,7 @@ static enum CXChildVisitResult getConstructorInfo_visitor( CXCursor cursor,
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
   switch ( kind ) {
     case CXCursor_CXXBaseSpecifier:;
-      CXCursor base_cls_csr = clang_getCursorReferenced( cursor );
+      CXCursor base_cls_csr = tidy_Cursor_getBaseSpecifierClass( cursor );
       if ( tidy_Cursor_isInvalid( base_cls_csr ) ) {
         CXType const type = clang_getCursorType( cursor );
         base_cls_csr = clang_getTypeDeclaration( type );
@@ -215,7 +215,7 @@ static enum CXChildVisitResult getCursorByName_visitor( CXCursor cursor,
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
   switch ( kind ) {
     case CXCursor_CXXBaseSpecifier:;
-      CXCursor base_cls_csr = clang_getCursorReferenced( cursor );
+      CXCursor base_cls_csr = tidy_Cursor_getBaseSpecifierClass( cursor );
       if ( tidy_Cursor_isInvalid( base_cls_csr ) ) {
         CXType const type = clang_getCursorType( cursor );
         base_cls_csr = clang_getTypeDeclaration( type );
@@ -511,6 +511,21 @@ bool tidy_Cursor_callsBaseConstructor( CXCursor ctor_csr,
   clang_visitChildren( ctor_csr, &callsBaseConstructor_visitor, &cbcd );
   return cbcd.explicitly_calls_base_ctor;
 }
+
+CXCursor tidy_Cursor_getBaseSpecifierClass( CXCursor spec_csr ) {
+  CXCursor cls_csr = clang_getCursorReferenced( spec_csr );
+  if ( !tidy_Cursor_isClassDecl( cls_csr ) ) {
+    //
+    // The base is named via an alias (or libclang returned nothing): resolve
+    // the canonical type instead, which is always the underlying class.
+    //
+    CXType type = clang_getCursorType( spec_csr );
+           type = clang_getCanonicalType( type );
+    cls_csr = clang_getTypeDeclaration( type );
+  }
+  return tidy_Cursor_isClassDecl( cls_csr ) ? cls_csr : clang_getNullCursor();
+}
+
 
 bool tidy_Cursor_getConstructorInfo( CXCursor cursor,
                                      tidy_ConstructorInfo *ctor_info ) {
@@ -1142,6 +1157,13 @@ CXType tidy_Type_getUnderlyingType( CXType type ) {
   } // for
 
   return type;
+}
+
+unsigned tidy_visitClassChildren( CXCursor cls_csr, CXCursorVisitor visitor,
+                                  CXClientData data ) {
+  assert( tidy_Cursor_isClassDecl( cls_csr ) );
+  CXCursor const cls_def_csr = tidy_getCursorDefinition( cls_csr );
+  return clang_visitChildren( cls_def_csr, visitor, data );
 }
 
 ///////////////////////////////////////////////////////////////////////////////
