@@ -853,36 +853,37 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
           svd->curr_sym = sym;
       } // switch
 
-      switch ( kind ) {
-        case CXCursor_Constructor:
-          visit_Constructor( cursor, svd );
-          break;
+      if ( !is_in_system_header ) {
+        switch ( kind ) {
+          case CXCursor_Constructor:
+            visit_Constructor( cursor, svd );
+            break;
 
-        case CXCursor_CXXMethod:
-        case CXCursor_Destructor:
-          visit_CXXMethod( cursor, svd );
-          break;
+          case CXCursor_CXXMethod:
+          case CXCursor_Destructor:
+            visit_CXXMethod( cursor, svd );
+            break;
 
-        case CXCursor_FieldDecl:
-          visit_FieldDecl( cursor, svd );
-          break;
+          case CXCursor_FieldDecl:
+            visit_FieldDecl( cursor, svd );
+            break;
 
-        case CXCursor_FunctionDecl:
-          if ( !is_in_system_header )
+          case CXCursor_FunctionDecl:
             visit_FunctionDecl( cursor, svd );
-          break;
+            break;
 
-        case CXCursor_MacroDefinition:
-          visit_MacroDefinition( cursor, svd );
-          break;
+          case CXCursor_MacroDefinition:
+            visit_MacroDefinition( cursor, svd );
+            break;
 
-        case CXCursor_VarDecl:
-          visit_VarDecl( cursor, svd );
-          break;
+          case CXCursor_VarDecl:
+            visit_VarDecl( cursor, svd );
+            break;
 
-        default:
-          /* suppress warning */;
-      } // switch
+          default:
+            /* suppress warning */;
+        } // switch
+      }
     }
   }
 
