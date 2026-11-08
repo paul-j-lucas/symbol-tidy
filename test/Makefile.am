@@ -51,6 +51,7 @@ TESTS+=	tests/config-bad-semantics-1.test \
 TESTS+=	tests/auto_delete_pool.test \
 	tests/constructors.test \
 	tests/destructors.test \
+	tests/encoded_char.test \
 	tests/functor.test \
 	tests/new-delete.test \
 	tests/range-for.test \
