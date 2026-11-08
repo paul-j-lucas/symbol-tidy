@@ -1,5 +1,8 @@
 2026-11-07  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * hash_table.c, hash_table.h: Added ht_table_clear().
+   * test/Makefile.am, encoded_char.cpp, encoded_char.out, encoded_char.test:
+     Another test.
    * clang_util.c, clang_util.h, cxx_symbol.c, symbol.c: Added
      tidy_Cursor_getBaseSpecifierClass() that properly handles base class
      specifiers.
