@@ -1,5 +1,6 @@
 2026-11-07  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * symbol.c: Now skipping visit_XxxYyy calls if is_in_system_header.
    * hash_table.c, hash_table.h: Added ht_table_clear().
    * test/Makefile.am, encoded_char.cpp, encoded_char.out, encoded_char.test:
      Another test.
