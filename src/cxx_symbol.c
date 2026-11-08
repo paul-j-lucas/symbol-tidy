@@ -482,7 +482,7 @@ skip:
  * Cleans-up all C++ symbols.
  */
 static void cxx_symbols_cleanup( void ) {
-  print_statistics();
+  verbose_print_statistics( &print_statistics );
   ht_table_cleanup( &cxx_adl_name_set, /*free_fn=*/NULL );
   ht_table_cleanup( &cxx_adl_type_set, /*free_fn=*/NULL );
 }
@@ -765,9 +765,6 @@ static void cxx_type_template_args_dtor_add_ref( CXType type,
  * Prints statistics for C++ ADL hash tables if requested.
  */
 static void print_statistics( void ) {
-  if ( !verbose_print_statistics() )
-    return;
-
   verbose_printf(
     "  adl-name set:\n"
   );

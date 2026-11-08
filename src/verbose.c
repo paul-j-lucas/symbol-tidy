@@ -39,6 +39,7 @@
 
 // standard
 #include <assert.h>
+#include <locale.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -318,12 +319,21 @@ int verbose_printf( char const *format, ... ) {
   return raw_len;
 }
 
-bool verbose_print_statistics( void ) {
+void verbose_print_statistics( void (*print_fn)( void ) ) {
+  if ( !IS_VERBOSE( STATISTICS ) )
+    return;
+
   static bool printed_header;
-  bool const want_statistics = IS_VERBOSE( STATISTICS );
-  if ( want_statistics && verbose_section_begin( &printed_header ) )
+  if ( verbose_section_begin( &printed_header ) )
     verbose_printf( "statistics:\n" );
-  return want_statistics;
+
+  assert( print_fn != NULL );
+
+  locale_t loc = newlocale( LC_NUMERIC_MASK, /*locale=*/"", /*base=*/NULL );
+  locale_t const prev_loc = uselocale( loc );
+  (*print_fn)();
+  uselocale( prev_loc );
+  freelocale( loc );
 }
 
 bool verbose_section_begin( bool *printed_header ) {

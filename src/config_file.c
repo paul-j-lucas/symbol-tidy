@@ -571,7 +571,7 @@ static void config_str_set( config_bool *cb, bool value, char const *s ) {
  * Cleans-up all configuration data.
  */
 static void config_cleanup( void ) {
-  print_statistics();
+  verbose_print_statistics( &print_statistics );
   ht_table_cleanup( &ignore_path_set, /*free_fn=*/NULL );
   ht_table_cleanup(
     &ignore_symbol_set, POINTER_CAST( ht_free_fn_t, &ignore_symbol_cleanup )
@@ -1008,9 +1008,6 @@ static void print_invalid_value( config_parse_fn_args const *config,
  * Prints statistics if requested.
  */
 static void print_statistics( void ) {
-  if ( !verbose_print_statistics() )
-    return;
-
   verbose_printf(
     "  ignore-path set:\n"
   );

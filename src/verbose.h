@@ -121,15 +121,14 @@ PJL_PRINTF_LIKE_FUNC(1)
 int verbose_printf( char const *format, ... );
 
 /**
- * Gets whether statistics should be printed.
+ * Gets whether statistics should be printed: if so, calls \a print_fn.
  *
- * @remarks If so, the `statistics:` header is printed only the first time this
- * function is called.
+ * @remarks If so, the `statistics:` header is printed before \a print_fn is
+ * called, but only the first time this function is called.
  *
- * @return Returns `true` only if statistics should be printed.
+ * @param print_fn The function to call to print statistics.
  */
-NODISCARD
-bool verbose_print_statistics( void );
+void verbose_print_statistics( void (*print_fn)( void ) );
 
 /**
  * This should be called once just before starting to print a new verbose

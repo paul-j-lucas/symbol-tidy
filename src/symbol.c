@@ -560,9 +560,6 @@ static void print_max_lf_stats( size_t mbr_off, char const *abbr ) {
  * Prints statistics for symbols if requested.
  */
 static void print_statistics( void ) {
-  if ( !verbose_print_statistics() )
-    return;
-
   verbose_printf(
     "  header set:\n"
   );
@@ -714,7 +711,7 @@ static void symbol_mark_used( tidy_symbol *sym ) {
  * Cleans-up all symbols.
  */
 static void symbols_cleanup( void ) {
-  print_statistics();
+  verbose_print_statistics( &print_statistics );
   ht_table_cleanup( &header_set, /*free_fn=*/NULL );
   ht_table_cleanup(
     &tidy_symbol_set, POINTER_CAST( ht_free_fn_t, &symbol_cleanup )
