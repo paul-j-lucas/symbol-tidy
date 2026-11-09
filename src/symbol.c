@@ -878,18 +878,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
   if ( is_definition ) {
     tidy_symbol *const sym = symbol_add( cursor, svd->source );
     if ( likely( sym != NULL ) ) {
-      if ( tidy_Cursor_isEnclosingScope( cursor ) )
-        sym->is_scope = true;
-
-      if ( is_in_system_header ) {
-        //
-        // As mentioned above, in C++, template code in standard headers calls
-        // back into user code, so mark all symbols in standard headers as
-        // roots.
-        //
-        sym->is_root = true;
-      }
-      else {
+      if ( !is_in_system_header ) {
         //
         // For definitions, set the symbol's path, line, and column.
         //
@@ -1578,8 +1567,12 @@ void cursor_add_ref( CXCursor to_csr, symbols_visit_data *svd ) {
 }
 
 tidy_symbol* symbol_add( CXCursor sym_csr, tidy_source const *source ) {
+  assert( source != NULL );
+
+  sym_csr = clang_getCanonicalCursor( sym_csr );
   if ( cursor_is_excluded( sym_csr, source ) )
     return NULL;
+
   char *key = tidy_getCursorUSR( sym_csr );
   if ( unlikely( key == NULL ) )
     return NULL;
@@ -1600,16 +1593,22 @@ tidy_symbol* symbol_add( CXCursor sym_csr, tidy_source const *source ) {
   if ( source->lang == CXLanguage_CPlusPlus )
     sym->display_name = tidy_Cursor_getScopedDisplayName( sym_csr );
 
-  //
-  // If the symbol's name is "main", we have to mark it as a root since nothing
-  // calls main().  But first ensure that it's the program's main() function:
-  // in C, anything named "main" must be main(); however, in C++, other things,
-  // e.g., member functions, can also be named "main".
-  //
-  if ( strcmp( sym->name, "main" ) == 0 &&
-       tidy_Cursor_isExternalGlobalFunction( sym_csr ) ) {
+  if ( (source->lang == CXLanguage_CPlusPlus &&
+        tidy_Cursor_isInSystemHeader( sym_csr )) ||
+        //
+        // If the symbol's name is "main", we have to mark it as a root since
+        // nothing calls main().  But first ensure that it's the program's
+        // main() function: in C, anything named "main" must be main();
+        // however, in C++, other things, e.g., member functions, can also be
+        // named "main".
+        //
+       (strcmp( sym->name, "main" ) == 0 &&
+        tidy_Cursor_isExternalGlobalFunction( sym_csr )) ) {
     sym->is_root = true;
   }
+
+  if ( tidy_Cursor_isEnclosingScope( sym_csr ) )
+    sym->is_scope = true;
 
   ht_table_init(
     &sym->ref_sym_set, HT_DPTR, 2.0, 128,
