@@ -52,10 +52,14 @@ TESTS+=	tests/auto_delete_pool.test \
 	tests/constructors.test \
 	tests/destructors.test \
 	tests/encoded_char.test \
+	tests/exception-unused.test \
+	tests/exception-used.test \
 	tests/functor.test \
 	tests/new-delete.test \
 	tests/range-for.test \
 	tests/std-exclude.test \
+	tests/streambuf-overflow.test \
+	tests/template-adl-unused.test \
 	tests/template-adl.test \
 	tests/template-ctor.test \
 	tests/template-omanip.test \
