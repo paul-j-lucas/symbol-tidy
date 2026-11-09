@@ -12,6 +12,7 @@ struct auto_delete_pool {
   }
 
   void add( void *obj ) {
+    (void)obj;
   }
 };
 

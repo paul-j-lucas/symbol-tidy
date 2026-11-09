@@ -3,6 +3,7 @@
 #include <unordered_set>
 
 size_t hash_string( char const *s ) {
+  (void)s;
   return 0;
 }
 
