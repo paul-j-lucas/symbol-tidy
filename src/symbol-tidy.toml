@@ -62,11 +62,6 @@ ignore-symbols = [
   "SGR_FG_YELLOW",
 ]
 
-[strbuf.c]
-ignore-symbols = [
-  "strbuf_sepsn_putsn"
-]
-
 [strbuf.h]
 ignore-symbols = [
   "strbuf_sepsn_puts"
@@ -152,11 +147,7 @@ ignore-symbols = [
 
 [verbose.h]
 ignore-symbols = [
-  "VERBOSE_DEBUG_CURSOR"
-]
-
-[verbose.c]
-ignore-symbols = [
+  "VERBOSE_DEBUG_CURSOR",
   "verbose_print_tokens"
 ]
 
