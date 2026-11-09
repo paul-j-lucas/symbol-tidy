@@ -178,6 +178,21 @@ static bool cursor_is_definition( CXCursor cursor ) {
     case CXCursor_UnionDecl:
       return !clang_Cursor_isAnonymous( cursor );
 
+    case CXCursor_ParmDecl:
+      //
+      // Only parameters of function definitions count.  Parameters of function
+      // declarations and pointer-to-function types would otherwise always look
+      // unused.
+      //
+      if ( !tidy_Cursor_inFunctionScope( cursor ) )
+        return false;
+      CXCursor const fn_csr = clang_getCursorSemanticParent( cursor );
+      if ( !tidy_isCursorDefinition( fn_csr ) )
+        return false;
+      if ( tidy_Cursor_isSpellingEqualTo( cursor, "" ) )
+        return false;                   // skip unnamed parameters
+      return true;
+
     default:
       return false;
   } // switch
@@ -283,6 +298,7 @@ static bool cursor_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
     case CXCursor_FieldDecl:
     case CXCursor_FunctionDecl:
     case CXCursor_MacroDefinition:
+    case CXCursor_ParmDecl:
     case CXCursor_StructDecl:
     case CXCursor_TypeAliasDecl:
     case CXCursor_TypedefDecl:
@@ -397,6 +413,50 @@ void cursor_visit_def( CXCursor sym_csr, tidy_symbol *sym,
       //      unused_label -> {}
       //
       // Now, f() references g(), so it would be marked used --- correctly.
+      //
+      break;
+
+    case CXCursor_ParmDecl:
+      //
+      // Never set curr_sym to a parameter since it can break a ref_sym_set.
+      // Consider:
+      //
+      //      constexpr int N = 42;
+      //
+      //      void f( int unused_param = N ) {
+      //      }
+      //
+      //      int main() {
+      //        f();
+      //      }
+      //
+      // The default argument is a child of the parameter's declaration.  If we
+      // set curr_sym to unused_param here, we'd get the following symbols and
+      // what they reference:
+      //
+      //      f() -> {}
+      //      N -> {}
+      //      main() [root] -> { f() }
+      //      unused_param -> { N }
+      //
+      // Note that f() does _not_ reference unused_param.  (If it did, then
+      // unused_param would incorrectly be considered used.  An actual use of
+      // the parameter in f()'s body is needed to reference it.)
+      //
+      // Since nothing references unused_param, it's correctly left as unused.
+      // But unused_param is the only symbol that has a reference to N, so N
+      // would be left as unused also --- incorrectly.  The default argument is
+      // evaluated whenever f() is called without that argument.
+      //
+      // By _not_ setting curr_sym to unused_param, we'd get the following
+      // symbols and what they reference:
+      //
+      //      f() -> { N }
+      //      N -> {}
+      //      main() [root] -> { f() }
+      //      unused_param -> {}
+      //
+      // Now, f() references N, so it would be marked used --- correctly.
       //
       break;
 
