@@ -1,5 +1,7 @@
 2026-11-08  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * symbol.c: Now doing much less for cursors in system headers; major
+     refactoring.
    * exception-used-3a.cpp, exception-used-3b.cpp, exception-used.out,
      exception-used.test: Another test.
    * test/Makefile.am, exception-unused.cpp, exception-used-1.cpp,
