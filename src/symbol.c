@@ -998,7 +998,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
   symbols_visit_data *const svd = data;
 
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
-  tidy_symbol *const      prev_sym = svd->curr_sym;
+  tidy_symbol *const      prev_svd_curr_sym = svd->curr_sym;
   CXSourceLocation const  sym_loc = clang_getCursorLocation( cursor );
 
   if ( clang_Location_isInSystemHeader( sym_loc ) ) {
@@ -1079,7 +1079,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
   }
 
   clang_visitChildren( cursor, &symbols_visitor, svd );
-  svd->curr_sym = prev_sym;
+  svd->curr_sym = prev_svd_curr_sym;
 
 skip:
   return CXChildVisit_Continue;
