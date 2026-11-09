@@ -275,16 +275,6 @@ static bool cursor_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
   enum CXCursorKind const sym_kind = clang_getCursorKind( sym_csr );
 
   switch ( sym_kind ) {
-    case CXCursor_Constructor:
-    case CXCursor_CXXMethod:
-      // Get the (expensive) class name only when needed.
-      cls_name = tidy_Cursor_getScopedSpelling( parent_csr );
-      break;
-    default:
-      /* suppress warning */;
-  } // switch
-
-  switch ( sym_kind ) {
     case CXCursor_ClassDecl:
     case CXCursor_ClassTemplate:
     case CXCursor_ClassTemplatePartialSpecialization:
@@ -302,6 +292,7 @@ static bool cursor_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
       break;
 
     case CXCursor_Constructor:
+      cls_name = tidy_Cursor_getScopedSpelling( parent_csr );
       if ( clang_CXXConstructor_isCopyConstructor( sym_csr ) &&
            config_bool_value( &opt_ignore_cxx_copy_ctors, cls_name ) ) {
         is_excluded = true;
@@ -315,8 +306,10 @@ static bool cursor_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
     case CXCursor_CXXMethod:
       if ( ignored ) {
         is_excluded = true;
+        break;
       }
-      else if ( clang_CXXMethod_isCopyAssignmentOperator( sym_csr ) ) {
+      cls_name = tidy_Cursor_getScopedSpelling( parent_csr );
+      if ( clang_CXXMethod_isCopyAssignmentOperator( sym_csr ) ) {
         if ( config_bool_value( &opt_ignore_cxx_copy_assigns, cls_name ) )
           is_excluded = true;
       }
@@ -1738,7 +1731,7 @@ void symbols_init( void ) {
     POINTER_CAST( ht_hash_fn_t, &tidy_header_hash )
   );
   ht_table_init(
-    &tidy_symbol_set, HT_DINT, 2.0, 16384,
+    &tidy_symbol_set, HT_DINT, 2.0, 4096,
     POINTER_CAST( ht_cmp_fn_t, &symbol_cmp ),
     POINTER_CAST( ht_hash_fn_t, &symbol_hash )
   );
