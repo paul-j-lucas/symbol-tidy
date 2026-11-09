@@ -102,7 +102,7 @@ static void visit_FieldDecl( CXCursor, symbols_visit_data* );
 static void visit_FunctionDecl( CXCursor, symbols_visit_data* );
 static void visit_MacroDefinition( CXCursor, symbols_visit_data* );
 static void visit_most_Ref( CXCursor, symbols_visit_data* );
-static void visit_OverloadedDeclRef( CXCursor, bool, symbols_visit_data* );
+static void visit_OverloadedDeclRef( CXCursor, symbols_visit_data* );
 static void visit_VarDecl( CXCursor, symbols_visit_data* );
 
 ////////// extern variables ///////////////////////////////////////////////////
@@ -136,6 +136,52 @@ static inline char const* symbol_name_for_print( tidy_symbol const *sym ) {
 }
 
 ////////// local functions ////////////////////////////////////////////////////
+
+/**
+ * Gets whether \a cursor is for a symbol definition.
+ *
+ * @param cursor The cursor to check.
+ * @return Returns `true` only if \a cursor is for a symbol definition.
+ *
+ * @sa cursor_visit_def()
+ */
+NODISCARD
+static bool cursor_is_definition( CXCursor cursor ) {
+  enum CXCursorKind const kind = clang_getCursorKind( cursor );
+  switch ( kind ) {
+    case CXCursor_ClassDecl:
+    case CXCursor_ClassTemplate:
+    case CXCursor_ClassTemplatePartialSpecialization:
+    case CXCursor_Constructor:
+    case CXCursor_ConversionFunction:
+    case CXCursor_CXXMethod:
+    case CXCursor_Destructor:
+    case CXCursor_FunctionDecl:
+    case CXCursor_VarDecl:
+      //
+      // These may be forward-declared, so ask whether this cursor is the
+      // definition.
+      //
+      return tidy_isCursorDefinition( cursor );
+
+    case CXCursor_EnumConstantDecl:
+    case CXCursor_FieldDecl:
+    case CXCursor_LabelStmt:
+    case CXCursor_MacroDefinition:
+    case CXCursor_TypeAliasDecl:
+    case CXCursor_TypedefDecl:
+      return true;
+
+    case CXCursor_EnumDecl:
+    case CXCursor_Namespace:
+    case CXCursor_StructDecl:
+    case CXCursor_UnionDecl:
+      return !clang_Cursor_isAnonymous( cursor );
+
+    default:
+      return false;
+  } // switch
+}
 
 /**
  * Gets whether \a cursor is nested, at any depth, within a class (or
@@ -312,6 +358,157 @@ done:
   free( cls_name );
   free( sym_scoped_name );
   return is_excluded;
+}
+
+/**
+ * Dispatch to the visitor-handling function based on the kind of \a sym_csr.
+ *
+ * @note This function must only be called for a cursor that _is_ a definition.
+ *
+ * @param sym_csr The cursor for a definition.
+ * @param sym The tidy_symbol for \a sym_csr.
+ * @param svd The symbols_visit_data to use.
+ *
+ * @sa cursor_is_definition()
+ * @sa cursor_visit_ref()
+ */
+void cursor_visit_def( CXCursor sym_csr, tidy_symbol *sym,
+                       symbols_visit_data *svd ) {
+  assert( sym != NULL );
+  assert( svd != NULL );
+
+  enum CXCursorKind const kind = clang_getCursorKind( sym_csr );
+
+  switch ( kind ) {
+    case CXCursor_LabelStmt:
+      //
+      // Never set curr_sym to a labeled statement since it can break a
+      // ref_sym_set.  Consider:
+      //
+      //      void g() { }
+      //
+      //      void f() {
+      //        unused_label: g();
+      //      }
+      //
+      //      int main() {
+      //        f();
+      //      }
+      //
+      // If we set curr_sym to unused_label here, we'd get the following
+      // symbols and what they reference:
+      //
+      //      f() -> {}
+      //      g() -> {}
+      //      main() [root] -> { f() }
+      //      unused_label -> { g() }
+      //
+      // Note that f() does _not_ reference unused_label.  (If it did, then
+      // ununsed label would incorrectly be considered used.  A actual goto
+      // statement is needed to reference it.)
+      //
+      // Since nothing references unused_label, it's correctly left as unused.
+      // But unused_label is the only symbol that has a reference to g(), so
+      // g() would be left as unused also --- incorrectly.
+      //
+      // By _not_ setting curr_sym to unused_label, we'd get the following
+      // symbols and what they reference:
+      //
+      //      f() -> { g() }
+      //      g() -> {}
+      //      main() [root] -> { f() }
+      //      unused_label -> {}
+      //
+      // Now, f() references g(), so it would be marked used --- correctly.
+      //
+      break;
+
+    default:
+      svd->curr_sym = sym;
+  } // switch
+
+  switch ( kind ) {
+    case CXCursor_Constructor:
+      visit_Constructor( sym_csr, svd );
+      break;
+
+    case CXCursor_CXXMethod:
+    case CXCursor_Destructor:
+      visit_CXXMethod( sym_csr, svd );
+      break;
+
+    case CXCursor_FieldDecl:
+      visit_FieldDecl( sym_csr, svd );
+      break;
+
+    case CXCursor_FunctionDecl:
+      visit_FunctionDecl( sym_csr, svd );
+      break;
+
+    case CXCursor_MacroDefinition:
+      visit_MacroDefinition( sym_csr, svd );
+      break;
+
+    case CXCursor_VarDecl:
+      visit_VarDecl( sym_csr, svd );
+      break;
+
+    default:
+      /* suppress warning */;
+  } // switch
+}
+
+/**
+ * A helper function for symbols_visitor() that dispatches to the visitor-
+ * handling function for reference kinds of cursors.
+ *
+ * @note This function most only be called for a cursor that is _not_ a
+ * definition.
+ *
+ * @param cursor The cursor being visited.
+ * @param svd The symbols_visit_data to use.
+ *
+ * @sa cursor_visit_def()
+ */
+static void cursor_visit_ref( CXCursor cursor, symbols_visit_data *svd ) {
+  assert( svd != NULL );
+
+  enum CXCursorKind const kind = clang_getCursorKind( cursor );
+  switch ( kind ) {
+    case CXCursor_CallExpr:
+    case CXCursor_CXXFunctionalCastExpr:
+    case CXCursor_CXXStaticCastExpr:
+    case CXCursor_CXXConstCastExpr:
+    case CXCursor_CXXReinterpretCastExpr:
+    case CXCursor_CXXDynamicCastExpr:
+    case CXCursor_DeclRefExpr:
+    case CXCursor_LabelRef:
+    case CXCursor_MacroExpansion:
+    case CXCursor_MemberRefExpr:
+    case CXCursor_TemplateRef:
+    case CXCursor_TypeRef:
+      visit_most_Ref( cursor, svd );
+      break;
+
+    case CXCursor_CXXDeleteExpr:
+      visit_CXXDeleteExpr( cursor, svd );
+      break;
+
+    case CXCursor_CXXForRangeStmt:
+      visit_CXXForRangeStmt( cursor, svd );
+      break;
+
+    case CXCursor_CXXNewExpr:
+      visit_CXXNewExpr( cursor, svd );
+      break;
+
+    case CXCursor_OverloadedDeclRef:
+      visit_OverloadedDeclRef( cursor, svd );
+      break;
+
+    default:
+      /* suppress warning */;
+  } // switch
 }
 
 /**
@@ -609,6 +806,34 @@ static void print_statistics( void ) {
 }
 
 /**
+ * Add the symbol's path, line, and column to \a sym.
+ *
+ * @param sym The tidy_symbol to add the definition for.
+ * @param sym_loc The source location of the cursor for \a sym.
+ */
+static void symbol_add_def( tidy_symbol *sym, CXSourceLocation sym_loc ) {
+  assert( sym != NULL );
+
+  CXFile sym_file;
+  clang_getSpellingLocation(
+    sym_loc, &sym_file, &sym->line, &sym->col, /*offset=*/NULL
+  );
+
+  if ( sym_file == NULL )
+    return;
+
+  CXString const    path_cxs = clang_getFileName( sym_file );
+  char const *const path_cs = clang_getCString( path_cxs );
+
+  if ( is_source_path( path_cs ) ) {
+    FREE( sym->path );                  // just in case
+    sym->path = strdup_or_exit( path_no_dot_slash( path_cs ) );
+  }
+
+  clang_disposeString( path_cxs );
+}
+
+/**
  * Cleans-up a tidy_symbol.
  *
  * @param sym The tidy_symbol to clean up.  If NULL, does nothing.
@@ -779,25 +1004,25 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
   assert( data != NULL );
   symbols_visit_data *const svd = data;
 
-  CXSourceLocation const sym_loc = clang_getCursorLocation( cursor );
-  bool const is_in_system_header = clang_Location_isInSystemHeader( sym_loc );
+  enum CXCursorKind const kind = clang_getCursorKind( cursor );
+  tidy_symbol *const      prev_sym = svd->curr_sym;
+  CXSourceLocation const  sym_loc = clang_getCursorLocation( cursor );
 
-  if ( is_in_system_header ) {
-    //
-    // Symbols in standard headers can be skipped entirely in C.
-    //
-    if ( svd->source->lang == CXLanguage_C )
+  if ( clang_Location_isInSystemHeader( sym_loc ) ) {
+    if ( svd->source->lang == CXLanguage_C ) {
+      //
+      // Symbols in standard headers can be skipped entirely in C.
+      //
       goto skip;
-    //
-    // In C++, they can't be skipped because template code in standard headers
-    // calls back into user code, so we need it to mark the user code as used.
-    //
-  }
-  else if ( IS_VERBOSE( CURSORS ) ) {
-    verbose_print_cursor( cursor );     // LCOV_EXCL_LINE
-  }
+    }
+    else {
+      //
+      // In C++, they can't be skipped entirely because template code can
+      // contain OverloadedDeclRefs that we need for argument-dependent lookup
+      // (ADL).
+      //
+    }
 
-  if ( is_in_system_header /* || opt_skip_user_headers*/ ) {
     enum CXCursorKind const parent_kind = clang_getCursorKind( parent );
     if ( parent_kind == CXCursor_TranslationUnit ) {
       //
@@ -808,197 +1033,59 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       if ( file_previously_seen( sym_file, svd ) )
         goto skip;
     }
+
+    if ( kind == CXCursor_OverloadedDeclRef ) {
+      //
+      // An unqualified call in a standard header, e.g., "swap(a,b)" inside a
+      // template, can't be resolved until the template is instantiated because
+      // its arguments depend on a template parameter.  Libclang represents the
+      // call as an OverloadedDeclRef that has only a name, e.g., "swap".
+      //
+      // When the template is later instantiated with a user-defined type,
+      // argument-dependent lookup (ADL) can find a user function of that name
+      // that nothing in user code calls directly.
+      //
+      // So remember just the name here; it's later combined with the user-
+      // defined types collected by cxx_adl_type_set_add() to decide which user
+      // functions to treat as roots.
+      //
+      CXString const    name_cxs = clang_getCursorSpelling( cursor );
+      char const *const name = clang_getCString( name_cxs );
+      if ( name != NULL && name[0] != '\0' )
+        cxx_adl_name_set_add( name );
+      clang_disposeString( name_cxs );
+    }
   }
+  else {
+    if ( IS_VERBOSE( CURSORS ) )
+      verbose_print_cursor( cursor );   // LCOV_EXCL_LINE
 
-  tidy_symbol *const prev_sym = svd->curr_sym;
+    if ( svd->source->lang == CXLanguage_CPlusPlus &&
+        (clang_isDeclaration( kind ) || clang_isExpression( kind )) ) {
+      //
+      // Remember the user-defined classes used as template arguments so we can
+      // later tell which user functions ADL could find from standard library
+      // templates.
+      //
+      CXType const type = clang_getCursorType( cursor );
+      cxx_adl_type_set_add( type );
+    }
 
-  bool is_definition = false;
-  enum CXCursorKind const kind = clang_getCursorKind( cursor );
-
-  if ( svd->source->lang == CXLanguage_CPlusPlus && !is_in_system_header &&
-       (clang_isDeclaration( kind ) || clang_isExpression( kind )) ) {
-    //
-    // Remember the user-defined classes used as template arguments so we can
-    // later tell which user functions ADL could find from standard templates.
-    //
-    CXType const type = clang_getCursorType( cursor );
-    cxx_adl_type_set_add( type );
-  }
-
-  switch ( kind ) {
-    case CXCursor_CallExpr:
-    case CXCursor_CXXFunctionalCastExpr:
-    case CXCursor_CXXStaticCastExpr:
-    case CXCursor_CXXConstCastExpr:
-    case CXCursor_CXXReinterpretCastExpr:
-    case CXCursor_CXXDynamicCastExpr:
-    case CXCursor_DeclRefExpr:
-    case CXCursor_LabelRef:
-    case CXCursor_MacroExpansion:
-    case CXCursor_MemberRefExpr:
-    case CXCursor_TemplateRef:
-    case CXCursor_TypeRef:
-      visit_most_Ref( cursor, svd );
-      break;
-
-    case CXCursor_ClassDecl:
-    case CXCursor_ClassTemplate:
-    case CXCursor_ClassTemplatePartialSpecialization:
-    case CXCursor_Constructor:
-    case CXCursor_ConversionFunction:
-    case CXCursor_CXXMethod:
-    case CXCursor_Destructor:
-    case CXCursor_FunctionDecl:
-    case CXCursor_VarDecl:
-      is_definition = tidy_isCursorDefinition( cursor );
-      break;
-
-    case CXCursor_CXXDeleteExpr:
-      visit_CXXDeleteExpr( cursor, svd );
-      break;
-
-    case CXCursor_CXXForRangeStmt:
-      visit_CXXForRangeStmt( cursor, svd );
-      break;
-
-    case CXCursor_CXXNewExpr:
-      visit_CXXNewExpr( cursor, svd );
-      break;
-
-    case CXCursor_EnumConstantDecl:
-    case CXCursor_FieldDecl:
-    case CXCursor_LabelStmt:
-    case CXCursor_MacroDefinition:
-    case CXCursor_TypeAliasDecl:
-    case CXCursor_TypedefDecl:
-      is_definition = true;
-      break;
-
-    case CXCursor_EnumDecl:
-    case CXCursor_Namespace:
-    case CXCursor_StructDecl:
-    case CXCursor_UnionDecl:
-      if ( !clang_Cursor_isAnonymous( cursor ) )
-        is_definition = true;
-      break;
-
-    case CXCursor_OverloadedDeclRef:
-      visit_OverloadedDeclRef( cursor, is_in_system_header, svd );
-      break;
-
-    default:
-      /* suppress warning */;
-  } // switch
-
-  if ( is_definition ) {
-    tidy_symbol *const sym = symbol_add( cursor, svd->source );
-    if ( likely( sym != NULL ) ) {
-      if ( !is_in_system_header ) {
-        //
-        // For definitions, set the symbol's path, line, and column.
-        //
-        CXFile sym_file;
-        clang_getSpellingLocation(
-          sym_loc, &sym_file, &sym->line, &sym->col, /*offset=*/NULL
-        );
-
-        if ( sym_file != NULL ) {
-          CXString const    path_cxs = clang_getFileName( sym_file );
-          char const *const path_cs = clang_getCString( path_cxs );
-          if ( is_source_path( path_cs ) ) {
-            FREE( sym->path );          // just in case
-            sym->path = strdup_or_exit( path_no_dot_slash( path_cs ) );
-          }
-          clang_disposeString( path_cxs );
-        }
+    if ( cursor_is_definition( cursor ) ) {
+      tidy_symbol *const sym = symbol_add( cursor, svd->source );
+      if ( likely( sym != NULL ) ) {
+        symbol_add_def( sym, sym_loc );
+        if ( sym->parent_sym == NULL )
+          sym->parent_sym = svd->curr_sym;
+        cursor_visit_def( cursor, sym, svd );
       }
-
-      if ( sym->parent_sym == NULL )
-        sym->parent_sym = svd->curr_sym;
-
-      switch ( kind ) {
-        case CXCursor_LabelStmt:
-          //
-          // Never set curr_sym to a labeled statement since it can break a
-          // ref_sym_set.  Consider:
-          //
-          //      void g() { }
-          //
-          //      void f() {
-          //        unused_label: g();
-          //      }
-          //
-          //      int main() {
-          //        f();
-          //      }
-          //
-          // If we set curr_sym to unused_label here, we'd get the following
-          // symbols and what they reference:
-          //
-          //      f() -> {}
-          //      g() -> {}
-          //      main() [root] -> { f() }
-          //      unused_label -> { g() }
-          //
-          // Note that f() does _not_ reference unused_label.  (If it did, then
-          // ununsed label would incorrectly be considered used.  A actual goto
-          // statement is needed to reference it.)
-          //
-          // Since nothing references unused_label, it's correctly left as
-          // unused.  But unused_label is the only symbol that has a reference
-          // to g(), so g() would be left as unused also --- incorrectly.
-          //
-          // By _not_ setting curr_sym to unused_label, we'd get the following
-          // symbols and what they reference:
-          //
-          //      f() -> { g() }
-          //      g() -> {}
-          //      main() [root] -> { f() }
-          //      unused_label -> {}
-          //
-          // Now, f() references g(), so it would be marked used --- correctly.
-          //
-          break;
-
-        default:
-          svd->curr_sym = sym;
-      } // switch
-
-      if ( !is_in_system_header ) {
-        switch ( kind ) {
-          case CXCursor_Constructor:
-            visit_Constructor( cursor, svd );
-            break;
-
-          case CXCursor_CXXMethod:
-          case CXCursor_Destructor:
-            visit_CXXMethod( cursor, svd );
-            break;
-
-          case CXCursor_FieldDecl:
-            visit_FieldDecl( cursor, svd );
-            break;
-
-          case CXCursor_FunctionDecl:
-            visit_FunctionDecl( cursor, svd );
-            break;
-
-          case CXCursor_MacroDefinition:
-            visit_MacroDefinition( cursor, svd );
-            break;
-
-          case CXCursor_VarDecl:
-            visit_VarDecl( cursor, svd );
-            break;
-
-          default:
-            /* suppress warning */;
-        } // switch
-      }
+    }
+    else {
+      cursor_visit_ref( cursor, svd );
     }
   }
 
-  clang_visitChildren( cursor, symbols_visitor, svd );
+  clang_visitChildren( cursor, &symbols_visitor, svd );
   svd->curr_sym = prev_sym;
 
 skip:
@@ -1452,29 +1539,12 @@ static void visit_most_Ref( CXCursor cursor, symbols_visit_data *svd ) {
  * invalid or null cursor.
  *
  * @param overloaded_csr The overloaded definition's cursor to visit.
- * @param is_in_system_header `true` only if \a overloaded_csr is in a standard
- * header.
  * @param svd The symbols_visit_data to use.
  */
 static void visit_OverloadedDeclRef( CXCursor overloaded_csr,
-                                     bool is_in_system_header,
                                      symbols_visit_data *svd ) {
   assert( svd != NULL );
   assert( svd->source->lang == CXLanguage_CPlusPlus );
-
-  if ( is_in_system_header ) {
-    //
-    // This is (likely) a dependent call in a standard template.  Its callee
-    // may be found by ADL at instantiation time among user functions that
-    // we'll never see referenced; remember its name.  See
-    // cxx_symbols_mark_adl_roots().
-    //
-    CXString const    name_cxs = clang_getCursorSpelling( overloaded_csr );
-    char const *const name = clang_getCString( name_cxs );
-    if ( name != NULL && name[0] != '\0' )
-      cxx_adl_name_set_add( name );
-    clang_disposeString( name_cxs );
-  }
 
   unsigned const num_decls = clang_getNumOverloadedDecls( overloaded_csr );
   for ( unsigned i = 0; i < num_decls; ++i ) {
