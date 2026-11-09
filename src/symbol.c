@@ -1154,6 +1154,24 @@ static void visit_CXXMethod( CXCursor method_csr, symbols_visit_data *svd ) {
     tidy_symbol *const base_sym = symbol_add( overridden_csrs[i], svd->source );
     if ( base_sym != NULL )
       symbol_add_ref( base_sym, svd->curr_sym );
+    //
+    // Standard library code can call a virtual function on an object of a
+    // user-defined derived class, but nothing in the AST shows the call.
+    // Therefore, add a reference from the class to the override so it will be
+    // marked as used if the class is.
+    //
+    CXCursor const canon_csr = clang_getCanonicalCursor( overridden_csrs[i] );
+    if ( tidy_Cursor_isInSystemHeader( canon_csr ) ) {
+      CXCursor const parent_sym = clang_getCursorSemanticParent( method_csr );
+      tidy_symbol *const cls_sym = symbol_add( parent_sym, svd->source );
+      if ( cls_sym != NULL ) {
+        symbol_add_ref( cls_sym, svd->curr_sym );
+      }
+      else {
+        // If the class was excluded, just mark the method as a root.
+        svd->curr_sym->is_root = true;
+      }
+    }
   } // for
 
   clang_disposeOverriddenCursors( overridden_csrs );
