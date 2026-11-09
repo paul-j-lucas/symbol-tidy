@@ -327,22 +327,6 @@ static bool cursor_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
       sym_csr = clang_getCanonicalCursor( sym_csr );
       return tidy_Cursor_isInSystemHeader( sym_csr );
 
-    case CXCursor_NonTypeTemplateParameter:
-    case CXCursor_TemplateTemplateParameter:
-    case CXCursor_TemplateTypeParameter:
-      //
-      // These are local to the template definition, so don't need to be added
-      // to tidy_symbol_set.
-      //
-      return true;
-
-    case CXCursor_ParmDecl:
-      //
-      // These are local to a function, so don't need to be added to
-      // tidy_symbol_set.
-      //
-      return true;
-
     default:
       /* suppress warning */;
   } // switch
