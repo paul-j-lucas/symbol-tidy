@@ -1,5 +1,19 @@
 2026-11-08  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * exception-used-3a.cpp, exception-used-3b.cpp, exception-used.out,
+     exception-used.test: Another test.
+   * test/Makefile.am, exception-unused.cpp, exception-used-1.cpp,
+     exception-used-2.cpp, ostream_iterator-unused.cpp, streambuf-overflow.cpp,
+     exception-unused.out, exception-used.out, streambuf-overflow.out,
+     template-adl-unused.out, exception-unused.test, exception-used.test,
+     streambuf-overflow.test, template-adl-unused.test: More tests.
+   * symbol.c, symbol.h: Added symbol_name_for_print().
+   * symbol.c: No longer set is_root = true for C++ system header code here --
+     now more precisely handled in visit_CXXMethod().
+   * symbol.c: Now adding references from a C++ standard library class to
+     overridden virtual member functions.
+   * symbol.c: Moved setting of is_root for system headers and is_scope to
+     symbol_add().
    * config_file.c, cxx_symbol.c, symbol.c, verbose.c, verbose.h:
      verbose_print_statistics() now takes a pointer to the function that prints
      statistics and also enables thousands separator printing using a temporary
