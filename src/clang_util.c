@@ -795,8 +795,8 @@ bool tidy_Cursor_isSpellingEqualTo( CXCursor cursor, char const *value ) {
   assert( value != NULL );
 
   CXString const    cxs = clang_getCursorSpelling( cursor );
-  char const *const cs = clang_getCString( cxs );
-  int const         cmp = cs == NULL ? 1 : strcmp( cs, value );
+  char const *const cs = empty_if_null( clang_getCString( cxs ) );
+  int const         cmp = strcmp( cs, value );
 
   clang_disposeString( cxs );
   return cmp == 0;
@@ -807,18 +807,16 @@ int tidy_Cursor_isSpellingEqualToAny_impl( CXCursor cursor,
   assert( values != NULL );
 
   CXString const    cxs = clang_getCursorSpelling( cursor );
-  char const *const cs = clang_getCString( cxs );
+  char const *const cs = empty_if_null( clang_getCString( cxs ) );
 
   int equal_idx = -1;
 
-  if ( cs != NULL ) {
-    for ( int i = 0; values[i] != NULL; ++i ) {
-      if ( strcmp( cs, values[i] ) == 0 ) {
-        equal_idx = i;
-        break;
-      }
-    } // for
-  }
+  for ( int i = 0; values[i] != NULL; ++i ) {
+    if ( strcmp( cs, values[i] ) == 0 ) {
+      equal_idx = i;
+      break;
+    }
+  } // for
 
   clang_disposeString( cxs );
   return equal_idx;
@@ -1147,7 +1145,7 @@ bool tidy_Token_isSpellingEqualTo( CXTranslationUnit tu, CXToken token,
   assert( value != NULL );
 
   CXString const    cxs = clang_getTokenSpelling( tu, token );
-  char const *const cs = clang_getCString( cxs );
+  char const *const cs = empty_if_null( clang_getCString( cxs ) );
   int const         cmp = strcmp( cs, value );
 
   clang_disposeString( cxs );
@@ -1159,7 +1157,7 @@ int tidy_Token_isSpellingEqualToAny_impl( CXTranslationUnit tu, CXToken token,
   assert( values != NULL );
 
   CXString const    cxs = clang_getTokenSpelling( tu, token );
-  char const *const cs = clang_getCString( cxs );
+  char const *const cs = empty_if_null( clang_getCString( cxs ) );
 
   int equal_idx = -1;
 
