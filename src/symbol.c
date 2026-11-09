@@ -119,6 +119,22 @@ hash_table_t tidy_symbol_set;
 static hash_table_t       header_set;   ///< The set of all header files.
 static tidy_header_stats  header_stats; ///< Statistics for \ref header_set.
 
+////////// inline functions ///////////////////////////////////////////////////
+
+/**
+ * Gets the name of \a sym that should be used for printing.
+ *
+ * @remarks For C, it's just the symbol's plain name; for C++, it's the
+ * symbol's prototype so overloaded functions can be distinguished.
+ *
+ * @param sym The tidy_symbol to get the name of.
+ * @return Returns said name.
+ */
+NODISCARD
+static inline char const* symbol_name_for_print( tidy_symbol const *sym ) {
+  return sym->cxx_prototype ? sym->cxx_prototype : sym->name;
+}
+
 ////////// local functions ////////////////////////////////////////////////////
 
 /**
@@ -539,8 +555,7 @@ static void print_max_lf_stats( size_t mbr_off, char const *abbr ) {
       "    %s-max-load-factor:\n", abbr
     );
     verbose_printf(
-      "      %s-name = \"%s\"\n", abbr,
-      max_sym->display_name ? max_sym->display_name : max_sym->name
+      "      %s-name = \"%s\"\n", abbr, symbol_name_for_print( max_sym )
     );
     if ( max_sym->path != NULL ) {
       verbose_printf(
@@ -602,7 +617,7 @@ static void symbol_cleanup( tidy_symbol *sym ) {
   if ( sym != NULL ) {
     FREE( sym->key );
     FREE( sym->name );
-    FREE( sym->display_name );
+    FREE( sym->cxx_prototype );
     FREE( sym->path );
     ht_table_cleanup( &sym->cxx_adl_usr_set, /*free_fn=*/NULL );
     ht_table_cleanup( &sym->ref_sym_set, /*free_fn=*/NULL );
@@ -1609,7 +1624,7 @@ tidy_symbol* symbol_add( CXCursor sym_csr, tidy_source const *source ) {
   }
 
   if ( source->lang == CXLanguage_CPlusPlus )
-    sym->display_name = tidy_Cursor_getScopedDisplayName( sym_csr );
+    sym->cxx_prototype = tidy_Cursor_getScopedDisplayName( sym_csr );
 
   //
   // If the symbol's name is "main", we have to mark it as a root since nothing
@@ -1704,7 +1719,7 @@ unsigned symbols_print_unused( void ) {
     color_start( stderr, sgr_locus );
     EPRINTF( "%2u", sym->col );
     color_end( stderr, sgr_locus );
-    EPRINTF( " | \"%s\"\n", sym->display_name ? sym->display_name : sym->name );
+    EPRINTF( " | \"%s\"\n", symbol_name_for_print( sym ) );
   } // for
 
   array_cleanup( &symbol_array, /*free_fn=*/NULL );
