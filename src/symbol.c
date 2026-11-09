@@ -1611,17 +1611,14 @@ tidy_symbol* symbol_add( CXCursor sym_csr, tidy_source const *source ) {
   if ( source->lang == CXLanguage_CPlusPlus )
     sym->display_name = tidy_Cursor_getScopedDisplayName( sym_csr );
 
-  if ( (source->lang == CXLanguage_CPlusPlus &&
-        tidy_Cursor_isInSystemHeader( sym_csr )) ||
-        //
-        // If the symbol's name is "main", we have to mark it as a root since
-        // nothing calls main().  But first ensure that it's the program's
-        // main() function: in C, anything named "main" must be main();
-        // however, in C++, other things, e.g., member functions, can also be
-        // named "main".
-        //
-       (strcmp( sym->name, "main" ) == 0 &&
-        tidy_Cursor_isExternalGlobalFunction( sym_csr )) ) {
+  //
+  // If the symbol's name is "main", we have to mark it as a root since nothing
+  // calls main().  But first ensure that it's the program's main() function:
+  // in C, anything named "main" must be main(); however, in C++, other things,
+  // e.g., member functions, can also be named "main".
+  //
+  if ( strcmp( sym->name, "main" ) == 0 &&
+       tidy_Cursor_isExternalGlobalFunction( sym_csr ) ) {
     sym->is_root = true;
   }
 
