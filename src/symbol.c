@@ -1015,7 +1015,7 @@ static unsigned symbols_mark_used( void ) {
       symbol_mark_used( sym );
   } // for
 
-  unsigned unused = 0;
+  unsigned unused_count = 0;
   ht_iterator_init( &iter, &tidy_symbol_set );
   for ( tidy_symbol *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
     if ( sym->is_dead )
@@ -1025,11 +1025,11 @@ static unsigned symbols_mark_used( void ) {
       sym->is_dead = true;
     }
     else if ( !sym->is_used ) {
-      ++unused;
+      ++unused_count;
     }
   } // for
 
-  return unused;
+  return unused_count;
 }
 
 /**
@@ -1839,12 +1839,12 @@ void symbols_init( void ) {
 }
 
 unsigned symbols_print_unused( void ) {
-  unsigned const unused = symbols_mark_used();
-  if ( unused == 0 )
+  unsigned const unused_count = symbols_mark_used();
+  if ( unused_count == 0 )
     return 0;
 
   array_t symbol_array = ARRAY_INIT( sizeof(tidy_symbol) );
-  array_reserve( &symbol_array, unused );
+  array_reserve( &symbol_array, unused_count );
 
   ht_iterator_t iter;
   ht_iterator_init( &iter, &tidy_symbol_set );
@@ -1888,9 +1888,9 @@ unsigned symbols_print_unused( void ) {
 
   EPRINTF(
     "%s: %u unused symbol%s\n",
-    prog_name, unused, plural_s( unused )
+    prog_name, unused_count, plural_s( unused_count )
   );
-  return unused;
+  return unused_count;
 }
 
 void symbols_visit( tidy_source *source ) {
