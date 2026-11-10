@@ -815,9 +815,9 @@ static void print_max_lf_stats( size_t mbr_off, char const *abbr ) {
     verbose_printf(
       "      %s-name = \"%s\"\n", abbr, symbol_name_for_print( max_sym )
     );
-    if ( max_sym->path != NULL ) {
+    if ( max_sym->loc.path != NULL ) {
       verbose_printf(
-        "      %s-path = \"%s\"\n", abbr, max_sym->path
+        "      %s-path = \"%s\"\n", abbr, max_sym->loc.path
       );
     }
     verbose_printf(
@@ -879,7 +879,7 @@ static void symbol_add_def( tidy_symbol *sym, CXSourceLocation sym_loc ) {
   unsigned def_line, def_col;
 
   clang_getExpansionLocation(
-    sym_loc, &ref_file, &sym->line, &sym->col, /*offset=*/NULL
+    sym_loc, &ref_file, &sym->loc.line, &sym->loc.col, /*offset=*/NULL
   );
   if ( ref_file == NULL )
     return;
@@ -895,7 +895,9 @@ static void symbol_add_def( tidy_symbol *sym, CXSourceLocation sym_loc ) {
     return;
 
   bool const is_defined_in_macro =
-    def_file != ref_file || def_line != sym->line || def_col != sym->col;
+    def_file != ref_file ||
+    def_line != sym->loc.line ||
+    def_col  != sym->loc.col;
 
   char *macro_path = NULL;
 
@@ -907,14 +909,14 @@ static void symbol_add_def( tidy_symbol *sym, CXSourceLocation sym_loc ) {
     }
   }
 
-  FREE( sym->path );                    // just in case
-  sym->path = path;
+  FREE( sym->loc.path );                // just in case
+  sym->loc.path = path;
 
   if ( is_defined_in_macro ) {
-    FREE( sym->macro_path );            // just in case
-    sym->macro_path = macro_path;
-    sym->macro_line = def_line;
-    sym->macro_col  = def_col;
+    FREE( sym->macro_loc.path );        // just in case
+    sym->macro_loc.path = macro_path;
+    sym->macro_loc.line = def_line;
+    sym->macro_loc.col  = def_col;
   }
 }
 
@@ -928,10 +930,10 @@ static void symbol_cleanup( tidy_symbol *sym ) {
     FREE( sym->key );
     FREE( sym->name );
     FREE( sym->cxx_prototype );
-    FREE( sym->path );
-    ht_table_cleanup( &sym->cxx_adl_usr_set, /*free_fn=*/NULL );
-    FREE( sym->macro_path );
+    FREE( sym->loc.path );
+    FREE( sym->macro_loc.path );
     ht_table_cleanup( &sym->ref_sym_set, /*free_fn=*/NULL );
+    ht_table_cleanup( &sym->cxx_adl_usr_set, /*free_fn=*/NULL );
   }
 }
 
@@ -969,17 +971,17 @@ NODISCARD
 static int symbol_cmp_by_path( tidy_symbol const *i_sym,
                                tidy_symbol const *j_sym ) {
   assert( i_sym != NULL );
-  assert( i_sym->path != NULL );
+  assert( i_sym->loc.path != NULL );
   assert( j_sym != NULL );
-  assert( j_sym->path != NULL );
+  assert( j_sym->loc.path != NULL );
 
-  int const cmp = strcmp( i_sym->path, j_sym->path );
+  int const cmp = strcmp( i_sym->loc.path, j_sym->loc.path );
   if ( cmp != 0 )
     return cmp;
-  if ( i_sym->line < j_sym->line ) return -1;
-  if ( i_sym->line > j_sym->line ) return  1;
-  if ( i_sym->col  < j_sym->col  ) return -1;
-  if ( i_sym->col  > j_sym->col  ) return  1;
+  if ( i_sym->loc.line < j_sym->loc.line ) return -1;
+  if ( i_sym->loc.line > j_sym->loc.line ) return  1;
+  if ( i_sym->loc.col  < j_sym->loc.col  ) return -1;
+  if ( i_sym->loc.col  > j_sym->loc.col  ) return  1;
   return 0;
 }
 
@@ -1066,7 +1068,7 @@ static unsigned symbols_mark_used( void ) {
   for ( tidy_symbol *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
     if ( sym->is_dead )
       continue;
-    if ( sym->path == NULL || sym->line == 0 ||
+    if ( sym->loc.path == NULL || sym->loc.line == 0 ||
          symbol_in_unused_scope( sym ) ) {
       sym->is_dead = true;
     }
@@ -1907,12 +1909,12 @@ unsigned symbols_print_unused( void ) {
   char const *prev_path = "";
   for ( size_t i = 0; i < symbol_array.len; ++i ) {
     tidy_symbol const *const sym = array_at_nc( &symbol_array, i );
-    if ( strcmp( sym->path, prev_path ) != 0 ) {
+    if ( strcmp( sym->loc.path, prev_path ) != 0 ) {
       color_start( stderr, sgr_locus );
-      EPRINTF( "\"%s\"", sym->path );
+      EPRINTF( "\"%s\"", sym->loc.path );
       color_end( stderr, sgr_locus );
       EPUTS( ": " );
-      prev_path = sym->path;
+      prev_path = sym->loc.path;
 
       color_start( stderr, sgr_warning );
       EPUTS( "warning" );
@@ -1920,10 +1922,10 @@ unsigned symbols_print_unused( void ) {
       EPUTS( ": unused symbols:\n" );
     }
 
-    bool const is_defined_in_macro = sym->macro_line > 0;
+    bool const is_defined_in_macro = sym->macro_loc.line > 0;
 
     color_start( stderr, sgr_locus );
-    EPRINTF( "%5u", sym->line );
+    EPRINTF( "%5u", sym->loc.line );
     color_end( stderr, sgr_locus );
     if ( is_defined_in_macro ) {
       EPUTS( "   " );                   // same width as ",%2u"
@@ -1931,24 +1933,24 @@ unsigned symbols_print_unused( void ) {
     else {
       EPUTC( ',' );
       color_start( stderr, sgr_locus );
-      EPRINTF( "%2u", sym->col );
+      EPRINTF( "%2u", sym->loc.col );
       color_end( stderr, sgr_locus );
     }
 
     EPRINTF( " | \"%s\"", symbol_name_for_print( sym ) );
     if ( is_defined_in_macro ) {
       EPUTS( " (defined at " );
-      if ( sym->macro_path != NULL ) {
+      if ( sym->macro_loc.path != NULL ) {
         color_start( stderr, sgr_locus );
-        EPRINTF( "\"%s\":", sym->macro_path );
+        EPRINTF( "\"%s\":", sym->macro_loc.path );
         color_end( stderr, sgr_locus );
       }
       color_start( stderr, sgr_locus );
-      EPRINTF( "%u", sym->macro_line );
+      EPRINTF( "%u", sym->macro_loc.line );
       color_end( stderr, sgr_locus );
       EPUTC( ',' );
       color_start( stderr, sgr_locus );
-      EPRINTF( "%u", sym->macro_col );
+      EPRINTF( "%u", sym->macro_loc.col );
       color_end( stderr, sgr_locus );
       EPUTC( ')' );
     }

@@ -53,9 +53,19 @@ typedef struct svd_cxx_for_range    svd_cxx_for_range;
 typedef struct svd_cxx_member       svd_cxx_member;
 typedef struct svd_cxx_operator     svd_cxx_operator;
 typedef struct symbols_visit_data   symbols_visit_data;
+typedef struct tidy_loc             tidy_loc;
 typedef struct tidy_symbol          tidy_symbol;
 
 ////////// structs ////////////////////////////////////////////////////////////
+
+/**
+ * A source file location.
+ */
+struct tidy_loc {
+  char const   *path;                   ///< File defined in.
+  unsigned      line;                   ///< Line defined on.
+  unsigned      col;                    ///< Column defined at.
+};
 
 /**
  * A symbol referenced in a translation unit.
@@ -64,12 +74,8 @@ struct tidy_symbol {
   char const   *key;                    ///< Unique key.
   char const   *name;                   ///< Name.
   char const   *cxx_prototype;          ///< C++ prototype.
-  char const   *path;                   ///< File defined in.
-  unsigned      line;                   ///< Line defined on.
-  unsigned      col;                    ///< Column defined at.
-  char const   *macro_path;             ///< File of macro defined in.
-  unsigned      macro_line;             ///< Line defined on.
-  unsigned      macro_col;              ///< Column defined at.
+  tidy_loc      loc;                    ///< Location.
+  tidy_loc      macro_loc;              ///< Location if defined in a macro.
   tidy_symbol  *parent_sym;             ///< Parent symbol, if any.
   hash_table_t  ref_sym_set;            ///< Symbol(s) referenced from this.
 
