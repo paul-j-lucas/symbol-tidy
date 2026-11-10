@@ -35,7 +35,7 @@
 .if !'\\$1'0' .sp
 ..
 .\" ---------------------------------------------------------------------------
-.TH \f3symbol-tidy\fP 1 "October 30, 2026" "PJL TOOLS"
+.TH \f3symbol-tidy\fP 1 "November 10, 2026" "PJL TOOLS"
 .SH NAME
 symbol-tidy \(em Symbol tidier
 .SH SYNOPSIS
@@ -555,14 +555,21 @@ Same as the
 command-line option.
 .TP
 .BI ignore-cxx-copy-assigns " \f1=\fP b"
-For C++ only,
-if true,
-copy assignment operators are ignored.
-Copy assigments,
+If true,
+this option ignores C++ copy assignment operators
+so they are never reported as unused.
+.IP
+In C++,
+copy assigments,
 copy constructors,
 move assignments,
 and move constructors
-often exist as part of a typical class's boilerplate.
+as often implemented
+as part of a class's boiletplate.
+Generally,
+you want to keep them
+even if they're currently unused
+because they may be used in the future.
 .TP
 .BI ignore-cxx-copy-ctors " \f1=\fP b"
 Like
@@ -589,6 +596,14 @@ are ignored,
 that is,
 even if the symbols are unused,
 they will not be reported as such.
+.IP
+For C++,
+names may be fully qualified,
+e.g., \f(CWMyClass::size\fP,
+or be wildcard qualified,
+e.g., \f(CW*::value_type\fP,
+where the latter will ignore the given symbol
+in any scope.
 .SS Source Tables
 This type of table specifies a source file,
 either a \f(CW.c\fP or \f(CW.cpp\fP
@@ -750,6 +765,53 @@ The load factor for the symbol hash table.
 .TP
 .B ss-size
 The total number of relevant symbols.
+.SH EXAMPLES
+.SS C Example
+For typical C programs, the
+.B symbol-tidy
+configuration file is often minimal:
+.cS
+[symbol-tidy]
+ignore-paths = "config.h"
+.cE
+Generated source files,
+such as \f(CWconfig.h\fP from GNU Autotools,
+should be ignored
+since they contain many symbols
+that aren't used.
+.SS C++ Example
+For C++ programs,
+the
+.B symbol-tidy
+configuration file is often a bit more involved:
+.cS
+[symbol-tidy]
+ignore-cxx-copy-assigns = true
+ignore-cxx-copy-ctors = true
+ignore-cxx-move-assigns = true
+ignore-cxx-move-ctors = true
+
+ignore-paths = "config.h"
+
+ignore-symbols = [
+  "*::difference_type",
+  "*::value_type",
+  "*::pointer",           "*::const_pointer",
+  "*::reference",         "*::const_reference",
+  "*::iterator",          "*::const_iterator",
+  "*::reverse_iterator",  "*::const_reverse_iterator",
+
+  "operator==", "operator!=",
+  "operator<",  "operator<=",
+  "operator>",  "operator>=",
+]
+.cE
+Similar to copy assignments,
+nested types like \f(CWvalue_type\fP, etc.,
+and the full set of relational operators,
+are often declared
+as part of a class's boiletplate
+and you don't want them reported as unused.
 .SH EXIT STATUS
 .PD 0
 .IP 0
