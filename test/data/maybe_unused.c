@@ -1,5 +1,4 @@
-#define PJL_DISCARD_RV(FN_CALL) \
-  do { [[maybe_unused]] typeof(FN_CALL) _rv = (FN_CALL); } while (0)
+#include "pjl_config.h"
 
 struct [[maybe_unused]] unused_struct {
   int x;
