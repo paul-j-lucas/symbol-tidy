@@ -1,5 +1,7 @@
 2026-11-10  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * maybe_unused.c, pjl_config.h: Better maybe_unused test.
+   * clang_util.c: Now handling attributes in macros in different files.
    * symbol.c, symbol.h: Added tidy_loc.
    * symbol.c, symbol.h: For symbols defined in macros, now prints "(defined at
      ...)".
