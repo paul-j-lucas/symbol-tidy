@@ -67,7 +67,8 @@ TESTS+=	tests/auto_delete_pool.test \
 
 # Miscellaneous tests.
 TESTS+=	tests/c-cxx-1.test \
-	tests/c-cxx-2.test
+	tests/c-cxx-2.test \
+	tests/maybe_unused.test
 
 ###############################################################################
 

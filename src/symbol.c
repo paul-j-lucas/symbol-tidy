@@ -370,6 +370,9 @@ void cursor_visit_def( CXCursor sym_csr, tidy_symbol *sym,
   assert( sym != NULL );
   assert( svd != NULL );
 
+  if ( tidy_Cursor_hasMaybeUnusedAttr( sym_csr ) )
+    sym->is_dead = true;
+
   enum CXCursorKind const kind = clang_getCursorKind( sym_csr );
 
   switch ( kind ) {
@@ -1015,6 +1018,8 @@ static unsigned symbols_mark_used( void ) {
   unsigned unused = 0;
   ht_iterator_init( &iter, &tidy_symbol_set );
   for ( tidy_symbol *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
+    if ( sym->is_dead )
+      continue;
     if ( sym->path == NULL || sym->line == 0 ||
          symbol_in_unused_scope( sym ) ) {
       sym->is_dead = true;

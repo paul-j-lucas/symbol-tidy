@@ -449,6 +449,55 @@ skip:
 }
 
 /**
+ * A helper function for tidy_Cursor_hasMaybeUnusedAttr() that looks for a
+ * "maybe unused" attribute.
+ *
+ * @remarks Libclang has no cursor kind for `[[maybe_unused]]` (or equivalent),
+ * so it appears in an AST as an UnexposedAttr --- which means we have to look
+ * through the cursor's tokens for it.
+ *
+ * @param cursor The cursor for the symbol in the AST being visited.
+ * @param parent Not used.
+ * @param data Not used.
+ * @return Returns `CXChildVisit_Break` if found or `CXChildVisit_Continue` if
+ * not.
+ */
+static enum CXChildVisitResult hasMaybeUnusedAttr_visitor( CXCursor cursor,
+                                                           CXCursor parent,
+                                                           CXClientData data ) {
+  (void)parent;
+  (void)data;
+
+  if ( clang_getCursorKind( cursor ) != CXCursor_UnexposedAttr )
+    goto skip;
+
+  CXSourceRange const     range = clang_getCursorExtent( cursor );
+  CXTranslationUnit const tu = clang_Cursor_getTranslationUnit( cursor );
+
+  CXToken *tokens;
+  unsigned token_count;
+  clang_tokenize( tu, range, &tokens, &token_count );
+
+  bool found = false;
+  for ( unsigned i = 0; i < token_count && !found; ++i ) {
+    if ( clang_getTokenKind( tokens[i] ) != CXToken_Identifier )
+      continue;
+    found = -1 != tidy_Token_isSpellingEqualToAny(
+      tu, tokens[i],
+      "maybe_unused", "__maybe_unused__",
+      "unused", "__unused__"
+    );
+  } // for
+
+  clang_disposeTokens( tu, tokens, token_count );
+  if ( found )
+    return CXChildVisit_Break;
+
+skip:
+  return CXChildVisit_Continue;
+}
+
+/**
  * Helper function for tidy_Cursor_isOrInClassTemplate() that gets whether \a
  * cursor is, or is nested within, a class template, or a specialization of
  * one.
@@ -641,6 +690,11 @@ CXCursor tidy_Cursor_getUnderlyingTypeDecl( CXCursor cursor ) {
 
   cursor = clang_getTypeDeclaration( type );
   return tidy_getCursorDefinition( cursor );
+}
+
+bool tidy_Cursor_hasMaybeUnusedAttr( CXCursor cursor ) {
+  return  clang_Cursor_hasAttrs( cursor ) &&
+          clang_visitChildren( cursor, &hasMaybeUnusedAttr_visitor, NULL ) != 0;
 }
 
 bool tidy_Cursor_inAnonymousClass( CXCursor cursor ) {

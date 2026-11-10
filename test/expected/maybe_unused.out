@@ -1,0 +1,2 @@
+$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers maybe_unused.c
+

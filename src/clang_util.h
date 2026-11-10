@@ -180,6 +180,15 @@ char* tidy_Cursor_getScopedSpelling( CXCursor cursor );
 NODISCARD
 CXCursor tidy_Cursor_getUnderlyingTypeDecl( CXCursor cursor );
 
+/**
+ * Gets whether \a cursor has a `[[maybe_unused]]` (or equivalent) attribute.
+ *
+ * @param cursor The cursor to theck.
+ * @return Returns `true` only if \a cursor has a `[[maybe_unused]]` (or
+ * equivalent) attribute.
+ */
+NODISCARD
+bool tidy_Cursor_hasMaybeUnusedAttr( CXCursor cursor );
 
 /**
  * Gets whether \a cursor is, or is nested at any depth within, an anonymous
