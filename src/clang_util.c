@@ -734,6 +734,11 @@ bool tidy_Cursor_isExternalLinkage( CXCursor cursor ) {
   } // switch
 }
 
+bool tidy_Cursor_isLocalVarDecl( CXCursor cursor ) {
+  enum CXCursorKind const kind = clang_getCursorKind( cursor );
+  return kind == CXCursor_VarDecl && tidy_Cursor_inFunctionScope( cursor );
+}
+
 bool tidy_Cursor_isReservedName( CXCursor cursor, enum CXLanguageKind lang ) {
   bool              is_reserved = false;
   CXString const    name_cxs = clang_getCursorSpelling( cursor );

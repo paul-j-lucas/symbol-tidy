@@ -274,6 +274,15 @@ inline bool tidy_Cursor_isInvalid( CXCursor cursor ) {
 }
 
 /**
+ * Gets whether \a cursor is a local (within a function) variable declaration.
+ *
+ * @param cursor The cursor to check.
+ * @return Returns `true` only if \a cursor is a local variable declaration.
+ */
+NODISCARD
+bool tidy_Cursor_isLocalVarDecl( CXCursor cursor );
+
+/**
  * Gets whether \a cursor has a name that is reserved in \a lang.
  *
  * @remarks A name is reserved if it matches any of these patterns:

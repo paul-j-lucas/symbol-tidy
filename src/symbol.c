@@ -1097,8 +1097,10 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
     if ( IS_VERBOSE( CURSORS ) )
       verbose_print_cursor( cursor );   // LCOV_EXCL_LINE
 
+    bool const is_expression = clang_isExpression( kind );
+
     if ( svd->source->lang == CXLanguage_CPlusPlus &&
-        (clang_isDeclaration( kind ) || clang_isExpression( kind )) ) {
+        (is_expression || clang_isDeclaration( kind )) ) {
       //
       // Remember the user-defined classes used as template arguments so we can
       // later tell which user functions ADL could find from standard library
@@ -1106,6 +1108,49 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       //
       CXType const type = clang_getCursorType( cursor );
       cxx_adl_type_set_add( type );
+    }
+
+    //
+    // A local variable's initializing expression must be referenced from the
+    // enclosing function, not the variable being initialized.  Consider:
+    //
+    //      void f( int x ) {
+    //        int unused_var = x;
+    //      }
+    //
+    //      int main() {
+    //        f( 42 );
+    //      }
+    //
+    // If we didn't handle this case specially, we'd get the following symbols
+    // and what they reference:
+    //
+    //      f() -> {}
+    //      main() [root] -> { f() }
+    //      x -> {}
+    //      unused_var -> { x }
+    //
+    // Note that unused_var references x.  Since nothing references unused_var,
+    // it's correctly left as unused.  But unused_var is the only symbol that
+    // has a reference to x, so x would be left as unused also --- incorrectly.
+    //
+    // Instead, we need to make the enclosing function f() reference x.  If f()
+    // is used, then x is used to initialize unused_var.  That unused_var is
+    // unused is irrelevant to x.
+    //
+    // By setting curr_sym to be curr_sym's parent, f(), we'd get the following
+    // symbols and what they reference:
+    //
+    //      f() -> { x }
+    //      main() [root] -> { f() }
+    //      x -> {}
+    //      unused_var -> {}
+    //
+    // Now, f() references x, so it would be marked used --- correctly.
+    //
+    if ( is_expression && svd->curr_sym != NULL && !svd->curr_sym->is_scope &&
+         tidy_Cursor_isLocalVarDecl( parent ) ) {
+      svd->curr_sym = svd->curr_sym->parent_sym;
     }
 
     if ( cursor_is_definition( cursor ) ) {
@@ -1599,6 +1644,11 @@ static void visit_OverloadedDeclRef( CXCursor overloaded_csr,
  * @remarks For C++ only, if a variable of a class type is declared and the
  * class has a constructor, mark the variable as a root since the constructor
  * may have side effects.
+ *
+ * @note A local variable's initializer must be referred to by the enclosing
+ * function, not to the variable.  That redirection can't be done here since it
+ * must happen while the variable's children are visited; see
+ * symbols_visitor().
  *
  * @param var_decl_csr The variable declaration's cursor to visit.
  * @param svd The symbols_visit_data to use.
