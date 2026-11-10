@@ -50,6 +50,28 @@
  * @{
  */
 
+////////// macros /////////////////////////////////////////////////////////////
+
+/**
+ * The number of tokens to get when tokenizing for an attribute.
+ *
+ * @remarks
+ * @parblock
+ * To get the tokens for a cursor, you'd ordinarily use the range from
+ * `clang_getCursorExtent()`.
+ *
+ * However, for an attribute, if it's is inside a macro, libclang puts the end
+ * of the range at the end of the macro's expansion, so the range can span two
+ * files and you can't tokenize across file boundaries.
+ *
+ * Instead, use a range starting at the attribute's own location and ending
+ * some reasonable size away and tokenize that.
+ * @endparblock
+ *
+ * @sa hasMaybeUnusedAttr_visitor()
+ */
+#define ATTR_TOKENIZE_WINDOW_SIZE 64
+
 ////////// typedefs ///////////////////////////////////////////////////////////
 
 #ifdef HAVE_TYPEOF
@@ -461,6 +483,8 @@ skip:
  * @param data Not used.
  * @return Returns `CXChildVisit_Break` if found or `CXChildVisit_Continue` if
  * not.
+ *
+ * @sa #ATTR_TOKENIZE_WINDOW_SIZE
  */
 static enum CXChildVisitResult hasMaybeUnusedAttr_visitor( CXCursor cursor,
                                                            CXCursor parent,
@@ -471,8 +495,21 @@ static enum CXChildVisitResult hasMaybeUnusedAttr_visitor( CXCursor cursor,
   if ( clang_getCursorKind( cursor ) != CXCursor_UnexposedAttr )
     goto skip;
 
-  CXSourceRange const     range = clang_getCursorExtent( cursor );
+  CXSourceLocation const loc = clang_getCursorLocation( cursor );
+  CXFile    file;
+  unsigned  offset;
+  clang_getSpellingLocation(
+    loc, &file, /*line=*/NULL, /*col=*/NULL, &offset
+  );
+  if ( file == NULL )
+    goto skip;
+
   CXTranslationUnit const tu = clang_Cursor_getTranslationUnit( cursor );
+  CXSourceLocation const start_loc =
+    clang_getLocationForOffset( tu, file, offset );
+  CXSourceLocation const end_loc =
+    clang_getLocationForOffset( tu, file, offset + ATTR_TOKENIZE_WINDOW_SIZE );
+  CXSourceRange const range = clang_getRange( start_loc, end_loc );
 
   CXToken *tokens;
   unsigned token_count;
@@ -480,13 +517,20 @@ static enum CXChildVisitResult hasMaybeUnusedAttr_visitor( CXCursor cursor,
 
   bool found = false;
   for ( unsigned i = 0; i < token_count && !found; ++i ) {
-    if ( clang_getTokenKind( tokens[i] ) != CXToken_Identifier )
-      continue;
-    found = -1 != tidy_Token_isSpellingEqualToAny(
-      tu, tokens[i],
-      "maybe_unused", "__maybe_unused__",
-      "unused", "__unused__"
-    );
+    CXToken const token = tokens[i];
+    switch ( clang_getTokenKind( token ) ) {
+      case CXToken_Identifier:
+        found = -1 != tidy_Token_isSpellingEqualToAny(
+          tu, token, "maybe_unused", "__maybe_unused__", "unused", "__unused__"
+        );
+        break;
+      case CXToken_Punctuation:
+        if ( !tidy_Token_isSpellingEqualTo( tu, token, "::" ) )
+          i = token_count;              // end of this attribute; stop
+        break;
+      default:
+        /* suppress warning */;
+    } // switch
   } // for
 
   clang_disposeTokens( tu, tokens, token_count );
