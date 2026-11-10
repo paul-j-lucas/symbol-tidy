@@ -273,8 +273,6 @@ static bool cursor_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
 
   if ( sym_scoped_name == NULL )
     goto done;
-  if ( strcmp( sym_scoped_name, TIDY_COMPILER_ID ) == 0 )
-    goto done;
 
   if ( cursor_in_ignored_class( sym_csr ) )
     goto done;
