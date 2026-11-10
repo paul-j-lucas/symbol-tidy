@@ -1,3 +1,23 @@
+2026-11-10  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * symbol.c, symbol.h: Added tidy_loc.
+   * symbol.c, symbol.h: For symbols defined in macros, now prints "(defined at
+     ...)".
+   * clang_util.c, clang_util.h, symbol.c, test/Makefile.am, maybe_unused.c,
+     maybe_unused.out, maybe_unused.test: Now handly [[maybe_unused]] ---
+     except for labels.
+
+2026-11-09  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * clang_util.c, clang_util.h, symbol.c: Fixed local variable initializers.
+   * symbol-tidy.toml: Using canonical cursors now shifts files symbols are
+     ignored from.
+   * symbol.c: Now reporting unused paramters.
+   * clang_util.c: Added empty_if_null() for *EqualTo* functions.
+   * auto_delete_pool.cpp, functor.cpp: Added (void) casts.
+   * symbol.c: Removed template parameter and regular parameter cases --
+     apparently make no difference.
+
 2026-11-08  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
    * symbol.c: Now doing much less for cursors in system headers; major
