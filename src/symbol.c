@@ -552,6 +552,27 @@ static void cursor_visit_ref( CXCursor cursor, symbols_visit_data *svd ) {
 }
 
 /**
+ * Calls `clang_getFileName()` on \a file and returns a copy of the path, but
+ * only if it's a source file.
+ *
+ * @param file The file to get the path of.
+ * @return Returns a copy of the path or NULL if \a file isn't a source path.
+ *
+ * @note The caller is responsible for freeing the returned string.
+ *
+ * @sa is_source_path()
+ */
+NODISCARD
+static char* dup_if_source_path( CXFile file ) {
+  CXString const    path_cxs = clang_getFileName( file );
+  char const *const path_cs = clang_getCString( path_cxs );
+  char *const       rv_path = is_source_path( path_cs ) ?
+    strdup_or_exit( path_no_dot_slash( path_cs ) ) : NULL;
+  clang_disposeString( path_cxs );
+  return rv_path;
+}
+
+/**
  * Gets whether the file for a top-level cursor can be skipped because it was
  * already visted for an earlier translation unit of the same language.
  *
@@ -854,23 +875,47 @@ static void print_statistics( void ) {
 static void symbol_add_def( tidy_symbol *sym, CXSourceLocation sym_loc ) {
   assert( sym != NULL );
 
-  CXFile sym_file;
-  clang_getSpellingLocation(
-    sym_loc, &sym_file, &sym->line, &sym->col, /*offset=*/NULL
-  );
+  CXFile ref_file, def_file;
+  unsigned def_line, def_col;
 
-  if ( sym_file == NULL )
+  clang_getExpansionLocation(
+    sym_loc, &ref_file, &sym->line, &sym->col, /*offset=*/NULL
+  );
+  if ( ref_file == NULL )
     return;
 
-  CXString const    path_cxs = clang_getFileName( sym_file );
-  char const *const path_cs = clang_getCString( path_cxs );
+  clang_getSpellingLocation(
+    sym_loc, &def_file, &def_line, &def_col, /*offset=*/NULL
+  );
+  if ( def_file == NULL )
+    return;
 
-  if ( is_source_path( path_cs ) ) {
-    FREE( sym->path );                  // just in case
-    sym->path = strdup_or_exit( path_no_dot_slash( path_cs ) );
+  char *const path = dup_if_source_path( ref_file );
+  if ( path == NULL )
+    return;
+
+  bool const is_defined_in_macro =
+    def_file != ref_file || def_line != sym->line || def_col != sym->col;
+
+  char *macro_path = NULL;
+
+  if ( is_defined_in_macro && def_file != ref_file ) {
+    macro_path = dup_if_source_path( def_file );
+    if ( macro_path == NULL ) {         // e.g., defined in a system header
+      free( path );
+      return;
+    }
   }
 
-  clang_disposeString( path_cxs );
+  FREE( sym->path );                    // just in case
+  sym->path = path;
+
+  if ( is_defined_in_macro ) {
+    FREE( sym->macro_path );            // just in case
+    sym->macro_path = macro_path;
+    sym->macro_line = def_line;
+    sym->macro_col  = def_col;
+  }
 }
 
 /**
@@ -885,6 +930,7 @@ static void symbol_cleanup( tidy_symbol *sym ) {
     FREE( sym->cxx_prototype );
     FREE( sym->path );
     ht_table_cleanup( &sym->cxx_adl_usr_set, /*free_fn=*/NULL );
+    FREE( sym->macro_path );
     ht_table_cleanup( &sym->ref_sym_set, /*free_fn=*/NULL );
   }
 }
@@ -1874,14 +1920,39 @@ unsigned symbols_print_unused( void ) {
       EPUTS( ": unused symbols:\n" );
     }
 
+    bool const is_defined_in_macro = sym->macro_line > 0;
+
     color_start( stderr, sgr_locus );
     EPRINTF( "%5u", sym->line );
     color_end( stderr, sgr_locus );
-    EPUTC( ',' );
-    color_start( stderr, sgr_locus );
-    EPRINTF( "%2u", sym->col );
-    color_end( stderr, sgr_locus );
-    EPRINTF( " | \"%s\"\n", symbol_name_for_print( sym ) );
+    if ( is_defined_in_macro ) {
+      EPUTS( "   " );                   // same width as ",%2u"
+    }
+    else {
+      EPUTC( ',' );
+      color_start( stderr, sgr_locus );
+      EPRINTF( "%2u", sym->col );
+      color_end( stderr, sgr_locus );
+    }
+
+    EPRINTF( " | \"%s\"", symbol_name_for_print( sym ) );
+    if ( is_defined_in_macro ) {
+      EPUTS( " (defined at " );
+      if ( sym->macro_path != NULL ) {
+        color_start( stderr, sgr_locus );
+        EPRINTF( "\"%s\":", sym->macro_path );
+        color_end( stderr, sgr_locus );
+      }
+      color_start( stderr, sgr_locus );
+      EPRINTF( "%u", sym->macro_line );
+      color_end( stderr, sgr_locus );
+      EPUTC( ',' );
+      color_start( stderr, sgr_locus );
+      EPRINTF( "%u", sym->macro_col );
+      color_end( stderr, sgr_locus );
+      EPUTC( ')' );
+    }
+    EPUTC( '\n' );
   } // for
 
   array_cleanup( &symbol_array, /*free_fn=*/NULL );

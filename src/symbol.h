@@ -67,6 +67,9 @@ struct tidy_symbol {
   char const   *path;                   ///< File defined in.
   unsigned      line;                   ///< Line defined on.
   unsigned      col;                    ///< Column defined at.
+  char const   *macro_path;             ///< File of macro defined in.
+  unsigned      macro_line;             ///< Line defined on.
+  unsigned      macro_col;              ///< Column defined at.
   tidy_symbol  *parent_sym;             ///< Parent symbol, if any.
   hash_table_t  ref_sym_set;            ///< Symbol(s) referenced from this.
 
