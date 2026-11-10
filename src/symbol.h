@@ -74,7 +74,7 @@ struct tidy_symbol {
   char const   *key;                    ///< Unique key.
   char const   *name;                   ///< Name.
   char const   *cxx_prototype;          ///< C++ prototype.
-  tidy_loc      loc;                    ///< Location.
+  tidy_loc      loc;                    ///< Source file location.
   tidy_loc      macro_loc;              ///< Location if defined in a macro.
   tidy_symbol  *parent_sym;             ///< Parent symbol, if any.
   hash_table_t  ref_sym_set;            ///< Symbol(s) referenced from this.
@@ -144,8 +144,9 @@ struct tidy_symbol {
    * A "dead" symbol is one that is excluded from being considered unused (even
    * if it is unused).  A symbol becomes dead if any of the following are true:
    *
-   *  1. Its \ref path is NULL or its \ref line is 0 (as they would be for
-   *     symbols in system headers).
+   *  1. Its \ref tidy_symbol::loc "loc"<tt>.</tt>\ref tidy_loc::path "path" is
+   *     NULL or its \ref tidy_symbol::loc "loc"<tt>.</tt>\ref tidy_loc::line
+   *     "line" is 0 (as they would be for symbols in system headers).
    *
    *  2. It's within an unused scope.
    * @endparblock
