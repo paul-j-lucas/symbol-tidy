@@ -1,6 +1,6 @@
 /*
 **      symbol-tidy -- Symbol tidier
-**      src/file_ext.c
+**      src/lang.c
 **
 **      Copyright (C) 2026  Paul J. Lucas
 **
@@ -20,12 +20,12 @@
 
 /**
  * @file
- * Defines constsnts and functions for supported C/C++ filename extensions.
+ * Defines functions for parsing strings into languages.
  */
 
 // local
 #include "pjl_config.h"                 /* must go first */
-#include "file_ext.h"
+#include "lang.h"
 #include "util.h"
 
 /// @cond DOXYGEN_IGNORE
@@ -41,45 +41,49 @@
 /// @endcond
 
 /**
- * @addtogroup tidy-file-ext-group
+ * @addtogroup tidy-lang-group
  * @{
  */
+
+////////// typedefs ///////////////////////////////////////////////////////////
+
+typedef struct ext_map ext_map;
+
+////////// structs ////////////////////////////////////////////////////////////
+
+/**
+ * A source file extension and the language it corresponds to.
+ */
+struct ext_map {
+  char const           *ext;            ///< Extension (without the `'.'`).
+  enum CXLanguageKind   lang;           ///< Language for \ref ext.
+};
 
 ////////// local constants ////////////////////////////////////////////////////
 
 /**
  * Array of all common C/C++ filename extensions.
  */
-static tidy_file_ext const FILE_EXT[] = {
+static ext_map const EXT_MAP[] = {
   { "c",   CXLanguage_C         },
   { "c++", CXLanguage_CPlusPlus },
   { "cc",  CXLanguage_CPlusPlus },
   { "cp",  CXLanguage_CPlusPlus },
   { "cpp", CXLanguage_CPlusPlus },
   { "cxx", CXLanguage_CPlusPlus },
-  { "h",   CXLanguage_C         },
-  { "h++", CXLanguage_CPlusPlus },
-  { "hh",  CXLanguage_CPlusPlus },
-  { "hp",  CXLanguage_CPlusPlus },
-  { "hpp", CXLanguage_CPlusPlus },
-  { "hxx", CXLanguage_CPlusPlus },
 };
 
 ////////// extern functions ///////////////////////////////////////////////////
 
-tidy_file_ext const* file_ext_find( char const *ext ) {
+enum CXLanguageKind lang_parse_ext( char const *ext ) {
   assert( ext != NULL );
 
-  FOREACH_FILE_EXT( fe ) {
-    if ( strcasecmp( ext, fe->ext ) == 0 )
-      return fe;
+  FOREACH_ARRAY_ELEMENT( ext_map, map, EXT_MAP ) {
+    if ( strcasecmp( ext, map->ext ) == 0 )
+      return map->lang;
   } // for
 
-  return NULL;
-}
-
-tidy_file_ext const* file_ext_next( tidy_file_ext const *fe ) {
-  return ARRAY_NEXT( FILE_EXT, fe );
+  return CXLanguage_Invalid;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

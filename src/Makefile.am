@@ -64,9 +64,9 @@ symbol_tidy_SOURCES =	array.c array.h \
 			config_file.c config_file.h \
 			cxx_symbol.c cxx_symbol.h \
 			cxx_util.c cxx_util.h \
-			file_ext.c file_ext.h \
 			fnv1a.c fnv1a.h \
 			hash_table.c hash_table.h \
+			lang.c lang.h \
 			options.c options.h \
 			path_util.c path_util.h \
 			pjl_config.h config.h \

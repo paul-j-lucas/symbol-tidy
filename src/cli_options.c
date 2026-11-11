@@ -27,7 +27,7 @@
 #include "pjl_config.h"                 /* must go first */
 #include "cli_options.h"
 #include "array.h"
-#include "file_ext.h"
+#include "lang.h"
 #include "options.h"
 #include "path_util.h"
 #include "print.h"
@@ -647,8 +647,8 @@ static int get_sources( int argc, char const *const argv[],
       char const *const ext = path_ext( argv_i );
       if ( ext == NULL )
         break;
-      tidy_file_ext const *const file_ext = file_ext_find( ext );
-      if ( file_ext == NULL )
+      enum CXLanguageKind lang = lang_parse_ext( ext );
+      if ( lang == CXLanguage_Invalid )
         break;
       argi = i;
     } // for
@@ -699,15 +699,14 @@ static int get_sources( int argc, char const *const argv[],
           argv[i]
         );
       }
-      tidy_file_ext const *const file_ext = file_ext_find( ext );
-      if ( file_ext == NULL ) {
+      lang = lang_parse_ext( ext );
+      if ( lang == CXLanguage_Invalid ) {
         fatal_error( EX_USAGE,
           "\"%s\": can't deduce language from extension"
           "; use -x/--language\n",
           argv[i]
         );
       }
-      lang = file_ext->lang;
     }
 
     tidy_source source = {
