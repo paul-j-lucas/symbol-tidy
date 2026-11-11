@@ -71,11 +71,26 @@ should be run
 only on valid C (\f(CW.c\fP) or C++ (\f(CW.cpp) source files,
 i.e., files should compile successfully
 with a C or C++ compiler first.
+(Errors in invalid source files
+will still be reported,
+but the error messages
+may not be as detailed
+as those from a regular compiler.)
+.P
+.I All
+source files
+comprising an entire
+program or library
+.I must
+be given to a single
+.B symbol-tidy
+command.
+If the number of source files is large,
+they can be given via either a text file
+or standard input.
 (See the
-.B \-\-language
-or
-.B \-x
-options for additional filename extensions.)
+.B \-\-files
+option below.)
 .SS Use with Make
 While
 .B symbol-tidy
@@ -325,7 +340,7 @@ The choices for
 .I s
 are:
 .RS 6
-.TP 12
+.TP 8
 .PD 0
 .B always
 Always exit with non-zero.
@@ -350,9 +365,14 @@ The default is
 .BR unused .
 .TP
 .BI \-\-files \f1=\fPf "\f1 | \fP" "" \-f " f"
-Reads paths of source files to tidy,
+Reads paths of source files to tidy from file
+.IR f ,
 one per line.
 Blank lines are ignored.
+If
+.I f
+is \f(CW-\fP,
+source files are read from standard input.
 .TP
 .BR \-\-no-config-layers " | " \-L
 Suppresses configuration file layering.
@@ -430,15 +450,31 @@ Important C or C++ compiler options:
 .BI \-\-language \f1=\fPs "\f1 | \fP" "" \-x " s"
 Specifies the langauge
 .I s
-of
-.IR source-file ,
-either \f(CWc\fP or \f(CWc++\fP,
-overriding the language indicated
-by its filename extension,
-if any.
+of subsequent
+source files given on the command-line
+and all source files given via the
+.B \-\-files
+option.
+The choices for
+.I s
+are:
+.RS
+.TP 8
+.PD 0
+.B c
+Force C source files overriding files' extensions.
+.TP
+.B c++
+Force C++ source files overriding files' extensions.
+.TP
+.B none
+Use files' extensions to infer language.
+.RE
+.PD
 .IP
-The extension of \f(CW.c\fP
-indicate a C source file;
+By default,
+the extension of \f(CW.c\fP
+indicates a C source file;
 the extensions of
 \f(CW.c++\fP,
 \f(CW.cc\fP,
