@@ -35,17 +35,17 @@
 .if !'\\$1'0' .sp
 ..
 .\" ---------------------------------------------------------------------------
-.TH \f3symbol-tidy\fP 1 "November 10, 2026" "PJL TOOLS"
+.TH \f3symbol-tidy\fP 1 "November 11, 2026" "PJL TOOLS"
 .SH NAME
 symbol-tidy \(em Symbol tidier
 .SH SYNOPSIS
 .B symbol-tidy
-.BI "[\-Xtidy " tidy-option ]...
-.BI [ compiler-option ]...
-.IR source-file ...
+.BI "[\-Xtidy " tidy-opt " ...]"
+.BI [ compiler-opt " ...]"
+.BI [ source-file " ...]"
 .br
 .B symbol-tidy
-.I other-option
+.I other-opt
 .SH DESCRIPTION
 .B symbol-tidy
 is a command-line tool
@@ -348,6 +348,11 @@ doesn't think anything went wrong.
 .BR "Use with Make" .)
 The default is
 .BR unused .
+.TP
+.BI \-\-files \f1=\fPf "\f1 | \fP" "" \-f " f"
+Reads paths of source files to tidy,
+one per line.
+Blank lines are ignored.
 .TP
 .BR \-\-no-config-layers " | " \-L
 Suppresses configuration file layering.

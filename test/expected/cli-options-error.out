@@ -70,6 +70,15 @@ symbol-tidy: error: "-e" requires an argument
 $ symbol-tidy -Xtidy -eX
 symbol-tidy: error: "X": invalid value for --error/-e; must be one of "violations", "always", or "never"
 
+$ symbol-tidy -Xtidy --file
+symbol-tidy: error: "--file" requires an argument
+
+$ symbol-tidy -Xtidy --file=
+symbol-tidy: error: "--file" requires an argument
+
+$ symbol-tidy -Xtidy -f
+symbol-tidy: error: "-f" requires an argument
+
 $ symbol-tidy -Xtidy --verbose
 symbol-tidy: error: "--verbose" requires an argument
 
@@ -96,6 +105,7 @@ tidy options:
   --debug            (-D) Print symbol-tidy debug output.
   --directory=ARG    (-d) Change directory before tidying.
   --error=ARG        (-e) When to exit with a non-zero status.
+  --files=ARG        (-f) Read file paths from path or '-' for standard input.
   --no-config-layers (-L) Don't do configuration file layering.
   --verbose=ARG      (-V) Print verbose output.
 
@@ -129,6 +139,7 @@ tidy options:
   --debug            (-D) Print symbol-tidy debug output.
   --directory=ARG    (-d) Change directory before tidying.
   --error=ARG        (-e) When to exit with a non-zero status.
+  --files=ARG        (-f) Read file paths from path or '-' for standard input.
   --no-config-layers (-L) Don't do configuration file layering.
   --verbose=ARG      (-V) Print verbose output.
 

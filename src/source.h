@@ -52,8 +52,8 @@ typedef struct tidy_source tidy_source;
  * A source file being tidied.
  */
 struct tidy_source {
-  char const         *argv_path;        ///< Source file's path from `argv`.
-  CXFile              file;             ///< The file fir \ref argv_path.
+  char const         *path;             ///< Source file's path.
+  CXFile              file;             ///< The file for \ref path.
   unsigned            tsid;             ///< Unique source ID.
   enum CXLanguageKind lang;             ///< Language of source file.
 

@@ -32,6 +32,9 @@
 // libclang
 #include <clang-c/Index.h>
 
+// standard
+#include <stdbool.h>
+
 /**
  * @defgroup tidy-lang-group File Extensions
  * A structure and functions for supported C/C++ filename extensions.
@@ -49,6 +52,16 @@
  */
 NODISCARD
 enum CXLanguageKind lang_parse_ext( char const *ext );
+
+/**
+ * Attempts to find \name among the set of supported language names.
+ *
+ * @param name The name to parse.  Must be one of `"c"`, `"c++"`, or `"none"`.
+ * @param rv_lang If not NULL, receives the language corresponding to \a name.
+ * @return Returns `true` only if \a name is valid.
+ */
+NODISCARD
+bool lang_parse_name( char const *name, enum CXLanguageKind *rv_lang );
 
 ///////////////////////////////////////////////////////////////////////////////
 

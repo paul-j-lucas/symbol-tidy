@@ -35,7 +35,9 @@
 
 // standard
 #include <assert.h>
+#include <stdbool.h>
 #include <stddef.h>
+#include <string.h>
 #include <strings.h>
 
 /// @endcond
@@ -47,30 +49,42 @@
 
 ////////// typedefs ///////////////////////////////////////////////////////////
 
-typedef struct ext_map ext_map;
+typedef struct lang_map lang_map;
 
 ////////// structs ////////////////////////////////////////////////////////////
 
 /**
  * A source file extension and the language it corresponds to.
  */
-struct ext_map {
-  char const           *ext;            ///< Extension (without the `'.'`).
+struct lang_map {
+  union {
+    char const         *ext;            ///< Extension (without the `'.'`).
+    char const         *name;           ///< Name: `"c"`, `"c++"`, or `"none"`.
+  };
   enum CXLanguageKind   lang;           ///< Language for \ref ext.
 };
 
 ////////// local constants ////////////////////////////////////////////////////
 
 /**
- * Array of all common C/C++ filename extensions.
+ * Map of all common C/C++ filename extensions.
  */
-static ext_map const EXT_MAP[] = {
-  { "c",   CXLanguage_C         },
-  { "c++", CXLanguage_CPlusPlus },
-  { "cc",  CXLanguage_CPlusPlus },
-  { "cp",  CXLanguage_CPlusPlus },
-  { "cpp", CXLanguage_CPlusPlus },
-  { "cxx", CXLanguage_CPlusPlus },
+static lang_map const EXT_MAP[] = {
+  { .ext = "c",   CXLanguage_C         },
+  { .ext = "c++", CXLanguage_CPlusPlus },
+  { .ext = "cc",  CXLanguage_CPlusPlus },
+  { .ext = "cp",  CXLanguage_CPlusPlus },
+  { .ext = "cpp", CXLanguage_CPlusPlus },
+  { .ext = "cxx", CXLanguage_CPlusPlus },
+};
+
+/**
+ * Map of language names.
+ */
+static lang_map const NAME_MAP[] = {
+  { .name = "c",    CXLanguage_C          },
+  { .name = "c++",  CXLanguage_CPlusPlus  },
+  { .name = "none", CXLanguage_Invalid    }
 };
 
 ////////// extern functions ///////////////////////////////////////////////////
@@ -78,12 +92,26 @@ static ext_map const EXT_MAP[] = {
 enum CXLanguageKind lang_parse_ext( char const *ext ) {
   assert( ext != NULL );
 
-  FOREACH_ARRAY_ELEMENT( ext_map, map, EXT_MAP ) {
+  FOREACH_ARRAY_ELEMENT( lang_map, map, EXT_MAP ) {
     if ( strcasecmp( ext, map->ext ) == 0 )
       return map->lang;
   } // for
 
   return CXLanguage_Invalid;
+}
+
+bool lang_parse_name( char const *name, enum CXLanguageKind *rv_lang ) {
+  assert( name != NULL );
+
+  FOREACH_ARRAY_ELEMENT( lang_map, map, NAME_MAP ) {
+    if ( strcmp( name, map->name ) == 0 ) {
+      if ( rv_lang != NULL )
+        *rv_lang = map->lang;
+      return true;
+    }
+  } // for
+
+  return false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

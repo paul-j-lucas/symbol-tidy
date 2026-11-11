@@ -125,11 +125,11 @@ int main( int argc, char const *argv[] ) {
 
   for ( size_t i = 0; i < sources.len; ++i ) {
     tidy_source *const source = array_at_nc( &sources, i );
-    if ( !source_path_add( source->argv_path ) )
+    if ( !source_path_add( source->path ) )
       continue;
 
     if ( IS_VERBOSE( SRC_FILE_ALWAYS ) )
-      verbose_printf( "source file = \"%s\"\n", source->argv_path );
+      verbose_printf( "source file = \"%s\"\n", source->path );
 
     source_parse( source );
     symbols_visit( source );

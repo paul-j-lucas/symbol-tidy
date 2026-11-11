@@ -281,11 +281,11 @@ skip: clang_disposeString( token_cxs );
  */
 static void source_parse_impl( tidy_source *source ) {
   assert( source != NULL );
-  assert( source->argv_path != NULL );
+  assert( source->path != NULL );
 
   enum CXErrorCode const error_code = clang_parseTranslationUnit2(
     tidy_index,
-    source->argv_path,
+    source->path,
     source->ptu_argv->elements,
     STATIC_CAST( int, source->ptu_argv->len ),
     /*unsaved_files=*/NULL,
@@ -297,11 +297,11 @@ static void source_parse_impl( tidy_source *source ) {
   switch ( error_code ) {
     // LCOV_EXCL_START
     case CXError_ASTReadError:
-      print_file_error( source->argv_path, 0, 0, "libclang AST error\n" );
+      print_file_error( source->path, 0, 0, "libclang AST error\n" );
       exit( EX_UNAVAILABLE );
 
     case CXError_Crashed:
-      print_file_error( source->argv_path, 0, 0, "libclang crashed\n" );
+      print_file_error( source->path, 0, 0, "libclang crashed\n" );
       exit( EX_UNAVAILABLE );
 
     case CXError_InvalidArguments:
@@ -317,12 +317,12 @@ static void source_parse_impl( tidy_source *source ) {
       // Yes, this is TOCTAU (well, TAUTOC since we're checking after the
       // fact), but it's better than nothing.
       //
-      if ( access( source->argv_path, R_OK ) == -1 ) {
-        print_file_error( source->argv_path, 0, 0, "%s\n", STRERROR() );
+      if ( access( source->path, R_OK ) == -1 ) {
+        print_file_error( source->path, 0, 0, "%s\n", STRERROR() );
         exit( EX_NOINPUT );
       }
       // LCOV_EXCL_START
-      print_file_error( source->argv_path, 0, 0, "libclang failed\n" );
+      print_file_error( source->path, 0, 0, "libclang failed\n" );
       exit( EX_DATAERR );
       // LCOV_EXCL_STOP
 
@@ -360,7 +360,7 @@ bool is_source_path( char const *path ) {
 
 void source_cleanup( tidy_source *source ) {
   if ( source != NULL ) {
-    // source->argv_path points to an argv so it doesn't need freeing
+    FREE( source->path );
     if ( source->tu != NULL )
       clang_disposeTranslationUnit( source->tu );
   }
@@ -369,7 +369,7 @@ void source_cleanup( tidy_source *source ) {
 void source_parse( tidy_source *source ) {
   assert( source != NULL );
   source_parse_impl( source );
-  source->file = clang_getFile( source->tu, source->argv_path );
+  source->file = clang_getFile( source->tu, source->path );
   source_cpp_visit( source, source->file );
   clang_getInclusions( source->tu, &include_visitor, source );
 }

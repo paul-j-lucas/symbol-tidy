@@ -42,6 +42,7 @@
 #define OPT_DIRECTORY             d
 #define OPT_DEBUG                 D
 #define OPT_ERROR                 e
+#define OPT_FILES                 f
 #define OPT_HELP                  h
 #define OPT_COLOR                 k
 #define OPT_NO_CONFIG_LAYERS      L

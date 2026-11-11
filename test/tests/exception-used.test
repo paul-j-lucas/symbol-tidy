@@ -12,4 +12,9 @@ test_symbol_tidy $TIDY_TEST_CXXFLAGS $TIDY_TEST_OPTIONS \
   $TIDY_TEST_CONFIG \
   exception-used-3a.cpp exception-used-3b.cpp
 
+printf '%s\n' exception-used-3a.cpp exception-used-3b.cpp | \
+test_symbol_tidy $TIDY_TEST_CXXFLAGS $TIDY_TEST_OPTIONS \
+  -Xtidy -f-
+  $TIDY_TEST_CONFIG
+
 # vim:set syntax=bash et sw=2 ts=2:

@@ -111,6 +111,7 @@ static struct option const OPTIONS[] = {
   { "debug",            no_argument,        NULL, COPT(DEBUG)             },
   { "directory",        required_argument,  NULL, COPT(DIRECTORY)         },
   { "error",            required_argument,  NULL, COPT(ERROR)             },
+  { "files",            required_argument,  NULL, COPT(FILES)             },
   { "help",             no_argument,        NULL, COPT(HELP)              },
   { "no-config-layers", no_argument,        NULL, COPT(NO_CONFIG_LAYERS)  },
   { "verbose",          required_argument,  NULL, COPT(VERBOSE)           },
@@ -133,6 +134,7 @@ static char const *const OPTIONS_HELP[] = {
   [ COPT(DEBUG) ] = "Print " PACKAGE " debug output",
   [ COPT(DIRECTORY) ] = "Change directory before tidying",
   [ COPT(ERROR) ] = "When to exit with a non-zero status",
+  [ COPT(FILES) ] = "Read file paths from path or '-' for standard input",
   [ COPT(HELP) ] = "Print this help and exit",
   [ COPT(NO_CONFIG_LAYERS) ] = "Don't do configuration file layering",
   [ COPT(VERBOSE) ] = "Print verbose output",
@@ -171,6 +173,19 @@ static char const*          get_opt_format( int );
 
 NODISCARD
 static struct option const* get_option_short( int );
+
+/////////// inline functions //////////////////////////////////////////////////
+
+/**
+ * Gets whether \a s is likely an option's argument.
+ *
+ * @param s The string to check.
+ * @return Returns `true` only if \a is likely an option's argument.
+ */
+NODISCARD
+static inline bool is_opt_arg( char const *s ) {
+  return s[0] != '-' || s[1] == '\0';
+}
 
 /////////// local functions ///////////////////////////////////////////////////
 
@@ -592,134 +607,6 @@ static char const* get_short_opt_value( int argc, char const *const argv[],
 }
 
 /**
- * Creates a tidy_source object for each source file to be tidied.
- *
- * @param argc The command-line argument count from `main()`.
- * @param argv The command-line argument values from `main()`.
- * @param rv_sources An array to receive the tidy_source files to be tidied.
- * @return Returns \a argc minus all the source file and language options
- * removed.
- */
-static int get_sources( int argc, char const *const argv[],
-                        array_t *rv_sources ) {
-  assert( argc > 0 );
-  assert( argv != NULL );
-  assert( rv_sources != NULL );
-
-  struct lang_map {
-    char const         *lang_name;
-    enum CXLanguageKind lang_kind;
-  };
-  typedef struct lang_map lang_map;
-
-  static lang_map const LANG_MAP[] = {
-    { "c",    CXLanguage_C          },
-    { "c++",  CXLanguage_CPlusPlus  },
-    { "none", CXLanguage_Invalid    }
-  };
-
-  int argi = 0;
-
-  //
-  // Find the first -x/--language option: if found, it marks the start of the
-  // source files in argv.
-  //
-  for ( int i = 1; i < argc; ++i ) {
-    int i_copy = i;
-    char const *lang_value = get_short_opt_value( argc, argv, 'x', &i_copy );
-    if ( lang_value == NULL )
-      lang_value = get_long_opt_value( argc, argv, "language", &i_copy );
-    if ( lang_value == NULL )
-      continue;
-    argi = i;
-  } // for
-
-  //
-  // If there's no -x/--language option, iterate backwards looking for the last
-  // option or argument without a filename extension: the argument after it
-  // marks the start of the source files in argv.
-  //
-  if ( argi == 0 ) {
-    for ( int i = argc - 1; i >= 1; --i ) {
-      char const *const argv_i = argv[i];
-      if ( argv_i[0] == '-' )
-        break;
-      char const *const ext = path_ext( argv_i );
-      if ( ext == NULL )
-        break;
-      enum CXLanguageKind lang = lang_parse_ext( ext );
-      if ( lang == CXLanguage_Invalid )
-        break;
-      argi = i;
-    } // for
-  }
-
-  if ( argi == 0 )
-    return 0;
-
-  //
-  // Finally, iterate forwards starting at argi constructing tidy_source
-  // objects.
-  //
-  enum CXLanguageKind x_lang = CXLanguage_Invalid;
-
-  for ( int i = argi; i < argc; ++i ) {
-    char const *lang_value = get_short_opt_value( argc, argv, 'x', &i );
-    if ( lang_value == NULL )
-      lang_value = get_long_opt_value( argc, argv, "language", &i );
-    if ( lang_value != NULL ) {
-      bool found_lang = false;
-      FOREACH_ARRAY_ELEMENT( lang_map, map, LANG_MAP ) {
-        if ( strcmp( lang_value, map->lang_name ) == 0 ) {
-          x_lang = map->lang_kind;
-          found_lang = true;
-          break;
-        }
-      } // for
-      if ( !found_lang ) {
-        fatal_error( EX_USAGE,
-          "\"%s\": invalid value for -x/--language;"
-          " must be one of \"c\", \"c++\", or \"none\"\n",
-          lang_value
-        );
-      }
-      continue;
-    }
-
-    enum CXLanguageKind lang = CXLanguage_Invalid;
-    if ( x_lang != CXLanguage_Invalid ) {
-      lang = x_lang;
-    }
-    else {
-      char const *const ext = path_ext( argv[i] );
-      if ( ext == NULL ) {
-        fatal_error( EX_USAGE,
-          "\"%s\": can't deduce language without extension"
-          "; use -x/--language\n",
-          argv[i]
-        );
-      }
-      lang = lang_parse_ext( ext );
-      if ( lang == CXLanguage_Invalid ) {
-        fatal_error( EX_USAGE,
-          "\"%s\": can't deduce language from extension"
-          "; use -x/--language\n",
-          argv[i]
-        );
-      }
-    }
-
-    tidy_source source = {
-      .argv_path = path_no_dot_slash( argv[i] ),
-      .lang = lang
-    };
-    *(tidy_source*)array_push_back( rv_sources ) = source;
-  } // for
-
-  return argi;
-}
-
-/**
  * Checks whether the \a argv[\a *pargi] is `-Xtidy` and followed by a
  * subsequent option.
  *
@@ -842,9 +729,12 @@ static char* make_short_opts( struct option const options[static const 2] ) {
  * tidy** specific options.  The caller is responsible for free'ing the array
  * of pointers to strings, but _not_ the strings themselves since they point at
  * strings from \a argv.
+ * @return Returns The language set by the last `-x`/`--language` option, if
+ * any, or `CXLanguage_Invalid`.
  */
-static void move_tidy_args( int *pargc, char const *argv[],
-                            int *ptidy_argc, char const **ptidy_argv[] ) {
+static enum CXLanguageKind move_tidy_args( int *pargc, char const *argv[],
+                                           int *ptidy_argc,
+                                           char const **ptidy_argv[] ) {
   assert(  pargc != NULL );
   assert( *pargc > 0 );
   assert(   argv != NULL );
@@ -854,6 +744,8 @@ static void move_tidy_args( int *pargc, char const *argv[],
   int const argc = *pargc;
   int new_argc = 1, tidy_argc = 1;
   char const *opt = NULL;
+  enum CXLanguageKind rv_file_lang = CXLanguage_Invalid;
+  enum CXLanguageKind x_lang = CXLanguage_Invalid;
 
   char const **const tidy_argv =
     MALLOC( char*, STATIC_CAST( size_t, argc ) + 1/*NULL*/ );
@@ -868,10 +760,12 @@ static void move_tidy_args( int *pargc, char const *argv[],
           struct option const *const option = get_option_short( *opt );
           if ( option == NULL )
             fatal_error( EX_USAGE, "'%c': %s\n", *opt, INVALID_XTIDY_OPTION );
+          if ( option->val == COPT(FILES) )
+            rv_file_lang = x_lang;
           if ( option->has_arg == required_argument ) {
             if ( opt[1] != '\0' )               // -<opt><arg>
               break;
-            if ( ++i >= argc || argv[i][0] == '-' )
+            if ( ++i >= argc || !is_opt_arg( argv[i] ) )
               goto short_opt_requires_argument;
             tidy_argv[ tidy_argc++ ] = argv[i]; // -<opt> <arg>
             break;
@@ -884,6 +778,8 @@ static void move_tidy_args( int *pargc, char const *argv[],
         struct option const *const option = get_option_long( opt );
         if ( option == NULL )
           fatal_error( EX_USAGE, "\"%s\": %s\n", opt, INVALID_XTIDY_OPTION );
+        if ( option->val == COPT(FILES) )
+          rv_file_lang = x_lang;
         if ( option->has_arg == required_argument ) {
           char *const equal = strchr( opt, '=' );
           if ( equal != NULL ) {                // --<long_opt>=<value>
@@ -893,11 +789,26 @@ static void move_tidy_args( int *pargc, char const *argv[],
             }
           }
           else {                                // --<long_opt> <value>
-            if ( ++i >= argc || argv[i][0] == '-' )
+            if ( ++i >= argc || !is_opt_arg( argv[i] ) )
               goto long_opt_requires_argument;
             tidy_argv[ tidy_argc++ ] = argv[i];
           }
         }
+      }
+      continue;
+    }
+
+    int i_copy = i;
+    char const *lang_value = get_short_opt_value( argc, argv, 'x', &i_copy );
+    if ( lang_value == NULL )
+      lang_value = get_long_opt_value( argc, argv, "language", &i_copy );
+    if ( lang_value != NULL ) {
+      if ( !lang_parse_name( lang_value, &x_lang ) ) {
+        fatal_error( EX_USAGE,
+          "\"%s\": invalid value for -x/--language;"
+          " must be one of \"c\", \"c++\", or \"none\"\n",
+          lang_value
+        );
       }
       continue;
     }
@@ -925,7 +836,7 @@ next_argv:;
   *pargc = new_argc;
   *ptidy_argc = tidy_argc;
   *ptidy_argv = tidy_argv;
-  return;
+  return rv_file_lang;
 
 long_opt_requires_argument:
   assert( opt != NULL );
@@ -1082,6 +993,169 @@ static void print_version( bool verbose ) {
 // LCOV_EXCL_STOP
 
 /**
+ * Adds a tidy_source for \a source_path, deducing its language from \a x_lang
+ * or, if that is `CXLanguage_Invalid`, from its extension.
+ *
+ * @param source_path The path of the source file to be tidied.
+ * @param x_lang The language specified by the most recent `-x`/`--language`
+ * option, if any.
+ * @param rv_sources An array to receive the new tidy_source.
+ */
+static void source_add( char const *source_path, enum CXLanguageKind x_lang,
+                        array_t *rv_sources ) {
+  if ( x_lang == CXLanguage_Invalid ) {
+    char const *const ext = path_ext( source_path );
+    if ( ext == NULL ) {
+      fatal_error( EX_USAGE,
+        "\"%s\": can't deduce language without extension"
+        "; use -x/--language\n", source_path
+      );
+    }
+    x_lang = lang_parse_ext( ext );
+    if ( x_lang == CXLanguage_Invalid ) {
+      fatal_error( EX_USAGE,
+        "\"%s\": can't deduce language from extension"
+        "; use -x/--language\n", source_path
+      );
+    }
+  }
+
+  tidy_source source = {
+    .path = strdup_or_exit( path_no_dot_slash( source_path ) ),
+    .lang = x_lang
+  };
+  *(tidy_source*)array_push_back( rv_sources ) = source;
+}
+
+/**
+ * Creates a tidy_source object for each source file given in \a argv to and
+ * adds them to \a rv_sources.
+ *
+ * @param argc The command-line argument count from `main()`.
+ * @param argv The command-line argument values from `main()`.
+ * @param rv_sources An array to receive the tidy_source files to be tidied.
+ * @return Returns \a argc minus all the source file and language options
+ * removed.
+ *
+ * @sa source_add()
+ * @sa sources_from_file()
+ */
+static int sources_from_argv( int argc, char const *const argv[],
+                              array_t *rv_sources ) {
+  assert( argc > 0 );
+  assert( argv != NULL );
+  assert( rv_sources != NULL );
+
+  int argi = 0;
+
+  //
+  // Find the first -x/--language option: if found, it marks the start of the
+  // source files in argv.
+  //
+  for ( int i = 1; i < argc; ++i ) {
+    int i_copy = i;
+    char const *lang_value = get_short_opt_value( argc, argv, 'x', &i_copy );
+    if ( lang_value == NULL )
+      lang_value = get_long_opt_value( argc, argv, "language", &i_copy );
+    if ( lang_value == NULL )
+      continue;
+    argi = i;
+  } // for
+
+  //
+  // If there's no -x/--language option, iterate backwards looking for the last
+  // option or argument without a filename extension: the argument after it
+  // marks the start of the source files in argv.
+  //
+  if ( argi == 0 ) {
+    for ( int i = argc - 1; i >= 1; --i ) {
+      char const *const argv_i = argv[i];
+      if ( argv_i[0] == '-' )
+        break;
+      char const *const ext = path_ext( argv_i );
+      if ( ext == NULL )
+        break;
+      enum CXLanguageKind lang = lang_parse_ext( ext );
+      if ( lang == CXLanguage_Invalid )
+        break;
+      argi = i;
+    } // for
+  }
+
+  if ( argi == 0 )
+    return argc;
+
+  //
+  // Finally, iterate forwards starting at argi constructing tidy_source
+  // objects.
+  //
+  enum CXLanguageKind lang = CXLanguage_Invalid;
+  for ( int i = argi; i < argc; ++i ) {
+    char const *lang_value = get_short_opt_value( argc, argv, 'x', &i );
+    if ( lang_value == NULL )
+      lang_value = get_long_opt_value( argc, argv, "language", &i );
+    if ( lang_value != NULL ) {
+      MAYBE_UNUSED bool const is_lang_valid =
+        lang_parse_name( lang_value, &lang );
+      // Value of -x/--language was checked in move_tidy_args().
+      assert( is_lang_valid );
+    }
+    else {
+      source_add( argv[i], lang, rv_sources );
+    }
+  } // for
+
+  return argi;
+}
+
+/**
+ * Creates a tidy_source object for each source file path read from \a
+ * file_path (or standard input if `-`) and adds it them to \a rv_sources.
+ * Blank lines are skipped.
+ *
+ * @param file_path The path of the text file containing paths of source files
+ * to be tidied, one per line.
+ * @param x_lang The language specified by the most recent `-x`/`--language`
+ * option, if any.
+ * @param rv_sources An array to receive the tidy_source files to be tidied.
+ *
+ * @sa source_add()
+ * @sa sources_from_argv()
+ */
+static void sources_from_file( char const *file_path,
+                               enum CXLanguageKind x_lang,
+                               array_t *rv_sources ) {
+  assert( file_path != NULL );
+  assert( rv_sources != NULL );
+
+  bool const is_stdin = strcmp( file_path, "-" ) == 0;
+  FILE *const fin = is_stdin ? stdin : fopen( file_path, "r" );
+  if ( fin == NULL )
+    fatal_error( EX_NOINPUT, "\"%s\": %s\n", file_path, STRERROR() );
+
+  char   *line = NULL;
+  size_t  line_cap = 0;
+  ssize_t line_len;
+
+  while ( (line_len = getline( &line, &line_cap, fin )) != -1 ) {
+    char const *const path =
+      path_no_dot_slash( strn_trim( line, STATIC_CAST( size_t, line_len ) ) );
+    if ( path[0] != '\0' )
+      source_add( path, x_lang, rv_sources );
+  } // while
+
+  free( line );
+  bool const had_error = ferror( fin ) != 0;
+  if ( !is_stdin )
+    fclose( fin );
+  if ( had_error ) {
+    fatal_error( EX_IOERR,
+      "\"%s\": %s\n", is_stdin ? "<stdin>" : file_path, STRERROR()
+    );
+  }
+}
+
+/**
  * Initializes every tidy_source's \ref tidy_source::ptu_argv.
  *
  * @param sources The sources to initialize.
@@ -1140,13 +1214,15 @@ void cli_options_init( int argc, char const *argv[], array_t *rv_sources ) {
   strbuf_t      err_buf = STRBUF_INIT();
   char const   *opt_compiler_path = OPT_COMPILER_DEFAULT;
   char const   *opt_directory = NULL;
+  char const   *opt_files_path = NULL;
   bool          opt_help = false;
   unsigned      opt_version = 0;
   char *const   short_opts = make_short_opts( OPTIONS );
   int           tidy_argc;
   char const  **tidy_argv;
 
-  move_tidy_args( &argc, argv, &tidy_argc, &tidy_argv );
+  enum CXLanguageKind x_lang =
+    move_tidy_args( &argc, argv, &tidy_argc, &tidy_argv );
 
   opterr = 0;                           // suppress default error message
   for (;;) {
@@ -1185,6 +1261,9 @@ void cli_options_init( int argc, char const *argv[], array_t *rv_sources ) {
             optarg, get_opt_format( short_opt )
           );
         }
+        break;
+      case COPT(FILES):
+        opt_files_path = optarg;
         break;
       case COPT(HELP):
         opt_help = true;
@@ -1241,7 +1320,22 @@ void cli_options_init( int argc, char const *argv[], array_t *rv_sources ) {
   free( short_opts );
   check_options();
 
-  int const new_argc = get_sources( argc, argv, rv_sources );
+  if ( opt_directory != NULL ) {
+    //
+    // We must chdir() before reading from opt_files_path (if given) or using
+    // opt_compiler_path (if given).
+    //
+    if ( IS_VERBOSE( DIRECTORY ) ) {
+      verbose_section_begin( /*printed_header=*/NULL );
+      verbose_printf( "directory = \"%s\"\n", opt_directory );
+    }
+    if ( chdir( opt_directory ) != 0 )
+      fatal_error( EX_IOERR, "\"%s\": %s\n", opt_directory, STRERROR() );
+  }
+
+  int const new_argc = sources_from_argv( argc, argv, rv_sources );
+  if ( opt_files_path != NULL )
+    sources_from_file( opt_files_path, x_lang, rv_sources );
   sources_init_argv( rv_sources, new_argc, argv, opt_compiler_path );
 
   if ( IS_VERBOSE( ARGS ) ) {
@@ -1270,15 +1364,6 @@ void cli_options_init( int argc, char const *argv[], array_t *rv_sources ) {
   }
   if ( rv_sources->len == 0 )
     fatal_error( EX_USAGE, "no source files given\n" );
-
-  if ( opt_directory != NULL ) {
-    if ( IS_VERBOSE( DIRECTORY ) ) {
-      verbose_section_begin( /*printed_header=*/NULL );
-      verbose_printf( "directory = \"%s\"\n", opt_directory );
-    }
-    if ( chdir( opt_directory ) != 0 )
-      fatal_error( EX_IOERR, "\"%s\": %s\n", opt_directory, STRERROR() );
-  }
 }
 
 bool option_is_set( int short_opt ) {

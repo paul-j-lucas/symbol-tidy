@@ -31,6 +31,10 @@ test_symbol_tidy -Xtidy --error=X
 test_symbol_tidy -Xtidy -e
 test_symbol_tidy -Xtidy -eX
 
+test_symbol_tidy -Xtidy --file
+test_symbol_tidy -Xtidy --file=
+test_symbol_tidy -Xtidy -f
+
 test_symbol_tidy -Xtidy --verbose
 test_symbol_tidy -Xtidy --verbose=
 test_symbol_tidy -Xtidy --verbose=X

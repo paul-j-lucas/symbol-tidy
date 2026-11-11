@@ -4,4 +4,9 @@ test_symbol_tidy $TIDY_TEST_OPTIONS \
   $TIDY_TEST_CONFIG \
   c-cxx.cpp c-cxx.c c-cxx-main.cpp
 
+printf '%s\n' c-cxx.cpp c-cxx.c c-cxx-main.cpp | \
+test_symbol_tidy $TIDY_TEST_OPTIONS \
+  -Xtidy -f- \
+  $TIDY_TEST_CONFIG
+
 # vim:set syntax=bash et sw=2 ts=2:

@@ -35,6 +35,7 @@ ignore-symbols = [
   "OPT_DIRECTORY",
   "OPT_DEBUG",
   "OPT_ERROR",
+  "OPT_FILES",
   "OPT_HELP",
   "OPT_COLOR",
   "OPT_NO_CONFIG_LAYERS",
