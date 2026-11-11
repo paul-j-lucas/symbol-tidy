@@ -1,5 +1,18 @@
+2026-11-11  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * man/man1/symbol-tidy.1, cli_options.c, cli_options.h, lang.c, lang.h,
+     source.c, source.h, symbol-tidy.c, symbol-tidy.toml, util.h, c-cxx-1.txt,
+     c-cxx-2.txt, c-cxx-1.out, c-cxx-2.out, cli-compiler-no-include-end.out,
+     cli-compiler-no-include-start.out, cli-help.out, cli-options-error.out,
+     exception-used.out, c-cxx-1.test, c-cxx-2.test,
+     cli-compiler-no-include-end.test, cli-compiler-no-include-start.test,
+     cli-options-error.test, exception-used.test: Added -f/--files option.
+   * src/Makefile.am, cli_options.c, lang.h: Reworked file_ext into lang.
+
 2026-11-10  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * symbol.c: Don't need to check for TIDY_COMPILER_ID.
+   * man/man1/symbol-tidy.1: Updated.
    * maybe_unused.c, pjl_config.h: Better maybe_unused test.
    * clang_util.c: Now handling attributes in macros in different files.
    * symbol.c, symbol.h: Added tidy_loc.
