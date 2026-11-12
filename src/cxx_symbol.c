@@ -105,7 +105,6 @@ static bool cxx_type_ctors_param( CXType, char const*, unsigned );
 
 static void cxx_type_template_args_dtor_add_ref( CXType, symbols_visit_data* );
 static void print_statistics( void );
-static void str_set_insert( hash_table_t*, char const* );
 
 ////////// local variables ////////////////////////////////////////////////////
 
