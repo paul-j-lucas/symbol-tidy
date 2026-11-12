@@ -1080,8 +1080,8 @@ bool config_bool_value( config_bool *cb, char const *s ) {
 
   if ( s != NULL ) {
     bool_str find_bs = { .s = s };
-    ht_entry_t const *const entry
-      = ht_table_find( &cb->bool_str_set, &find_bs );
+    ht_entry_t const *const entry =
+      ht_table_find( &cb->bool_str_set, &find_bs );
     if ( entry != NULL ) {
       bool_str const *const found_bs = HT_DINT( entry );
       return found_bs->value;
