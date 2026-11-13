@@ -1,5 +1,11 @@
+2026-11-12  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * array.c: Added assert().
+
 2026-11-11  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * cxx_symbol.c, toml_lite.c: Removed unnecessary forwar definitions.
+   * man/man1/symbol-tidy.1: Updated.
    * man/man1/symbol-tidy.1, cli_options.c, cli_options.h, lang.c, lang.h,
      source.c, source.h, symbol-tidy.c, symbol-tidy.toml, util.h, c-cxx-1.txt,
      c-cxx-2.txt, c-cxx-1.out, c-cxx-2.out, cli-compiler-no-include-end.out,
