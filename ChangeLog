@@ -1,5 +1,6 @@
 2026-11-13  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * clang_util.c: Now checking functions' type's spelling for __attribute__.
    * config_file.c, cxx_symbol.c, fwd_dec.c, symbol.c, verbose.c, verbose.h:
      Added printing statistics functions.
    * man/man1/symbol-tidy.1, src/Makefile.am, array.c, array.h, clang_util.c,
