@@ -770,7 +770,59 @@ CXCursor tidy_Cursor_getUnderlyingTypeDecl( CXCursor cursor ) {
 }
 
 bool tidy_Cursor_hasAnyAttr( CXCursor cursor ) {
-  return clang_visitChildren( cursor, &hasAnyAttr_visitor, NULL ) != 0;
+  if ( clang_Cursor_hasAttrs( cursor ) &&
+       clang_visitChildren( cursor, &hasAnyAttr_visitor, NULL ) != 0 ) {
+    return true;
+  }
+
+  CXType const type = clang_getCursorType( cursor );
+  switch ( type.kind ) {
+    case CXType_FunctionNoProto:
+    case CXType_FunctionProto:
+      //
+      // In libclang, some attributes, e.g., noreturn, are absorbed into a
+      // function's type and have no attribute cursor, but they still appear in
+      // the type's spelling.  So, for functions only, look at the spelling of
+      // its type.
+      //
+      break;
+    default:
+      return false;
+  } // switch
+
+  //
+  // To complicate matters, the type's spelling includes paramters that may
+  // have their own attributes, e.g., the function 'f' has a parameter 'p'
+  // that's a pointer to no-return function taking char and returning int:
+  //
+  //      void f( int (*p)(char) __attribute__((noreturn)) )
+  //
+  // Hence, we have to scan the spelling ignoring everything inside parentheses
+  // since that belongs to parameter types. Only attributes outside parentheses
+  // matter.
+  //
+  bool              found_zero_depth_attr = false;
+  int               paren_depth = 0;
+  CXString const    type_cxs = clang_getTypeSpelling( type );
+  char const *const type_cs = clang_getCString( type_cxs );
+
+  for ( char const *s = type_cs; !found_zero_depth_attr && *s != '\0'; ++s ) {
+    switch ( *s ) {
+      case '(':
+        ++paren_depth;
+        break;
+      case ')':
+        --paren_depth;
+        break;
+      default:
+        if ( paren_depth == 0 && STRNCMPLIT( s, "__attribute__" ) == 0 )
+          found_zero_depth_attr = true;
+        break;
+    } // switch
+  } // for
+
+  clang_disposeString( type_cxs );
+  return found_zero_depth_attr;
 }
 
 bool tidy_Cursor_hasMaybeUnusedAttr( CXCursor cursor ) {
