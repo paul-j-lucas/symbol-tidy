@@ -106,7 +106,7 @@ struct fwd_statistics {
 
 static void         fwd_statistics_cleanup( fwd_statistics* );
 static void const*  ht_table_get_any( hash_table_t const* );
-static void         print_statistics( void );
+static void         print_statistics( verbose_stat_ctx* );
 
 ////////// local variables ////////////////////////////////////////////////////
 
@@ -339,23 +339,19 @@ static void const* ht_table_get_any( hash_table_t const *table ) {
 
 /**
  * Prints statistics for forward declarations.
+ *
+ * @param vsc The verbose_stat_ctx to use.
  */
-static void print_statistics( void ) {
-  verbose_printf(
-    "  forward declaration set:\n"
+static void print_statistics( verbose_stat_ctx *vsc ) {
+  verbose_statf( vsc, "forward declaration set:\n" );
+  verbose_statf( vsc,
+    "fds-max-load-factor = " TIDY_STAT_LF_FMT "\n", fwd_stats.max_lf
   );
-  verbose_printf(
-    "    fds-max-load-factor = " TIDY_STAT_LF_FMT "\n", fwd_stats.max_lf
+  verbose_statf( vsc,
+    "fds-max-load-factor-path \"%s\"\n", fwd_stats.max_lf_path
   );
-  verbose_printf(
-    "    fds-max-load-factor-path \"%s\"\n", fwd_stats.max_lf_path
-  );
-  verbose_printf(
-    "    fds-max-size = %zu\n", fwd_stats.max_size
-  );
-  verbose_printf(
-    "    fds-max-size-path \"%s\"\n", fwd_stats.max_size_path
-  );
+  verbose_statf( vsc, "fds-max-size = %zu\n", fwd_stats.max_size );
+  verbose_statf( vsc, "fds-max-size-path \"%s\"\n", fwd_stats.max_size_path );
 }
 
 ////////// extern functions ///////////////////////////////////////////////////

@@ -176,7 +176,7 @@ static void   ignore_paths_parse_string( config_parse_fn_args const* );
 static void   ignore_symbol_cleanup( ignore_symbol* );
 static void   ignore_symbols_parse( config_parse_fn_args const* );
 static void   ignore_symbols_parse_string( config_parse_fn_args const* );
-static void   print_statistics( void );
+static void   print_statistics( verbose_stat_ctx* );
 static void   print_invalid_value( config_parse_fn_args const*,
                                    toml_value const*, toml_type );
 
@@ -1006,29 +1006,23 @@ static void print_invalid_value( config_parse_fn_args const *config,
 
 /**
  * Prints statistics if requested.
+ *
+ * @param vsc The verbose_stat_ctx to use.
  */
-static void print_statistics( void ) {
-  verbose_printf(
-    "  ignore-path set:\n"
+static void print_statistics( verbose_stat_ctx *vsc ) {
+  verbose_statf( vsc, "ignore-path set:\n" );
+  verbose_statf( vsc,
+    "ips-load-factor = " TIDY_STAT_LF_FMT "\n",
+    ht_table_load_factor( &ignore_path_set )
   );
-  verbose_printf(
-    "    ips-load-factor = " TIDY_STAT_LF_FMT "\n",
-                           ht_table_load_factor( &ignore_path_set )
-  );
-  verbose_printf(
-    "    ips-size = %u\n", ignore_path_set.size
-  );
+  verbose_statf( vsc, "ips-size = %u\n", ignore_path_set.size );
 
-  verbose_printf(
-    "  ignored-symbol set:\n"
+  verbose_statf( vsc, "ignored-symbol set:\n" );
+  verbose_statf( vsc,
+    "iss-load-factor = " TIDY_STAT_LF_FMT "\n",
+    ht_table_load_factor( &ignore_symbol_set )
   );
-  verbose_printf(
-    "    iss-load-factor = " TIDY_STAT_LF_FMT "\n",
-                           ht_table_load_factor( &ignore_symbol_set )
-  );
-  verbose_printf(
-    "    iss-size = %u\n", ignore_symbol_set.size
-  );
+  verbose_statf( vsc, "iss-size = %u\n", ignore_symbol_set.size );
 }
 
 /**

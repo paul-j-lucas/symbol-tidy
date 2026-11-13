@@ -784,10 +784,12 @@ CXCursor macro_Token_getScopedNameCursor( CXTranslationUnit tu,
  * Prints statistics for a hash table that has the maximum load factor among
  * all symbols.
  *
+ * @param vsc The verbose_stat_ctx to use.
  * @param mbr_off The offset of the hash table (from `offsetof`).
  * @param abbr The abbreviation to use.
  */
-static void print_max_lf_stats( size_t mbr_off, char const *abbr ) {
+static void print_max_lf_stats( verbose_stat_ctx *vsc, size_t mbr_off,
+                                char const *abbr ) {
   tidy_symbol const *max_sym = NULL;
   double max_lf = -1.0;
 
@@ -806,62 +808,47 @@ static void print_max_lf_stats( size_t mbr_off, char const *abbr ) {
     }
   } // for
 
-  if ( max_sym != NULL ) {
-    verbose_printf(
-      "    %s-max-load-factor:\n", abbr
-    );
-    verbose_printf(
-      "      %s-name = \"%s\"\n", abbr, symbol_name_for_print( max_sym )
-    );
-    if ( max_sym->loc.path != NULL ) {
-      verbose_printf(
-        "      %s-path = \"%s\"\n", abbr, max_sym->loc.path
-      );
-    }
-    verbose_printf(
-      "      %s-load-factor = " TIDY_STAT_LF_FMT "\n", abbr, max_lf
-    );
-    verbose_printf(
-      "      %s-size = %u\n", abbr, max_sym->ref_sym_set.size
-    );
-  }
+  if ( max_sym == NULL )
+    return;
+
+  ++vsc->indent;
+  verbose_statf( vsc, "%s-max-load-factor:\n", abbr );
+  verbose_statf( vsc,
+    "%s-name = \"%s\"\n", abbr, symbol_name_for_print( max_sym )
+  );
+  if ( max_sym->loc.path != NULL )
+    verbose_statf( vsc, "%s-path = \"%s\"\n", abbr, max_sym->loc.path );
+  verbose_statf( vsc, "%s-load-factor = " TIDY_STAT_LF_FMT "\n", abbr, max_lf );
+  verbose_statf( vsc, "%s-size = %u\n", abbr, max_sym->ref_sym_set.size );
+  --vsc->indent;
 }
 
 /**
  * Prints statistics for symbols if requested.
+ *
+ * @param vsc The verbose_stat_ctx to use.
  */
-static void print_statistics( void ) {
-  verbose_printf(
-    "  header set:\n"
+static void print_statistics( verbose_stat_ctx *vsc ) {
+  verbose_statf( vsc, "header set:\n" );
+  verbose_statf( vsc,
+    "hs-load-factor = " TIDY_STAT_LF_FMT "\n",
+    ht_table_load_factor( &header_set )
   );
-  verbose_printf(
-    "    hs-load-factor = " TIDY_STAT_LF_FMT "\n",
-                          ht_table_load_factor( &header_set )
-  );
-  verbose_printf(
-    "    hs-size = %u\n", header_set.size
-  );
+  verbose_statf( vsc, "hs-size = %u\n", header_set.size );
+  verbose_statf( vsc, "hs-revisit-count = %u\n", header_stats.revisit_count );
+  verbose_statf( vsc, "hs-skipped-count = %'u\n", header_stats.skipped_count );
 
-  verbose_printf(
-    "    hs-revisit-count = %u\n", header_stats.revisit_count
+  verbose_statf( vsc, "symbol set:\n" );
+  verbose_statf( vsc,
+    "ss-load-factor = " TIDY_STAT_LF_FMT "\n",
+    ht_table_load_factor( &tidy_symbol_set )
   );
-  verbose_printf(
-    "    hs-skipped-count = %'u\n", header_stats.skipped_count
-  );
+  verbose_statf( vsc, "ss-size = %u\n", tidy_symbol_set.size );
 
-  verbose_printf(
-    "  symbol set:\n"
+  print_max_lf_stats( vsc, offsetof( tidy_symbol, ref_sym_set ), "ss-rss" );
+  print_max_lf_stats( vsc,
+    offsetof( tidy_symbol, cxx_adl_usr_set ), "ss-adlus"
   );
-  verbose_printf(
-    "    ss-load-factor = " TIDY_STAT_LF_FMT "\n",
-                          ht_table_load_factor( &tidy_symbol_set )
-  );
-  verbose_printf(
-    "    ss-size = %u\n", tidy_symbol_set.size
-  );
-
-  print_max_lf_stats( offsetof( tidy_symbol, ref_sym_set ), "ss-rss" );
-  print_max_lf_stats( offsetof( tidy_symbol, cxx_adl_usr_set ), "ss-adlus" );
 }
 
 /**

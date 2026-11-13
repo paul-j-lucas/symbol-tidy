@@ -319,7 +319,7 @@ int verbose_printf( char const *format, ... ) {
   return raw_len;
 }
 
-void verbose_print_statistics( void (*print_fn)( void ) ) {
+void verbose_print_statistics( void (*print_fn)( verbose_stat_ctx* ) ) {
   if ( !IS_VERBOSE( STATISTICS ) )
     return;
 
@@ -331,7 +331,8 @@ void verbose_print_statistics( void (*print_fn)( void ) ) {
 
   locale_t loc = newlocale( LC_NUMERIC_MASK, /*locale=*/"", /*base=*/NULL );
   locale_t const prev_loc = uselocale( loc );
-  (*print_fn)();
+  verbose_stat_ctx vsc = { 0 };
+  (*print_fn)( &vsc );
   uselocale( prev_loc );
   freelocale( loc );
 }
@@ -343,6 +344,26 @@ bool verbose_section_begin( bool *printed_header ) {
   if ( true_or_set( &print_blank_line ) )
     verbose_printf( "\n" );
   return true;
+}
+
+void verbose_statf( verbose_stat_ctx *vsc, char const *format, ... ) {
+  PUTS( "// tidy | " );
+
+  char const *const colon = strrchr( format, ':' );
+  bool const        is_header = colon != NULL && colon[1] == '\n';
+
+  if ( is_header && vsc->indent > 0 )
+    --vsc->indent;
+
+  FPUTNSP( (vsc->indent + 1) * 2, stdout );
+
+  va_list args;
+  va_start( args, format );
+  vprintf( format, args );
+  va_end( args );
+
+  if ( is_header )
+    ++vsc->indent;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

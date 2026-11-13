@@ -104,7 +104,7 @@ NODISCARD
 static bool cxx_type_ctors_param( CXType, char const*, unsigned );
 
 static void cxx_type_template_args_dtor_add_ref( CXType, symbols_visit_data* );
-static void print_statistics( void );
+static void print_statistics( verbose_stat_ctx* );
 
 ////////// local variables ////////////////////////////////////////////////////
 
@@ -762,29 +762,23 @@ static void cxx_type_template_args_dtor_add_ref( CXType type,
 
 /**
  * Prints statistics for C++ ADL hash tables if requested.
+ *
+ * @param vsc The verbose_stat_ctx to use.
  */
-static void print_statistics( void ) {
-  verbose_printf(
-    "  adl-name set:\n"
+static void print_statistics( verbose_stat_ctx *vsc ) {
+  verbose_statf( vsc, "adl-name set:\n" );
+  verbose_statf( vsc,
+    "adl-ns-load-factor = " TIDY_STAT_LF_FMT "\n",
+    ht_table_load_factor( &cxx_adl_name_set )
   );
-  verbose_printf(
-    "    adl-ns-load-factor = " TIDY_STAT_LF_FMT "\n",
-                              ht_table_load_factor( &cxx_adl_name_set )
-  );
-  verbose_printf(
-    "    adl-ns-size = %u\n", cxx_adl_name_set.size
-  );
+  verbose_statf( vsc, "adl-ns-size = %u\n", cxx_adl_name_set.size );
 
-  verbose_printf(
-    "  adl-type set:\n"
+  verbose_statf( vsc, "adl-type set:\n" );
+  verbose_statf( vsc,
+    "adl-ts-load-factor = " TIDY_STAT_LF_FMT "\n",
+    ht_table_load_factor( &cxx_adl_type_set )
   );
-  verbose_printf(
-    "    adl-ts-load-factor = " TIDY_STAT_LF_FMT "\n",
-                              ht_table_load_factor( &cxx_adl_type_set )
-  );
-  verbose_printf(
-    "    adl-ts-size = %u\n", cxx_adl_type_set.size
-  );
+  verbose_statf( vsc, "adl-ts-size = %u\n", cxx_adl_type_set.size );
 }
 
 /**
