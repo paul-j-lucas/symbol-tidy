@@ -1,6 +1,7 @@
 #include <exception>
 
-void f();
+void f() {
+}
 
 int main() {
   f();

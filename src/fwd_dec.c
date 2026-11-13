@@ -187,9 +187,14 @@ static fnv1a_t fwd_dec_hash( fwd_dec const *fwd ) {
 /**
  * Gets whether \a fwd is a necessary forward declaration.
  *
- * @remarks A forward declaration is necessary if a function is defined in the
- * same translation unit and is referenced between the declaration and its
- * definition.
+ * @remarks
+ * @parblock
+ * A forward declaration is necessary if the function is referenced and either:
+ *
+ *  + The reference is before its definition; or:
+ *  + Isn’t defined in this translation unit.
+ *
+ * @endparblock
  *
  * @note A function with internal linkage and no references at all is _not_
  * reported since it will be reported as an unused symbol.
@@ -207,7 +212,7 @@ static bool fwd_dec_is_necessary( fwd_dec const *fwd ) {
       //
       // Nothing references it, so the declaration is unnecessary.
       //
-      return true;
+      return false;
     }
     else {
       //
@@ -217,7 +222,7 @@ static bool fwd_dec_is_necessary( fwd_dec const *fwd ) {
       // another translation unit; for one with internal linkage, the missing
       // definition is a link-time error.
       //
-      return false;
+      return true;
     }
   }
 
