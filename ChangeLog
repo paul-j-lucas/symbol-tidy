@@ -1,5 +1,12 @@
+2026-11-13  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * man/man1/symbol-tidy.1, src/Makefile.am, array.c, array.h, clang_util.c,
+     clang_util.h, fwd_dec.c, fwd_dec.h, symbol-tidy.c, symbol.c, symbol.h:
+     Added ability to detect unnecessary function forward declarations.
+
 2026-11-12  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * symbol-tidy.c: Exit status more inline with include-tidy.
    * array.c: Added assert().
 
 2026-11-11  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
