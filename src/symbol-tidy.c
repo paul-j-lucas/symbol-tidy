@@ -48,8 +48,8 @@
  * **include-tidy**-specific exit status codes.
  */
 enum {
-  TIDY_EX_UNUSED          = 1,    ///< One or more unused symbols.
-  TIDY_EX_NO_UNUSED_ERROR = 2     ///< No unused symbols, but error anyway.
+  TIDY_EX_VIOLATIONS          = 1,      ///< One or more violations.
+  TIDY_EX_NO_VIOLATIONS_ERROR = 2       ///< No violations, but error anyway.
 };
 
 ////////// extern variables ///////////////////////////////////////////////////
@@ -91,9 +91,9 @@ NODISCARD
 static int tidy_status( unsigned unused_symbols ) {
   if ( opt_error != TIDY_ERROR_NEVER ) {
     if ( unused_symbols > 0 )
-      return TIDY_EX_UNUSED;
+      return TIDY_EX_VIOLATIONS;
     if ( opt_error == TIDY_ERROR_ALWAYS )
-      return TIDY_EX_NO_UNUSED_ERROR;
+      return TIDY_EX_NO_VIOLATIONS_ERROR;
   }
   return EX_OK;
 }
