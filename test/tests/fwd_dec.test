@@ -4,4 +4,8 @@ test_symbol_tidy $TIDY_TEST_OPTIONS \
   $TIDY_TEST_CONFIG \
   fwd_dec.c
 
+test_symbol_tidy $TIDY_TEST_CXXFLAGS $TIDY_TEST_OPTIONS \
+  $TIDY_TEST_CONFIG \
+  fwd_dec.cpp
+
 # vim:set syntax=bash et sw=2 ts=2:
