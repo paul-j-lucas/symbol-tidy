@@ -1,5 +1,5 @@
 $ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers fwd_dec.c
-"fwd_dec.c": warning: unnecessary forward declarations:
+"fwd_dec.c": warning: unnecessary declarations:
     2,13 | "unnecessary_plain"
     8,13 | "unnecessary_attr" (move attributes to definition at line 9)
    12,12 | "unnecessary_recursive"

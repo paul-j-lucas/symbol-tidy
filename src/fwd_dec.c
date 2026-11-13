@@ -481,7 +481,7 @@ unsigned fwd_decs_print_unnecessary( tidy_source const *source ) {
   color_start( stderr, sgr_warning );
   EPUTS( "warning" );
   color_end( stderr, sgr_warning );
-  EPUTS( ": unnecessary forward declarations:\n" );
+  EPUTS( ": unnecessary declarations:\n" );
 
   for ( size_t i = 0; i < fwd_array.len; ++i ) {
     fwd = array_at_nc( &fwd_array, i );
