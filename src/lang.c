@@ -54,7 +54,7 @@ typedef struct lang_map lang_map;
 ////////// structs ////////////////////////////////////////////////////////////
 
 /**
- * A source file extension and the language it corresponds to.
+ * A source file extension or name and the language either corresponds to.
  */
 struct lang_map {
   union {

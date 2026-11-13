@@ -36,27 +36,27 @@
 #include <stdbool.h>
 
 /**
- * @defgroup tidy-lang-group File Extensions
- * A structure and functions for supported C/C++ filename extensions.
+ * @defgroup tidy-lang-group Languages
+ * Functions parsing strings into languages.
  * @{
  */
 
 ////////// extern functions ///////////////////////////////////////////////////
 
 /**
- * Attempts to find \a ext among the set of supported C/C++ file extensions.
+ * Gets the language corresponding to \a ext.
  *
- * @param ext A filename extension (without the dot).
- * @return Returns the corresponding language if found or `CXLanguage_Invalid`
- * if not.
+ * @param ext A case-insensitive source filename extension (without the dot).
+ * @return Returns the language corresponding to \a ext if found or
+ * `CXLanguage_Invalid` if not.
  */
 NODISCARD
 enum CXLanguageKind lang_parse_ext( char const *ext );
 
 /**
- * Attempts to find \name among the set of supported language names.
+ * Gets the language corresponding to \a name.
  *
- * @param name The name to parse.  Must be one of `"c"`, `"c++"`, or `"none"`.
+ * @param name The language name.  Must be one of `"c"`, `"c++"`, or `"none"`.
  * @param rv_lang If not NULL, receives the language corresponding to \a name.
  * @return Returns `true` only if \a name is valid.
  */
