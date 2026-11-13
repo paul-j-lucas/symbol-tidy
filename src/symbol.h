@@ -187,6 +187,27 @@ struct symbols_visit_data {
   tidy_symbol        *curr_sym;         ///< Current symbol, if any.
 
   /**
+   * A unique ID for every non-standard-header cursor visited by
+   * symbols_visitor() restarting at 1 for every translation unit.
+   *
+   * @remarks Unlike cursors' offsets that are comparable only within a single
+   * file, this visit ID gives a total ordering that is comparable across an
+   * entire translation unit.
+   *
+   * @note This relies on clang_visitChildren() visiting cursors in source code
+   * order (including `#include`d files).
+   *
+   * @note It is currently used only for detecting unnecessary forward
+   * declarations, specifically whether one cursor comes before another, e.g.,
+   * whether a function is referenced before its definition.
+   *
+   * @sa fwd_decl_maybe_unnecessary()
+   * @sa fwd_decl_visit_def()
+   * @sa fwd_decl_visit_ref()
+   */
+  unsigned            visit_id;
+
+  /**
    * Mini file_previously_seen() result cache that allows cursors from header
    * files we've already visited to be skipped.
    */
@@ -294,8 +315,9 @@ unsigned symbols_print_unused( void );
  * Visits all symbols in \a source.
  *
  * @param source The source file to visit.
+ * @return Returns the number of unnecessary forward declarations for \a source.
  */
-void symbols_visit( tidy_source *source );
+unsigned symbols_visit( tidy_source *source );
 
 ////////// extern variables ///////////////////////////////////////////////////
 

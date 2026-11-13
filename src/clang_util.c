@@ -471,6 +471,26 @@ skip:
 }
 
 /**
+ * A helper function for tidy_Cursor_hasAnyAttr() that breaks on the first
+ * attribute.
+ *
+ * @param cursor The cursor being visited.
+ * @param parent Not used.
+ * @param data Not used.
+ * @return Returns `CXChildVisit_Break` if \a cursor is an attribute; otherwise
+ * returns `CXChildVisit_Continue`.
+ */
+static enum CXChildVisitResult hasAnyAttr_visitor( CXCursor cursor,
+                                                   CXCursor parent,
+                                                   CXClientData data ) {
+  (void)parent;
+  (void)data;
+
+  enum CXCursorKind const kind = clang_getCursorKind( cursor );
+  return clang_isAttribute( kind ) ? CXChildVisit_Break : CXChildVisit_Continue;
+}
+
+/**
  * A helper function for tidy_Cursor_hasMaybeUnusedAttr() that looks for a
  * "maybe unused" attribute.
  *
@@ -612,6 +632,19 @@ bool tidy_Cursor_callsBaseConstructor( CXCursor ctor_csr,
   return cbcd.explicitly_calls_base_ctor;
 }
 
+char* tidy_Cursor_dupFileName( CXCursor cursor ) {
+  if ( tidy_Cursor_isInvalid( cursor ) )
+    return NULL;
+
+  CXFile const      file = tidy_getCursorLocation_File( cursor );
+  CXString const    path_cxs = clang_getFileName( file );
+  char const *const path_cs = clang_getCString( path_cxs );
+  char *const       rv_path = strdup_or_exit( path_cs );
+
+  clang_disposeString( path_cxs );
+  return rv_path;
+}
+
 CXCursor tidy_Cursor_getBaseSpecifierClass( CXCursor spec_csr ) {
   CXCursor cls_csr = clang_getCursorReferenced( spec_csr );
   if ( !tidy_Cursor_isClassDecl( cls_csr ) ) {
@@ -736,6 +769,10 @@ CXCursor tidy_Cursor_getUnderlyingTypeDecl( CXCursor cursor ) {
   return tidy_getCursorDefinition( cursor );
 }
 
+bool tidy_Cursor_hasAnyAttr( CXCursor cursor ) {
+  return clang_visitChildren( cursor, &hasAnyAttr_visitor, NULL ) != 0;
+}
+
 bool tidy_Cursor_hasMaybeUnusedAttr( CXCursor cursor ) {
   return  clang_Cursor_hasAttrs( cursor ) &&
           clang_visitChildren( cursor, &hasMaybeUnusedAttr_visitor, NULL ) != 0;
@@ -756,6 +793,19 @@ bool tidy_Cursor_inAnonymousClass( CXCursor cursor ) {
   return false;
 }
 
+bool tidy_Cursor_inFileScope( CXCursor cursor ) {
+  CXCursor const parent_csr = clang_getCursorLexicalParent( cursor );
+  enum CXCursorKind const kind = clang_getCursorKind( parent_csr );
+  switch ( kind ) {
+    case CXCursor_LinkageSpec:
+    case CXCursor_Namespace:
+    case CXCursor_TranslationUnit:
+      return true;
+    default:
+      return false;
+  } // switch
+}
+
 bool tidy_Cursor_inFunctionScope( CXCursor cursor ) {
   cursor = clang_getCursorSemanticParent( cursor );
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
@@ -770,6 +820,40 @@ bool tidy_Cursor_inFunctionScope( CXCursor cursor ) {
     default:
       return false;
   } // switch
+}
+
+bool tidy_Cursor_inLinkageSpec( CXCursor cursor ) {
+  CXCursor parent_csr = clang_getCursorLexicalParent( cursor );
+  for (;;) {
+    enum CXCursorKind const kind = clang_getCursorKind( parent_csr );
+    switch ( kind ) {
+      case CXCursor_LinkageSpec:
+        return true;
+      case CXCursor_Namespace:
+        parent_csr = clang_getCursorLexicalParent( parent_csr );
+        break;
+      default:
+        return false;
+    } // switch
+  } // for
+}
+
+bool tidy_Cursor_inMacro( CXCursor cursor ) {
+  CXSourceLocation const loc = clang_getCursorLocation( cursor );
+
+  CXFile    spell_file, exp_file;
+  unsigned  spell_line, spell_col, exp_line, exp_col;
+
+  clang_getSpellingLocation(
+    loc, &spell_file, &spell_line, &spell_col, /*offset=*/NULL
+  );
+  clang_getExpansionLocation(
+    loc, &exp_file, &exp_line, &exp_col, /*offset=*/NULL
+  );
+
+  return spell_file != exp_file ||
+         spell_line != exp_line ||
+         spell_col  != exp_col;
 }
 
 bool tidy_Cursor_isClassDecl( CXCursor cursor ) {

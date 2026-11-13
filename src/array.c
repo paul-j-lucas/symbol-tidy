@@ -51,21 +51,28 @@
 ////////// extern functions ///////////////////////////////////////////////////
 
 void array_cleanup( array_t *restrict array, array_free_fn_t free_fn ) {
-  if ( array == NULL || array->elements == NULL )
+  if ( array != NULL ) {
+    array_clear( array, free_fn );
+    free( array->elements );
+    array_init( array, array->esize );
+  }
+}
+
+void array_clear( array_t *restrict array, array_free_fn_t free_fn ) {
+  if ( array == NULL || array->len == 0 )
     return;
 
-  // Force hoist of array-> out of loop.
-  char *const   elements = array->elements;
-  size_t const  esize = array->esize;
-
   if ( free_fn != NULL ) {
+    // Force hoist of array-> out of loop.
+    char *const       elements = array->elements;
+    size_t const      esize = array->esize;
     char const *const end = elements + array->len * esize;
+
     for ( char *element = elements; element < end; element += esize )
       (*free_fn)( element );
   }
 
-  free( elements );
-  array_init( array, esize );
+  array->len = 0;
 }
 
 void* array_insert( array_t *restrict array, size_t index, size_t n ) {

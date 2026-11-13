@@ -35,7 +35,7 @@
 .if !'\\$1'0' .sp
 ..
 .\" ---------------------------------------------------------------------------
-.TH \f3symbol-tidy\fP 1 "November 11, 2026" "PJL TOOLS"
+.TH \f3symbol-tidy\fP 1 "November 12, 2026" "PJL TOOLS"
 .SH NAME
 symbol-tidy \(em Symbol tidier
 .SH SYNOPSIS
@@ -56,15 +56,24 @@ or C++
 source files
 comprising an entire
 program or library
-by reporting
-unused symbols,
+by reporting:
+.IP \(bu 3
+Unused symbols,
 specifically unused
+functions,
 labels,
 macros,
-functions,
+parameters,
 types,
 and
 variables.
+.IP \(bu
+Unnecessary forward function declarations.
+.PP
+Any source file that has either
+an unused symbol
+or an unnecessary forward declaration
+is in ``violation.''
 .SS General Use
 .B symbol-tidy
 should be run
@@ -75,7 +84,7 @@ with a C or C++ compiler first.
 will still be reported,
 but the error messages
 may not be as detailed
-as those from a regular compiler.)
+as those from a compiler.)
 .P
 .I All
 source files
@@ -153,7 +162,7 @@ prints each source file's name;
 causes
 .B symbol-tidy
 always to exit with a zero status
-even with unused symbols so
+even for violations so
 .B make
 doesn't think anything went wrong.
 (See the
@@ -340,7 +349,7 @@ The choices for
 .I s
 are:
 .RS 6
-.TP 8
+.TP 12
 .PD 0
 .B always
 Always exit with non-zero.
@@ -348,8 +357,8 @@ Always exit with non-zero.
 .B never
 Always exit with zero.
 .TP
-.B unused
-Exit with non-zero only when there are unused symbols.
+.B violations
+Exit with non-zero only when violations.
 .RE
 .PD
 .IP
@@ -362,7 +371,7 @@ doesn't think anything went wrong.
 (See
 .BR "Use with Make" .)
 The default is
-.BR unused .
+.BR violations .
 .TP
 .BI \-\-files \f1=\fPf "\f1 | \fP" "" \-f " f"
 Reads paths of source files to tidy from file
@@ -412,7 +421,7 @@ option.
 .B f
 Name of
 .I source-file
-only if it has unused symbols.
+only if in violation.
 .TP
 .B F
 Name of
@@ -653,15 +662,15 @@ file.
 .BI ignore-as-argument " \f1=\fP b"
 If true,
 the file given for the table name
-is not checked for unused symbols
+is not checked for violations
 when given as
 .IR source-file .
 .IP
 This allows there to be files
 you don't control
 (third-party or generated)
-present and not check them for unused symbols
-yet still use \f(CW*.c\fP.
+present and not check them for violations
+yet still use \f(CW*.c\fP with shell.
 (See
 .B Use with Make
 above.)
@@ -856,13 +865,13 @@ and you don't want them reported as unused.
 .SH EXIT STATUS
 .PD 0
 .IP 0
-No unused symbols or the
+No violations or the
 .B \-\-error=never
 option was given.
 .IP 1
-One or more unused symbols.
+One or more violations.
 .IP 2
-No unused symbols, but the
+No violations, but the
 .B \-\-error=always
 option was given.
 .IP 64

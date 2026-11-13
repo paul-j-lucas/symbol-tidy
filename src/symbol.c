@@ -32,6 +32,7 @@
 #include "config_file.h"
 #include "cxx_symbol.h"
 #include "fnv1a.h"
+#include "fwd_dec.h"
 #include "hash_table.h"
 #include "options.h"
 #include "path_util.h"
@@ -87,11 +88,6 @@ struct tidy_header_stats {
 };
 
 ////////// local functions ////////////////////////////////////////////////////
-
-NODISCARD
-static int  symbol_cmp( tidy_symbol const*, tidy_symbol const* );
-
-static void symbol_cleanup( tidy_symbol* );
 
 static void visit_Constructor( CXCursor, symbols_visit_data* );
 static void visit_CXXDeleteExpr( CXCursor, symbols_visit_data* );
@@ -538,6 +534,10 @@ static void cursor_visit_ref( CXCursor cursor, symbols_visit_data *svd ) {
 
     case CXCursor_CXXNewExpr:
       visit_CXXNewExpr( cursor, svd );
+      break;
+
+    case CXCursor_FunctionDecl:
+      fwd_dec_maybe_unnecessary( cursor, svd );
       break;
 
     case CXCursor_OverloadedDeclRef:
@@ -1145,6 +1145,8 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
     }
   }
   else {
+    ++svd->visit_id;
+
     if ( IS_VERBOSE( CURSORS ) )
       verbose_print_cursor( cursor );   // LCOV_EXCL_LINE
 
@@ -1551,6 +1553,8 @@ static void visit_FieldDecl( CXCursor field_csr, symbols_visit_data *svd ) {
 static void visit_FunctionDecl( CXCursor fn_csr, symbols_visit_data *svd ) {
   assert( svd != NULL );
 
+  fwd_dec_visit_def( fn_csr, svd );
+
   if ( svd->source->lang != CXLanguage_CPlusPlus || svd->curr_sym == NULL )
     return;
 
@@ -1642,6 +1646,8 @@ static void visit_most_Ref( CXCursor cursor, symbols_visit_data *svd ) {
     return;
   }
 
+  fwd_dec_visit_ref( ref_csr, svd );
+
   tidy_symbol *const ref_sym = symbol_add( ref_csr, svd->source );
   if ( ref_sym != NULL ) {
     symbol_add_ref( svd->curr_sym, ref_sym );
@@ -1685,6 +1691,7 @@ static void visit_OverloadedDeclRef( CXCursor overloaded_csr,
     if ( tidy_Cursor_isInvalid( dec_csr ) )
       continue;                         // LCOV_EXCL_LINE
     dec_csr = clang_getCanonicalCursor( dec_csr );
+    fwd_dec_visit_ref( dec_csr, svd );
     cursor_add_ref( dec_csr, svd );
   } // for
 }
@@ -1881,6 +1888,7 @@ void symbols_init( void ) {
     POINTER_CAST( ht_hash_fn_t, &symbol_hash )
   );
   cxx_symbols_init();
+  fwd_decs_init();
   ATEXIT( &symbols_cleanup );
 }
 
@@ -1956,15 +1964,10 @@ unsigned symbols_print_unused( void ) {
   } // for
 
   array_cleanup( &symbol_array, /*free_fn=*/NULL );
-
-  EPRINTF(
-    "%s: %u unused symbol%s\n",
-    prog_name, unused_count, plural_s( unused_count )
-  );
   return unused_count;
 }
 
-void symbols_visit( tidy_source *source ) {
+unsigned symbols_visit( tidy_source *source ) {
   symbols_visit_data svd = {
     .source = source,
     .cxx_constructor = {
@@ -1978,6 +1981,7 @@ void symbols_visit( tidy_source *source ) {
   };
   CXCursor const cursor = clang_getTranslationUnitCursor( source->tu );
   clang_visitChildren( cursor, &symbols_visitor, &svd );
+  return fwd_decs_print_unnecessary( source );
 }
 
 ///////////////////////////////////////////////////////////////////////////////

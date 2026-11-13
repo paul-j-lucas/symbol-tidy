@@ -77,6 +77,17 @@ bool tidy_Cursor_callsBaseConstructor( CXCursor ctor_csr,
                                        CXCursor base_cls_csr );
 
 /**
+ * Gets a copy of the path of the file \a cursor is in.
+ *
+ * @param cursor The cursor to get the file name of.
+ * @return Returns a copy of \a cursor's file's path.
+ *
+ * @note The caller is responsible for freeing the returned string.
+ */
+NODISCARD
+char* tidy_Cursor_dupFileName( CXCursor cursor );
+
+/**
  * Gets the cursor for the class that a `CXXBaseSpecifier` cursor specifies,
  * seeing through type aliases and alias templates.
  *
@@ -181,11 +192,25 @@ NODISCARD
 CXCursor tidy_Cursor_getUnderlyingTypeDecl( CXCursor cursor );
 
 /**
+ * Gets whether \a cursor has any attributes, e.g., `[[noreturn]]` or
+ * `__attribute__`.
+ *
+ * @param cursor The cursor to check.
+ * @return Returns `true` only if \a cursor has an attribute.
+ *
+ * @sa tidy_Cursor_hasMaybeUnusedAttr()
+ */
+NODISCARD
+bool tidy_Cursor_hasAnyAttr( CXCursor cursor );
+
+/**
  * Gets whether \a cursor has a `[[maybe_unused]]` (or equivalent) attribute.
  *
  * @param cursor The cursor to theck.
  * @return Returns `true` only if \a cursor has a `[[maybe_unused]]` (or
  * equivalent) attribute.
+ *
+ * @sa tidy_Cursor_hasAnyAttr()
  */
 NODISCARD
 bool tidy_Cursor_hasMaybeUnusedAttr( CXCursor cursor );
@@ -201,6 +226,16 @@ NODISCARD
 bool tidy_Cursor_inAnonymousClass( CXCursor cursor );
 
 /**
+ * Gets whether \a cursor is lexically at file or namespace scope, i.e., not a
+ * class member, friend, or block-scope declaration.
+ *
+ * @param cursor The cursor to check.
+ * @return Returns `true` only if \a cursor is at file or namespace scope.
+ */
+NODISCARD
+bool tidy_Cursor_inFileScope( CXCursor cursor );
+
+/**
  * Gets whether \a cursor is within a function.
  *
  * @param cursor The cursor to check.
@@ -208,6 +243,30 @@ bool tidy_Cursor_inAnonymousClass( CXCursor cursor );
  */
 NODISCARD
 bool tidy_Cursor_inFunctionScope( CXCursor cursor );
+
+/**
+ * Gets whether \a csr is lexically inside a linkage specification, e.g.,
+ * `extern "C"`.
+ *
+ * @remarks Namespaces are looked through.  The language of the linkage
+ * specification isn't inspected.
+ *
+ * @param cursor The cursor to check.
+ * @return Returns `true` only if \a csr is lexically inside a linkage
+ * specification.
+ */
+NODISCARD
+bool tidy_Cursor_inLinkageSpec( CXCursor cursor );
+
+/**
+ * Gets whether \a cursor was written by a macro expansion.
+ *
+ * @param cursor The cursor to check.
+ * @return Returns `true` only if \a cursor's spelling and expansion locations
+ * differ.
+ */
+NODISCARD
+bool tidy_Cursor_inMacro( CXCursor cursor );
 
 /**
  * Gets whether \a cursor is a class, class template, structure, or union.

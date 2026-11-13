@@ -193,10 +193,26 @@ struct array {
  * @warning \a free_fn must _not_ modify \a array.
  * @note If \a free_fn is NULL, this is an O(1) operation; otherwise O(N).
  *
+ * @sa array_clear()
  * @sa array_init()
  * @sa #ARRAY_INIT()
  */
 void array_cleanup( array_t *restrict array, array_free_fn_t free_fn );
+
+/**
+ * Clears \a array by setting its \ref array::len "length" to zero, but keeps
+ * the memory allocated for its elements for re-use.
+ *
+ * @param array The array to clear.  If NULL, does nothing.
+ * @param free_fn A pointer to a function used to free each element or NULL if
+ * unnecessary.
+ *
+ * @warning \a free_fn must _not_ modify \a array.
+ * @note If \a free_fn is NULL, this is an O(1) operation; otherwise O(N).
+ *
+ * @sa array_cleanup()
+ */
+void array_clear( array_t *restrict array, array_free_fn_t free_fn );
 
 /**
  * Pushes the elements of \a src_array onto the back of \a dst_array.

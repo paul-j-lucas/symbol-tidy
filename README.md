@@ -5,21 +5,27 @@ STAY TUNED.
 
 ## Introduction
 
-Most C and C++ compilers can warn only when a parameter
-or `static` variable or function
+Most C and C++ compilers can warn only when
+a `static` variable or function,
+a parameter,
+or label
 is unused
 within a single source file.
 
 **symbol-tidy** (Tidy) is a command-line tool
 that allows you to tidy-up symbols
 in a set of either C or C++ source files
-comprising a program,
-specifically:
+comprising a program.
+Specifically,
+**Tidy** can warn you about:
 
-+ For every symbol (macro, type, non-`static` variable or function)
-  in a set of source files, it should be used at least once.
++ Symbols, specifically functions (`static` or not), labels, macros,
+  parameters, types, and variable, that are not used at least once
+  in any source file comprising a program.
 
-That means Tidy will print a warning for those that aren't.
++ Unnecessary function forward declarations in any source file.
+
+That means **Tidy** will print a warning for those that aren't.
 
 **symbol-tidy** has a companion
 [**include-tidy**](https://github.com/paul-j-lucas/include-tidy/)
@@ -27,7 +33,7 @@ project.
 
 ## Dependencies
 
-Tidy has the following dependencies:
+**Tidy** has the following dependencies:
 
 + [Libclang](https://clang.llvm.org/docs/LibClang.html)
   (typically installed as part of either a `clang`
@@ -50,9 +56,9 @@ Although Clang and LLVM are often packaged seperately,
 their versions increment in lockstep,
 so you _should_ install the same version for both.
 
-Tidy was written against version 21.x of Libclang.
-(Hopefully, Tidy will continue to work with future versions.)
-Tidy is known _not_ to work correctly
+**Tidy** was written against version 21.x of Libclang.
+(Hopefully, **Tidy** will continue to work with future versions.)
+**Tidy** is known _not_ to work correctly
 with version 18.
 Nothing is known about either versions 19 or 20.
 
@@ -85,15 +91,15 @@ then do:
 
     make doc                            # or: make docs
 
-Since Tidy uses
+Since **Tidy** uses
 [Autotools](https://en.wikipedia.org/wiki/GNU_Autotools)
 that is exclusively for Unix-like environments,
-Tidy
+**Tidy**
 (or any other software that uses Autotools)
 will not compile
 nor run
 on native Windows.
-If you're determined to run Tidy on Windows,
+If you're determined to run **Tidy** on Windows,
 you might try one of
 [Cygwin](https://www.cygwin.com),
 [MinGW-64](https://www.mingw-w64.org),
