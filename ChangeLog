@@ -1,5 +1,7 @@
 2026-11-13  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * config_file.c, cxx_symbol.c, fwd_dec.c, symbol.c, verbose.c, verbose.h:
+     Added printing statistics functions.
    * man/man1/symbol-tidy.1, src/Makefile.am, array.c, array.h, clang_util.c,
      clang_util.h, fwd_dec.c, fwd_dec.h, symbol-tidy.c, symbol.c, symbol.h:
      Added ability to detect unnecessary function forward declarations.
