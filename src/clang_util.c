@@ -138,11 +138,11 @@ enum CXChildVisitResult callsBaseConstructor_visitor( CXCursor cursor,
 
   CXCursor const ref_csr = clang_getCursorReferenced( cursor );
   if ( tidy_Cursor_isInvalid( ref_csr ) )
-    goto skip;
+    goto skip;                          // LCOV_EXCL_LINE
 
   enum CXCursorKind const ref_kind = clang_getCursorKind( ref_csr );
   if ( ref_kind != CXCursor_Constructor )
-    goto skip;
+    goto skip;                          // LCOV_EXCL_LINE
 
   CXCursor sem_parent = clang_getCursorSemanticParent( ref_csr );
   sem_parent = clang_getCanonicalCursor( sem_parent );
@@ -183,7 +183,7 @@ static enum CXChildVisitResult getConstructorInfo_visitor( CXCursor cursor,
         base_cls_csr = clang_getTypeDeclaration( type );
       }
       if ( tidy_Cursor_isInvalid( base_cls_csr ) )
-        break;
+        break;                          // LCOV_EXCL_LINE
       if ( !tidy_Cursor_getConstructorInfo( base_cls_csr, ctor_info ) )
         break;
       FALLTHROUGH;
@@ -521,8 +521,8 @@ static enum CXChildVisitResult hasMaybeUnusedAttr_visitor( CXCursor cursor,
   clang_getSpellingLocation(
     loc, &file, /*line=*/NULL, /*col=*/NULL, &offset
   );
-  if ( file == NULL )
-    goto skip;
+  if ( unlikely( file == NULL ) )
+    goto skip;                          // LCOV_EXCL_LINE
 
   CXTranslationUnit const tu = clang_Cursor_getTranslationUnit( cursor );
   CXSourceLocation const start_loc =
@@ -663,7 +663,7 @@ CXCursor tidy_Cursor_getBaseSpecifierClass( CXCursor spec_csr ) {
 bool tidy_Cursor_getConstructorInfo( CXCursor cursor,
                                      tidy_ConstructorInfo *ctor_info ) {
   if ( tidy_Cursor_isInvalid( cursor ) )
-    return false;
+    return false;                       // LCOV_EXCL_LINE
 
   CXType type = clang_getCursorType( cursor );
          type = clang_getCanonicalType( type );
@@ -673,11 +673,11 @@ bool tidy_Cursor_getConstructorInfo( CXCursor cursor,
     cls_csr = cursor;
 
   if ( !tidy_Cursor_isClassDecl( cls_csr ) )
-    return false;
+    return false;                       // LCOV_EXCL_LINE
 
   tidy_ConstructorInfo local_info;
   if ( ctor_info == NULL )
-    ctor_info = &local_info;
+    ctor_info = &local_info;            // LCOV_EXCL_LINE
 
   *ctor_info = (tidy_ConstructorInfo){
     .def_ctor_csr = clang_getNullCursor()
@@ -713,7 +713,7 @@ CXCursor tidy_Cursor_getDefaultConstructor( CXCursor cls_csr ) {
 
 CXCursor tidy_Cursor_getDestructor( CXCursor cls_csr ) {
   if ( tidy_Cursor_isInvalid( cls_csr ) )
-    return cls_csr;
+    return cls_csr;                     // LCOV_EXCL_LINE
   CXCursor const cls_def_csr = tidy_getCursorDefinition( cls_csr );
   CXCursor dtor_csr = clang_getNullCursor();
   clang_visitChildren( cls_def_csr, &getDestructor_visitor, &dtor_csr );
@@ -760,7 +760,7 @@ char* tidy_Cursor_getScopedSpelling( CXCursor cursor ) {
 
 CXCursor tidy_Cursor_getUnderlyingTypeDecl( CXCursor cursor ) {
   if ( tidy_Cursor_isInvalid( cursor ) )
-    return cursor;
+    return cursor;                      // LCOV_EXCL_LINE
 
   CXType  type = clang_getCursorType( cursor );
           type = tidy_Type_getUnderlyingType( type );
@@ -1208,7 +1208,7 @@ char* tidy_getCursorUSR( CXCursor cursor ) {
   unsigned line, col;
   clang_getSpellingLocation( loc, &file, &line, &col, /*offset=*/NULL );
   if ( unlikely( file == NULL ) )
-    return NULL;
+    return NULL;                        // LCOV_EXCL_LINE
 
   CXString const    path_cxs = clang_getFileName( file );
   char const *const path_cs = path_no_dot_slash( clang_getCString( path_cxs ) );
@@ -1293,8 +1293,8 @@ bool tidy_isEscapedNewline( CXTranslationUnit tu, CXToken const *tokens,
   size_t source_len;
   char const *const source_text =
     clang_getFileContents( tu, prev_file, &source_len );
-  if ( source_text == NULL )
-    return false;
+  if ( unlikely( source_text == NULL ) )
+    return false;                       // LCOV_EXCL_LINE
 
   bool saw_backslash = false;
   for ( unsigned i = prev_offset; i < curr_offset && i < source_len; ++i ) {

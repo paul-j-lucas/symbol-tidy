@@ -79,7 +79,7 @@ void* array_insert( array_t *restrict array, size_t index, size_t n ) {
   assert( array != NULL );
 
   if ( unlikely( n == 0 ) )
-    return NULL;
+    return NULL;                        // LCOV_EXCL_LINE
   if ( index > array->len )
     index = array->len;
 
