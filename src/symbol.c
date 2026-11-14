@@ -620,6 +620,16 @@ static bool file_previously_seen( CXFile file, symbols_visit_data *svd ) {
 }
 
 /**
+ * Cleans-up a tidy_loc.
+ *
+ * @param loc The tidy_loc to clean up.  If NULL, does nothing.
+ */
+static void loc_cleanup( tidy_loc *loc ) {
+  if ( loc != NULL )
+    FREE( loc->path );
+}
+
+/**
  * For a macro, gets the cursor for the identifier given by \a token within \a
  * scope_csr, but only if \a token actually is an identifier, neither
  * `__VA_ARGS__` nor `__VA_OPT__`, nor one of the current macro's parameters.
@@ -919,8 +929,8 @@ static void symbol_cleanup( tidy_symbol *sym ) {
     FREE( sym->key );
     FREE( sym->name );
     FREE( sym->cxx_prototype );
-    FREE( sym->loc.path );
-    FREE( sym->macro_loc.path );
+    loc_cleanup( &sym->loc );
+    loc_cleanup( &sym->macro_loc );
     ht_table_cleanup( &sym->ref_sym_set, /*free_fn=*/NULL );
     ht_table_cleanup( &sym->cxx_adl_usr_set, /*free_fn=*/NULL );
   }
