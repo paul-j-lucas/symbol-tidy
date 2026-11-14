@@ -1,5 +1,13 @@
 2026-11-13  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * clang_util.c, symbol.c, verbose.c: Now using clang_File_isEqual().
+   * fwd_dec.cpp, fwd_dec.out, fwd_dec.test: Added C++ forward declarations
+     test.
+   * fwd_dec.c, fwd_dec.out: s/unnecessary forward declarations/unnecessary
+     declarations/
+   * fwd_dec.c, exception-used-3a.cpp: Fixed fwd_dec_is_necessary().
+   * test/Makefile.am, fwd_dec.c, fwd_dec.out, fwd_dec.test: New forward
+     declaration test.
    * clang_util.c: Now checking functions' type's spelling for __attribute__.
    * config_file.c, cxx_symbol.c, fwd_dec.c, symbol.c, verbose.c, verbose.h:
      Added printing statistics functions.
