@@ -586,14 +586,14 @@ NODISCARD
 static bool file_previously_seen( CXFile file, symbols_visit_data *svd ) {
   assert( svd != NULL );
 
-  if ( file == NULL || file == svd->source->file )
+  if ( file == NULL || clang_File_isEqual( file, svd->source->file ) )
     return false;                       // never skip the TU's own source
 
   //
   // Consecutive top-level cursors are usually from the same file: if so,
   // return the last result.
   //
-  if ( file == svd->fps.last_file )
+  if ( clang_File_isEqual( file, svd->fps.last_file ) )
     return svd->fps.last_seen;
 
   bool seen = false;
@@ -880,7 +880,7 @@ static void symbol_add_def( tidy_symbol *sym, CXSourceLocation sym_loc ) {
     return;
 
   bool const is_defined_in_macro =
-    def_file != ref_file ||
+    !clang_File_isEqual( def_file, ref_file ) ||
     def_line != sym->loc.line ||
     def_col  != sym->loc.col;
 

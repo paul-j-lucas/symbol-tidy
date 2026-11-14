@@ -124,8 +124,10 @@ static bool is_loc_in_any_range( CXSourceLocation loc, array_t const *ranges ) {
     clang_getFileLocation( start_loc, &start_file, NULL, NULL, &start_offset );
     clang_getFileLocation( end_loc, &end_file, NULL, NULL, &end_offset );
 
-    if ( file == start_file && offset >= start_offset && offset < end_offset )
+    if ( clang_File_isEqual( file, start_file ) &&
+         offset >= start_offset && offset < end_offset ) {
       return true;
+    }
   } // for
 
   return false;

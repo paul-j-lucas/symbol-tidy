@@ -903,7 +903,7 @@ bool tidy_Cursor_inMacro( CXCursor cursor ) {
     loc, &exp_file, &exp_line, &exp_col, /*offset=*/NULL
   );
 
-  return spell_file != exp_file ||
+  return !clang_File_isEqual( spell_file, exp_file ) ||
          spell_line != exp_line ||
          spell_col  != exp_col;
 }
@@ -1146,7 +1146,7 @@ CXSourceRange tidy_getCursorExtent( CXCursor cursor ) {
     end_loc, &end_file, /*line=*/NULL, /*column=*/NULL, &end_offset
   );
 
-  if ( start_file == NULL || start_file != end_file )
+  if ( start_file == NULL || !clang_File_isEqual( start_file, end_file ) )
     return range;                       // LCOV_EXCL_LINE
 
   CXTranslationUnit const tu = clang_Cursor_getTranslationUnit( cursor );
@@ -1287,7 +1287,7 @@ bool tidy_isEscapedNewline( CXTranslationUnit tu, CXToken const *tokens,
   clang_getSpellingLocation(
     curr_loc, &curr_file, /*line=*/NULL, /*column=*/NULL, &curr_offset
   );
-  if ( prev_file == NULL || prev_file != curr_file )
+  if ( prev_file == NULL || !clang_File_isEqual( prev_file, curr_file ) )
     return false;
 
   size_t source_len;
