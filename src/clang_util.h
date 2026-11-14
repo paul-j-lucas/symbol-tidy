@@ -316,7 +316,9 @@ bool tidy_Cursor_isExternalGlobalFunction( CXCursor cursor );
  * @return Returns `true` only if \a cursor has external linkage.
  */
 NODISCARD
-bool tidy_Cursor_isExternalLinkage( CXCursor cursor );
+inline bool tidy_Cursor_isExternalLinkage( CXCursor cursor ) {
+  return clang_getCursorLinkage( cursor ) == CXLinkage_External;
+}
 
 /**
  * Gets whether \a cursor is in a system header.

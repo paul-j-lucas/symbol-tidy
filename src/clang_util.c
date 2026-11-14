@@ -957,17 +957,6 @@ bool tidy_Cursor_isExternalGlobalFunction( CXCursor cursor ) {
   return true;
 }
 
-bool tidy_Cursor_isExternalLinkage( CXCursor cursor ) {
-  enum CXLinkageKind const linkage = clang_getCursorLinkage( cursor );
-  switch ( linkage ) {
-    case CXLinkage_External:
-    case CXLinkage_UniqueExternal:
-      return true;
-    default:
-      return false;
-  } // switch
-}
-
 bool tidy_Cursor_isLocalVarDecl( CXCursor cursor ) {
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
   return kind == CXCursor_VarDecl && tidy_Cursor_inFunctionScope( cursor );
@@ -1447,6 +1436,7 @@ unsigned tidy_visitClassChildren( CXCursor cls_csr, CXCursorVisitor visitor,
 
 extern inline bool tidy_Cursor_isInSystemHeader( CXCursor );
 extern inline bool tidy_Cursor_isInvalid( CXCursor );
+extern inline bool tidy_Cursor_isExternalLinkage( CXCursor );
 extern inline int tidy_FileUniqueID_cmp( CXFileUniqueID const*,
                                          CXFileUniqueID const* );
 extern inline CXFile tidy_getFileLocation_File( CXSourceLocation );
