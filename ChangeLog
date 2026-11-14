@@ -1,5 +1,6 @@
 2026-11-14  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * symbol.c: Added loc_cleanup().
    * config_file.c, cxx_symbol.c, fwd_dec.c, symbol.c, verbose.c: Excluding
      lines from code coverage.
    * test/Makefile.am, error.c, error.out, error.test: Added test.
