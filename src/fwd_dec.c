@@ -353,10 +353,10 @@ static void print_statistics( verbose_stat_ctx *vsc ) {
     "fds-max-load-factor = " TIDY_STAT_LF_FMT "\n", fwd_stats.max_lf
   );
   verbose_statf( vsc,
-    "fds-max-load-factor-path \"%s\"\n", fwd_stats.max_lf_path
+    "fds-max-load-factor-path = \"%s\"\n", fwd_stats.max_lf_path
   );
   verbose_statf( vsc, "fds-max-size = %zu\n", fwd_stats.max_size );
-  verbose_statf( vsc, "fds-max-size-path \"%s\"\n", fwd_stats.max_size_path );
+  verbose_statf( vsc, "fds-max-size-path = \"%s\"\n", fwd_stats.max_size_path );
 }
 
 ////////// extern functions ///////////////////////////////////////////////////
