@@ -47,6 +47,9 @@ TESTS+=	tests/config-bad-semantics-1.test \
 	tests/config-enoent.test \
 	tests/config-ignore-symbols.test
 
+# Error tests
+TESTS+=	tests/enoent.test
+
 # C++ tests.
 TESTS+=	tests/auto_delete_pool.test \
 	tests/constructors.test \
