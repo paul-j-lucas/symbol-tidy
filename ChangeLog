@@ -1,3 +1,13 @@
+2026-11-14  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * config_file.c, cxx_symbol.c, fwd_dec.c, symbol.c, verbose.c: Excluding
+     lines from code coverage.
+   * test/Makefile.am, error.c, error.out, error.test: Added test.
+   * test/Makefile.am, enoent.out, enoent.test: Added test.
+   * man/man1/symbol-tidy.1: Completed STATISTICS section.
+   * fwd_dec.c: Added missing '='.
+   * verbose.c: Added VERBOSE_PREFIX.
+
 2026-11-13  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
    * array.c, clang_util.c: Added LCOV_EXCL_LINE.
