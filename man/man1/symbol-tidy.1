@@ -35,7 +35,7 @@
 .if !'\\$1'0' .sp
 ..
 .\" ---------------------------------------------------------------------------
-.TH \f3symbol-tidy\fP 1 "November 12, 2026" "PJL TOOLS"
+.TH \f3symbol-tidy\fP 1 "November 14, 2026" "PJL TOOLS"
 .SH NAME
 symbol-tidy \(em Symbol tidier
 .SH SYNOPSIS
@@ -805,16 +805,94 @@ for
 .B symbol-tidy
 itself.)
 .TP 6
-.B ips-size
-The total number of ignored files.
+.B adl-ns-load-factor
+The load factor of the
+C++ argument-dependent lookup (ADL) name set.
+.TP
+.B adl-ns-size
+The size of the C++ ADL name set.
+.TP
+.B adl-ts-load-factor
+The load factor of the
+C++ argument-dependent lookup (ADL) type set.
+.TP
+.B adl-ts-size
+The size of the C++ ADL type set.
+.TP
+.B fds-max-load-factor
+The maximum load factor of the forward declaration set.
+.TP
+.B fds-max-load-factor-path
+The path of the file that yielded
+.BR fds-max-load-factor .
+.TP
+.B fds-max-size
+The maximum size of the forward declaration set.
+.TP
+.B fds-max-size-path
+The path of the file that yielded
+.BR fds-max-size .
+.TP
+.B hs-load-factor
+The load factor of the headers set.
+.TP
+.B hs-size
+The size of the header set.
+.TP
+.B hs-revisited-count
+The number of headers revisited.
+.TP
+.B hs-skipped-count
+The number of headers skipped.
+.TP
 .B ips-load-factor
-The load factor for the ignoted files hash table.
+The load factor of the ignored files set.
+.TP
+.B ips-size
+The size of the ignored files set.
+.TP
+.B iss-load-factor
+The load factor of the ignored symbols set.
+.TP
+.B iss-size
+The size of the ignored symbols set.
+.TP
+.B ss-adl-usr-max-load-factor
+The maximum load factor of the
+C++ argument-dependent lookup (ADL)
+unified symbol resolution (USR)
+set.
+.TP
+.B ss-adl-usr-name
+The name of the symbol that yielded
+.BR ss-adl-usr-max-load-factor .
+.TP
+.B ss-adl-usr-path
+The path defining
+.BR ss-adl-usr-name .
+.TP
+.B ss-adl-usr-size
+The size of the C++ ADL set.
 .TP
 .B ss-load-factor
-The load factor for the symbol hash table.
+The load factor of the symbol set.
 .TP
 .B ss-size
-The total number of relevant symbols.
+The size of the symbol set.
+.TP
+.B ss-rss-max-load-factor
+The maximum load factor of the reference symbol set.
+.TP
+.B ss-rss-name
+The name of the symbol that yielded
+.BR ss-rss-max-load-factor .
+.TP
+.B ss-rss-path
+The path defining
+.BR ss-rss-name .
+.TP
+.B ss-rss-size
+The size of the reference symbol set.
 .SH EXAMPLES
 .SS C Example
 For typical C programs, the
