@@ -1,5 +1,7 @@
 2026-11-13  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * array.c, clang_util.c: Added LCOV_EXCL_LINE.
+   * fwd_dec.out: Updated expected results.
    * clang_util.c, symbol.c, verbose.c: Now using clang_File_isEqual().
    * fwd_dec.cpp, fwd_dec.out, fwd_dec.test: Added C++ forward declarations
      test.
