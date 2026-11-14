@@ -53,6 +53,13 @@
  * @{
  */
 
+////////// local constants ////////////////////////////////////////////////////
+
+/**
+ * Verbose output prefix.
+ */
+static char const VERBOSE_PREFIX[] = "// tidy | ";
+
 ////////// local functions ////////////////////////////////////////////////////
 
 // LCOV_EXCL_START
@@ -313,7 +320,7 @@ void verbose_print_tokens( CXCursor cursor ) {
 #endif /* NDEBUG */
 
 int verbose_printf( char const *format, ... ) {
-  PUTS( "// tidy | " );
+  PUTS( VERBOSE_PREFIX );
   va_list args;
   va_start( args, format );
   int const raw_len = vprintf( format, args );
@@ -349,7 +356,7 @@ bool verbose_section_begin( bool *printed_header ) {
 }
 
 void verbose_statf( verbose_stat_ctx *vsc, char const *format, ... ) {
-  PUTS( "// tidy | " );
+  PUTS( VERBOSE_PREFIX );
 
   char const *const colon = strrchr( format, ':' );
   bool const        is_header = colon != NULL && colon[1] == '\n';
