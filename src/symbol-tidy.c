@@ -84,14 +84,13 @@ void test_init( char const *env_var ) {
 /**
  * Gets the status **symbol-tidy** should exit with.
  *
- * @param unused_symbols The number of unused symbols.
- * @param unnecessary_decs The number of unnecessary declarations.
+ * @param violations The number of violations.
  * @return Returns said exit status.
  */
 NODISCARD
-static int tidy_status( unsigned unused_symbols, unsigned unnecessary_decs ) {
+static int tidy_status( unsigned violations_count ) {
   if ( opt_error != TIDY_ERROR_NEVER ) {
-    if ( unused_symbols > 0 || unnecessary_decs > 0 )
+    if ( violations_count > 0 )
       return TIDY_EX_VIOLATIONS;
     if ( opt_error == TIDY_ERROR_ALWAYS )
       return TIDY_EX_NO_VIOLATIONS_ERROR;
@@ -124,7 +123,7 @@ int main( int argc, char const *argv[] ) {
   if ( IS_VERBOSE( SRC_FILE_ALWAYS ) )
     verbose_section_begin( /*printed_header=*/NULL );
 
-  unsigned unnecessary_count = 0;
+  unsigned unnecessary_decs = 0;
 
   for ( size_t i = 0; i < sources.len; ++i ) {
     tidy_source *const source = array_at_nc( &sources, i );
@@ -135,23 +134,28 @@ int main( int argc, char const *argv[] ) {
       verbose_printf( "source file = \"%s\"\n", source->path );
 
     source_parse( source );
-    unnecessary_count += symbols_visit( source );
+    unnecessary_decs += symbols_visit( source );
     source_cleanup( source );
   } // for
 
-  unsigned const unused_count = symbols_print_unused();
+  unsigned const unused_symbols = symbols_print_unused();
 
-  if ( unused_count > 0 || unnecessary_count > 0 ) {
+  if ( unused_symbols > 0 || unnecessary_decs > 0 ) {
     EPRINTF( "%s: ", prog_name );
 
-    if ( unused_count > 0 )
-      EPRINTF( "%u unused symbol%s", unused_count, plural_s( unused_count ) );
-    if ( unnecessary_count > 0 ) {
-      if ( unused_count > 0 )
+    if ( unused_symbols > 0 ) {
+      EPRINTF(
+        "%u unused symbol%s",
+        unused_symbols, plural_s( unused_symbols )
+      );
+    }
+
+    if ( unnecessary_decs > 0 ) {
+      if ( unused_symbols > 0 )
         EPUTS( "; " );
       EPRINTF(
         "%u unnecessary declaration%s",
-        unnecessary_count, plural_s( unnecessary_count )
+        unnecessary_decs, plural_s( unnecessary_decs )
       );
     }
 
@@ -159,5 +163,5 @@ int main( int argc, char const *argv[] ) {
   }
 
   array_cleanup( &sources, /*free_fn=*/NULL );
-  return tidy_status( unused_count, unnecessary_count );
+  return tidy_status( unused_symbols + unnecessary_decs );
 }
