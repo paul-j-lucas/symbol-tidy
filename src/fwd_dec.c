@@ -342,6 +342,7 @@ static void const* ht_table_get_any( hash_table_t const *table ) {
   return ht_iterator_next( &iter );
 }
 
+// LCOV_EXCL_START
 /**
  * Prints statistics for forward declarations.
  *
@@ -358,6 +359,7 @@ static void print_statistics( verbose_stat_ctx *vsc ) {
   verbose_statf( vsc, "fds-max-size = %zu\n", fwd_stats.max_size );
   verbose_statf( vsc, "fds-max-size-path = \"%s\"\n", fwd_stats.max_size_path );
 }
+// LCOV_EXCL_STOP
 
 ////////// extern functions ///////////////////////////////////////////////////
 

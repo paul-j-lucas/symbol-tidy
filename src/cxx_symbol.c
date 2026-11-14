@@ -760,6 +760,7 @@ static void cxx_type_template_args_dtor_add_ref( CXType type,
   } // for
 }
 
+// LCOV_EXCL_START
 /**
  * Prints statistics for C++ ADL hash tables if requested.
  *
@@ -780,6 +781,7 @@ static void print_statistics( verbose_stat_ctx *vsc ) {
   );
   verbose_statf( vsc, "adl-ts-size = %u\n", cxx_adl_type_set.size );
 }
+// LCOV_EXCL_STOP
 
 /**
  * Inserts a string to a lazily initialized string set.

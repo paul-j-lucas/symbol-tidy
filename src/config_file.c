@@ -1004,6 +1004,7 @@ static void print_invalid_value( config_parse_fn_args const *config,
   ++error_count;
 }
 
+// LCOV_EXCL_START
 /**
  * Prints statistics if requested.
  *
@@ -1024,6 +1025,7 @@ static void print_statistics( verbose_stat_ctx *vsc ) {
   );
   verbose_statf( vsc, "iss-size = %u\n", ignore_symbol_set.size );
 }
+// LCOV_EXCL_STOP
 
 /**
  * Prints a TOML value.

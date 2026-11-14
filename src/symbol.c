@@ -244,7 +244,7 @@ static bool cursor_in_ignored_class( CXCursor cursor ) {
 NODISCARD
 static bool cursor_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
   if ( tidy_Cursor_isInvalid( sym_csr ) )
-    return true;
+    return true;                        // LCOV_EXCL_LINE
 
   CXFile const sym_file = tidy_getCursorLocation_File( sym_csr );
   if ( sym_file == NULL )
@@ -680,7 +680,7 @@ static unsigned macro_get_params( CXTranslationUnit tu,
   assert( param_set != NULL );
 
   if ( unlikely( token_count < 2 ) )
-    return 1;
+    return 1;                           // LCOV_EXCL_LINE
 
   unsigned rv_idx = 1;
 
@@ -780,6 +780,7 @@ CXCursor macro_Token_getScopedNameCursor( CXTranslationUnit tu,
   return rv_csr;
 }
 
+// LCOV_EXCL_START
 /**
  * Prints statistics for a hash table that has the maximum load factor among
  * all symbols.
@@ -850,6 +851,7 @@ static void print_statistics( verbose_stat_ctx *vsc ) {
     offsetof( tidy_symbol, cxx_adl_usr_set ), "ss-adl-usr"
   );
 }
+// LCOV_EXCL_STOP
 
 /**
  * Add the symbol's path, line, and column to \a sym.
@@ -866,18 +868,18 @@ static void symbol_add_def( tidy_symbol *sym, CXSourceLocation sym_loc ) {
   clang_getExpansionLocation(
     sym_loc, &ref_file, &sym->loc.line, &sym->loc.col, /*offset=*/NULL
   );
-  if ( ref_file == NULL )
-    return;
+  if ( unlikely( ref_file == NULL ) )
+    return;                             // LCOV_EXCL_LINE
 
   clang_getSpellingLocation(
     sym_loc, &def_file, &def_line, &def_col, /*offset=*/NULL
   );
-  if ( def_file == NULL )
-    return;
+  if ( unlikely( def_file == NULL ) )
+    return;                             // LCOV_EXCL_LINE
 
   char *const path = dup_if_source_path( ref_file );
-  if ( path == NULL )
-    return;
+  if ( unlikely( path == NULL ) )
+    return;                             // LCOV_EXCL_LINE
 
   bool const is_defined_in_macro =
     !clang_File_isEqual( def_file, ref_file ) ||
@@ -886,11 +888,13 @@ static void symbol_add_def( tidy_symbol *sym, CXSourceLocation sym_loc ) {
 
   char *macro_path = NULL;
 
-  if ( is_defined_in_macro && def_file != ref_file ) {
+  if ( is_defined_in_macro && !clang_File_isEqual( def_file, ref_file ) ) {
     macro_path = dup_if_source_path( def_file );
     if ( macro_path == NULL ) {         // e.g., defined in a system header
+      // LCOV_EXCL_START
       free( path );
       return;
+      // LCOV_EXCL_STOP
     }
   }
 
@@ -965,9 +969,11 @@ static int symbol_cmp_by_path( tidy_symbol const *i_sym,
     return cmp;
   if ( i_sym->loc.line < j_sym->loc.line ) return -1;
   if ( i_sym->loc.line > j_sym->loc.line ) return  1;
+  // LCOV_EXCL_START
   if ( i_sym->loc.col  < j_sym->loc.col  ) return -1;
   if ( i_sym->loc.col  > j_sym->loc.col  ) return  1;
   return 0;
+  // LCOV_EXCL_STOP
 }
 
 /**
@@ -1280,8 +1286,8 @@ static void visit_Constructor( CXCursor ctor_csr, symbols_visit_data *svd ) {
 static void visit_CXXForRangeStmt( CXCursor range_stmt_csr,
                                    symbols_visit_data *svd ) {
   CXCursor range_expr = tidy_Cursor_getFirstExprChild( range_stmt_csr );
-  if ( clang_Cursor_isNull( range_expr ) )
-    return;
+  if ( unlikely( clang_Cursor_isNull( range_expr ) ) )
+    return;                             // LCOV_EXCL_LINE
 
   CXType range_type = clang_getCursorType( range_expr );
   bool is_range_const = clang_isConstQualifiedType( range_type );
@@ -1442,10 +1448,10 @@ static void visit_CXXMethod( CXCursor method_csr, symbols_visit_data *svd ) {
  * @param svd The symbols_visit_data to use.
  */
 static void visit_CXXNewExpr( CXCursor new_csr, symbols_visit_data *svd ) {
-  CXType type = clang_getCursorType( new_csr );
-  type = clang_getCanonicalType( type );
-  if ( type.kind != CXType_Pointer )
-    return;
+  CXType  type = clang_getCursorType( new_csr );
+          type = clang_getCanonicalType( type );
+  if ( unlikely( type.kind != CXType_Pointer ) )
+    return;                             // LCOV_EXCL_LINE
 
   CXType pointee_type = clang_getPointeeType( type );
          pointee_type = clang_getCanonicalType( pointee_type );
@@ -1810,7 +1816,7 @@ tidy_symbol* symbol_add( CXCursor sym_csr, tidy_source const *source ) {
 
   char *key = tidy_getCursorUSR( sym_csr );
   if ( unlikely( key == NULL ) )
-    return NULL;
+    return NULL;                        // LCOV_EXCL_LINE
 
   tidy_symbol new_sym = {
     .key = key,
