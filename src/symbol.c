@@ -847,7 +847,7 @@ static void print_statistics( verbose_stat_ctx *vsc ) {
 
   print_max_lf_stats( vsc, offsetof( tidy_symbol, ref_sym_set ), "ss-rss" );
   print_max_lf_stats( vsc,
-    offsetof( tidy_symbol, cxx_adl_usr_set ), "ss-adlus"
+    offsetof( tidy_symbol, cxx_adl_usr_set ), "ss-adl-usr"
   );
 }
 
