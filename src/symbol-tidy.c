@@ -88,7 +88,7 @@ static void print_summary( unsigned unused_symbols, unsigned unneeded_forwards,
 
   if ( unneeded_forwards > 0 ) {
     EPRINTF(
-      "%s%u unneeded declaration%s",
+      "%s%u unneeded forward%s",
       sep, unneeded_forwards, plural_s( unneeded_forwards )
     );
     sep = "; ";

@@ -15,7 +15,7 @@ $ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers fwd_dec.c
 "fwd_dec.c": warning: unneeded external linkage:
    19, 6 | "unnecessary_extern"
    27, 5 | "abs"
-symbol-tidy: 3 unused symbols; 8 unneeded declarations; 2 unneeded external linkage
+symbol-tidy: 3 unused symbols; 8 unneeded forwards; 2 unneeded external linkage
 
 $ symbol-tidy -std=c++20 -Xtidy --directory=data -Xtidy --no-config-layers fwd_dec.cpp
 "fwd_dec.cpp": warning: unneeded declarations:
@@ -23,5 +23,5 @@ $ symbol-tidy -std=c++20 -Xtidy --directory=data -Xtidy --no-config-layers fwd_d
    11,15 | "lk_both(int)"
    19,15 | "lk_attr(int)" (move attributes and linkage specification to definition at line 21)
    24,26 | "cpp_attr(int)" (move attributes to definition at line 25)
-symbol-tidy: 4 unneeded declarations
+symbol-tidy: 4 unneeded forwards
 
