@@ -1,5 +1,15 @@
+2026-11-15  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * man/man1/symbol-tidy.1, clang_util.c, clang_util.h, config_file.c,
+     cxx_symbol.c, fwd_dec.c, fwd_dec.h, options.c, options.h, symbol-tidy.c,
+     symbol.c, symbol.h, functor.cpp, fwd_dec.c, fwd_dec.cpp, labels.c,
+     maybe_unused.c, omanip.cpp, range-for.cpp, fwd_dec.out: Now also print
+     symbols that have external linkage unnessarily.
+
 2026-11-14  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * clang_util.c, clang_util.h: tidy_Cursor_isExternalLinkage now returns true
+     only for CXLinkage_External.
    * symbol.c: Added loc_cleanup().
    * config_file.c, cxx_symbol.c, fwd_dec.c, symbol.c, verbose.c: Excluding
      lines from code coverage.
