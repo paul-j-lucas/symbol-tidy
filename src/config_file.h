@@ -98,12 +98,12 @@ void config_bool_init( config_bool *cb );
  * Gets the value of a config_bool.
  *
  * @param cb The config_bool to get the value of.
- * @param abs_path The source absolute path, if any, to get the value for.
- * @return Returns the Boolean value for \a abs_path, if any, or the global
- * value, if not.
+ * @param path The source path, if any, to get the value for.
+ * @return Returns the Boolean value for \a path, if any, or the global value,
+ * if not.
  */
 NODISCARD
-bool config_bool_value( config_bool *cb, char const *abs_path );
+bool config_bool_value( config_bool *cb, char const *path );
 
 /**
  * Reads an **symbol-tidy** configuration file, if any.

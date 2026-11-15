@@ -340,7 +340,7 @@ static void config_bool_parse( config_parse_fn_args const *config,
     return;
 
   char const *const s = config->table_kind == TABLE_SYMBOL_TIDY ?
-    NULL : config->table->key.name;
+    NULL : path_no_dot_slash( config->table->key.name );
   config_str_set( rv_cb, value, s );
 }
 
