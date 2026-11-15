@@ -84,7 +84,7 @@ void test_init( char const *env_var ) {
 /**
  * Gets the status **symbol-tidy** should exit with.
  *
- * @param violations The number of violations.
+ * @param violations_count The number of violations.
  * @return Returns said exit status.
  */
 NODISCARD

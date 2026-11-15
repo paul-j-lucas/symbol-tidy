@@ -201,9 +201,9 @@ struct symbols_visit_data {
    * declarations, specifically whether one cursor comes before another, e.g.,
    * whether a function is referenced before its definition.
    *
-   * @sa fwd_decl_maybe_unnecessary()
-   * @sa fwd_decl_visit_def()
-   * @sa fwd_decl_visit_ref()
+   * @sa fwd_dec_maybe_unnecessary()
+   * @sa fwd_dec_visit_def()
+   * @sa fwd_dec_visit_ref()
    */
   unsigned            visit_id;
 
