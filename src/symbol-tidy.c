@@ -64,6 +64,45 @@ char const   *prog_name;
 ////////// local functions ////////////////////////////////////////////////////
 
 /**
+ * Prints a summary line only if any if the parameters values are &gt; 0.
+ *
+ * @param unused_symbols The number of unused symbols.
+ * @param unneeded_forwards The number of unneeded declarations.
+ * @param unneeded_externs The number of unneeded external declarations.
+ */
+static void print_summary( unsigned unused_symbols, unsigned unneeded_forwards,
+                           unsigned unneeded_externs ) {
+  if ( unused_symbols == 0 && unneeded_forwards == 0 &&
+       unneeded_externs == 0 ) {
+    return;
+  }
+
+  char const *sep ="";
+
+  EPRINTF( "%s: ", prog_name );
+
+  if ( unused_symbols > 0 ) {
+    EPRINTF( "%u unused symbol%s", unused_symbols, plural_s( unused_symbols ) );
+    sep = "; ";
+  }
+
+  if ( unneeded_forwards > 0 ) {
+    EPRINTF(
+      "%s%u unneeded declaration%s",
+      sep, unneeded_forwards, plural_s( unneeded_forwards )
+    );
+    sep = "; ";
+  }
+
+  if ( unneeded_externs > 0 ) {
+    EPRINTF( "%s%u unneeded external linkage", sep, unneeded_externs );
+    sep = "; ";
+  }
+
+  EPUTC( '\n' );
+}
+
+/**
  * Initializes testing.
  *
  * @param env_var The name of the environment variable containing a test format
@@ -123,7 +162,7 @@ int main( int argc, char const *argv[] ) {
   if ( IS_VERBOSE( SRC_FILE_ALWAYS ) )
     verbose_section_begin( /*printed_header=*/NULL );
 
-  unsigned unnecessary_decs = 0;
+  unsigned unneeded_forwards = 0;
 
   for ( size_t i = 0; i < sources.len; ++i ) {
     tidy_source *const source = array_at_nc( &sources, i );
@@ -134,34 +173,15 @@ int main( int argc, char const *argv[] ) {
       verbose_printf( "source file = \"%s\"\n", source->path );
 
     source_parse( source );
-    unnecessary_decs += symbols_visit( source );
+    unneeded_forwards += symbols_visit( source );
     source_cleanup( source );
   } // for
 
   unsigned const unused_symbols = symbols_print_unused();
-
-  if ( unused_symbols > 0 || unnecessary_decs > 0 ) {
-    EPRINTF( "%s: ", prog_name );
-
-    if ( unused_symbols > 0 ) {
-      EPRINTF(
-        "%u unused symbol%s",
-        unused_symbols, plural_s( unused_symbols )
-      );
-    }
-
-    if ( unnecessary_decs > 0 ) {
-      if ( unused_symbols > 0 )
-        EPUTS( "; " );
-      EPRINTF(
-        "%u unnecessary declaration%s",
-        unnecessary_decs, plural_s( unnecessary_decs )
-      );
-    }
-
-    EPUTC( '\n' );
-  }
+  unsigned const unneeded_externs = symbols_print_unneeded_external();
 
   array_cleanup( &sources, /*free_fn=*/NULL );
-  return tidy_status( unused_symbols + unnecessary_decs );
+
+  print_summary( unused_symbols, unneeded_forwards, unneeded_externs );
+  return tidy_status( unused_symbols + unneeded_forwards + unneeded_externs );
 }

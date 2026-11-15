@@ -35,7 +35,7 @@
 .if !'\\$1'0' .sp
 ..
 .\" ---------------------------------------------------------------------------
-.TH \f3symbol-tidy\fP 1 "November 14, 2026" "PJL TOOLS"
+.TH \f3symbol-tidy\fP 1 "November 15, 2026" "PJL TOOLS"
 .SH NAME
 symbol-tidy \(em Symbol tidier
 .SH SYNOPSIS
@@ -68,11 +68,12 @@ types,
 and
 variables.
 .IP \(bu
+Functions or variables with unnecessary external linkage
+that could be declared \f(CWstatic\fP.
+.IP \(bu
 Unnecessary forward function declarations.
 .PP
-Any source file that has either
-an unused symbol
-or an unnecessary forward declaration
+Any source file that has any of the above
 is in ``violation.''
 .SS General Use
 .B symbol-tidy
@@ -654,6 +655,14 @@ or be wildcard qualified,
 e.g., \f(CW*::value_type\fP,
 where the latter will ignore the given symbol
 in any scope.
+.TP
+.BI ignore-unneeded-extern " \f1=\fP b"
+If true,
+this option ignores functions
+or variables
+that have external linkage
+but could have internal linkage
+(\f(CWstatic\fP) instead.
 .SS Source Tables
 This type of table specifies a source file,
 either a \f(CW.c\fP or \f(CW.cpp\fP
@@ -689,7 +698,12 @@ ignore-as-argument = true
 .BI ignore-symbols " \f1=\fP s" "\f1 | \fP[" s " \f1[,\fP " s "\f1]*\fP ]"
 Same as in the
 .BR "symbol-tidy Table" ,
-but for only for the source file given for the table name.
+but only for the source file given for the table name.
+.TP
+.BI ignore-unneeded-extern " \f1=\fP b"
+Same as in the
+.BR "symbol-tidy Table" ,
+but only for the source file given for the table name.
 .SS Symbol Tables
 This type of table specifies a symbol name.
 .TP 6

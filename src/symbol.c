@@ -114,6 +114,7 @@ hash_table_t tidy_symbol_set;
 
 static hash_table_t       header_set;   ///< The set of all header files.
 static tidy_header_stats  header_stats; ///< Statistics for \ref header_set.
+static bool               print_unneeded_external;
 
 ////////// inline functions ///////////////////////////////////////////////////
 
@@ -132,6 +133,44 @@ static inline char const* symbol_name_for_print( tidy_symbol const *sym ) {
 }
 
 ////////// local functions ////////////////////////////////////////////////////
+
+/**
+ * Gets whether \a sym_csr is a definition of the kind of symbol that could be
+ * given internal linkage: a non-member, non-template function or variable that
+ * currently has external linkage.
+ *
+ * @param sym_csr The definition's cursor to check.
+ * @return Returns `true` only if \a sym_csr could be `static`.
+ */
+NODISCARD
+static bool cursor_is_maybe_internal( CXCursor sym_csr ) {
+  enum CXCursorKind const kind = clang_getCursorKind( sym_csr );
+  switch ( kind ) {
+    case CXCursor_FunctionDecl:
+    case CXCursor_VarDecl:
+      break;
+    default:
+      return false;
+  } // switch
+
+  if ( !tidy_Cursor_isExternalLinkage( sym_csr ) )
+    return false;                       // already static
+
+  CXCursor const parent_csr = clang_getCursorSemanticParent( sym_csr );
+  if ( tidy_Cursor_isClassDecl( parent_csr ) )
+    return false;                       // static data member
+
+  CXCursor const tmpl_csr = clang_getSpecializedCursorTemplate( sym_csr );
+  if ( !tidy_Cursor_isInvalid( tmpl_csr ) ) {
+    //
+    // If it's not invalid, it means it's a function template specialization
+    // which means it can't be static.
+    //
+    return false;
+  }
+
+  return true;
+}
 
 /**
  * Gets whether \a cursor is for a symbol definition.
@@ -509,6 +548,9 @@ static void cursor_visit_ref( CXCursor cursor, symbols_visit_data *svd ) {
 
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
   switch ( kind ) {
+    case CXCursor_MacroExpansion:
+      svd->macro_exp_csr = cursor;
+      FALLTHROUGH;
     case CXCursor_CallExpr:
     case CXCursor_CXXFunctionalCastExpr:
     case CXCursor_CXXStaticCastExpr:
@@ -517,7 +559,6 @@ static void cursor_visit_ref( CXCursor cursor, symbols_visit_data *svd ) {
     case CXCursor_CXXDynamicCastExpr:
     case CXCursor_DeclRefExpr:
     case CXCursor_LabelRef:
-    case CXCursor_MacroExpansion:
     case CXCursor_MemberRefExpr:
     case CXCursor_TemplateRef:
     case CXCursor_TypeRef:
@@ -537,7 +578,7 @@ static void cursor_visit_ref( CXCursor cursor, symbols_visit_data *svd ) {
       break;
 
     case CXCursor_FunctionDecl:
-      fwd_dec_maybe_unnecessary( cursor, svd );
+      fwd_dec_maybe_unneeded( cursor, svd );
       break;
 
     case CXCursor_OverloadedDeclRef:
@@ -627,6 +668,31 @@ static bool file_previously_seen( CXFile file, symbols_visit_data *svd ) {
 static void loc_cleanup( tidy_loc *loc ) {
   if ( loc != NULL )
     FREE( loc->path );
+}
+
+/**
+ * Prints \a loc as
+ * <tt>"</tt><i>path</i><tt>":</tt><i>line</i><tt>,</tt><i>col</i>.
+ *
+ * @note The path is printed only if it's non-NULL.
+ *
+ * @param loc The tidy_loc to print.
+ */
+static void loc_print( tidy_loc const *loc ) {
+  assert( loc != NULL );
+
+  if ( loc->path != NULL ) {
+    color_start( stderr, sgr_locus );
+    EPRINTF( "\"%s\":", loc->path );
+    color_end( stderr, sgr_locus );
+  }
+  color_start( stderr, sgr_locus );
+  EPRINTF( "%u", loc->line );
+  color_end( stderr, sgr_locus );
+  EPUTC( ',' );
+  color_start( stderr, sgr_locus );
+  EPRINTF( "%u", loc->col );
+  color_end( stderr, sgr_locus );
 }
 
 /**
@@ -864,12 +930,74 @@ static void print_statistics( verbose_stat_ctx *vsc ) {
 // LCOV_EXCL_STOP
 
 /**
+ * If \a sym was defined by the most recent macro expansion visited, sets
+ * \a sym's \ref tidy_symbol::macro_def_loc "macro_def_loc" to the location
+ * of the macro's name in its definition.
+ *
+ * @remarks If the expansion can't be matched to \a sym or the macro isn't
+ * defined in a source file (e.g., it's from a system header), does nothing.
+ *
+ * @param sym The tidy_symbol to set the macro name location of.
+ * @param sym_file The file \a sym's expansion location is in.
+ * @param svd The symbols_visit_data to use.
+ */
+static void svd_set_macro_def_loc( symbols_visit_data const *svd,
+                                   tidy_symbol *sym, CXFile sym_file ) {
+  assert( sym != NULL );
+  assert( svd != NULL );
+
+  CXSourceLocation const sym_exp_loc = clang_getLocation(
+    svd->source->tu, sym_file, sym->loc.line, sym->loc.col
+  );
+  if ( clang_equalLocations( sym_exp_loc, clang_getNullLocation() ) )
+    return;
+
+  CXSourceLocation const macro_exp_loc =
+    clang_getCursorLocation( svd->macro_exp_csr );
+  if ( !clang_equalLocations( sym_exp_loc, macro_exp_loc ) )
+    return;
+
+  CXCursor const macro_def_csr =
+    clang_getCursorReferenced( svd->macro_exp_csr );
+  if ( tidy_Cursor_isInvalid( macro_def_csr ) )
+    return;
+
+  CXSourceLocation const macro_def_loc =
+    clang_getCursorLocation( macro_def_csr );
+
+  CXFile macro_def_file;
+  unsigned macro_def_line, macro_def_col;
+  clang_getSpellingLocation(
+    macro_def_loc, &macro_def_file, &macro_def_line, &macro_def_col,
+    /*offset=*/NULL
+  );
+  if ( macro_def_file == NULL )
+    return;
+
+  char *macro_def_path = NULL;          // NULL means same file as sym
+  if ( !clang_File_isEqual( macro_def_file, sym_file ) ) {
+    macro_def_path = dup_if_source_path( macro_def_file );
+    if ( macro_def_path == NULL )       // e.g., defined in a system header
+      return;
+  }
+
+  loc_cleanup( &sym->macro_def_loc );
+  sym->macro_def_loc = (tidy_loc){
+    .path = macro_def_path,
+    .line = macro_def_line,
+    .col  = macro_def_col
+  };
+}
+
+/**
  * Add the symbol's path, line, and column to \a sym.
  *
  * @param sym The tidy_symbol to add the definition for.
  * @param sym_loc The source location of the cursor for \a sym.
+ * @param svd The symbols_visit_data to use.
  */
-static void symbol_add_def( tidy_symbol *sym, CXSourceLocation sym_loc ) {
+static void symbol_add_def( tidy_symbol *sym, CXSourceLocation sym_loc,
+                            symbols_visit_data const *svd ) {
   assert( sym != NULL );
 
   CXFile ref_file, def_file;
@@ -916,6 +1044,7 @@ static void symbol_add_def( tidy_symbol *sym, CXSourceLocation sym_loc ) {
     sym->macro_loc.path = macro_path;
     sym->macro_loc.line = def_line;
     sym->macro_loc.col  = def_col;
+    svd_set_macro_def_loc( svd, sym, ref_file );
   }
 }
 
@@ -930,7 +1059,9 @@ static void symbol_cleanup( tidy_symbol *sym ) {
     FREE( sym->name );
     FREE( sym->cxx_prototype );
     loc_cleanup( &sym->loc );
+    loc_cleanup( &sym->dec_loc );
     loc_cleanup( &sym->macro_loc );
+    loc_cleanup( &sym->macro_def_loc );
     ht_table_cleanup( &sym->ref_sym_set, /*free_fn=*/NULL );
     ht_table_cleanup( &sym->cxx_adl_usr_set, /*free_fn=*/NULL );
   }
@@ -1016,6 +1147,50 @@ static bool symbol_in_unused_scope( tidy_symbol const *sym ) {
 }
 
 /**
+ * Gets whether \a sym has external linkage unnecessarily.
+ *
+ * @remarks
+ * @parblock
+ * A symbol has external linkage unnecessarily if it:
+ *
+ *  + Has external linkage; and:
+ *  + Is defined and used only in a single source file.
+ *
+ * @endparblock
+ *
+ * @param sym The symbol to check.
+ * @return Returns `true` only if \a sym has external linkage unnecessarily.
+ *
+ * @note This must be called only after symbols_mark_used().
+ */
+NODISCARD
+static bool symbol_is_unneeded_extern( tidy_symbol const *sym ) {
+  assert( sym != NULL );
+
+  // These checks can be in any order.
+  if ( !sym->is_maybe_internal )
+    return false;                       // Not a candidate for internal.
+  if ( sym->is_dead )
+    return false;                       // Dead symbols are ignored.
+  if ( sym->is_root )
+    return false;                       // Roots must have external linkage.
+  if ( !sym->is_used )
+    return false;                       // Unused are reported separately.
+  if ( sym->is_ref_from_other_file )
+    return false;                       // Referenced from another file.
+
+  // But this check must come after those.
+  if ( sym->ref_tsid == 0 )
+    return true;                        // Used, but referenced indirectly.
+
+  // And this check must come after the one above.
+  if ( sym->ref_tsid != sym->def_tsid )
+    return false;                       // Referenced from another TU.
+
+  return true;                          // Referenced only from defining TU.
+}
+
+/**
  * Marks a symbol as used.
  *
  * @param sym The symbol to mark as used.
@@ -1033,6 +1208,153 @@ static void symbol_mark_used( tidy_symbol *sym ) {
           (ref_sym = ht_iterator_next( &iter )) != NULL; ) {
       symbol_mark_used( ref_sym );
     } // for
+  }
+}
+
+/**
+ * Prints a tidy_symbol.
+ *
+ * @param sym The tidy_symbol to print.
+ */
+static void symbol_print( tidy_symbol const *sym ) {
+  assert( sym != NULL );
+
+  bool const is_defined_in_macro = sym->macro_loc.line > 0;
+
+  color_start( stderr, sgr_locus );
+  EPRINTF( "%5u", sym->loc.line );
+  color_end( stderr, sgr_locus );
+  if ( is_defined_in_macro ) {
+    EPUTS( "   " );                     // same width as ",%2u"
+  }
+  else {
+    EPUTC( ',' );
+    color_start( stderr, sgr_locus );
+    EPRINTF( "%2u", sym->loc.col );
+    color_end( stderr, sgr_locus );
+  }
+
+  EPRINTF( " | \"%s\"", symbol_name_for_print( sym ) );
+  if ( is_defined_in_macro ) {
+    EPUTS( " (defined at " );
+    loc_print( &sym->macro_loc );
+    if ( sym->macro_def_loc.line > 0 ) {
+      EPUTS( " via macro at " );
+      loc_print( &sym->macro_def_loc );
+    }
+    EPUTC( ')' );
+  }
+}
+
+/**
+ * Prints the path of \a sym.
+ *
+ * @param sym The tidy_symbol to print the path of.
+ */
+static void symbol_print_path( tidy_symbol const *sym  ) {
+  assert( sym != NULL );
+
+  color_start( stderr, sgr_locus );
+  EPRINTF( "\"%s\"", sym->loc.path );
+  color_end( stderr, sgr_locus );
+  EPUTS( ": " );
+  color_start( stderr, sgr_warning );
+  EPUTS( "warning" );
+  color_end( stderr, sgr_warning );
+}
+
+/**
+ * Records, for the symbol that \a sym_csr defines, whether it's a candidate
+ * for having its external linkage removed and, if so, where its first
+ * declaration is when that's in a header.
+ *
+ * @param sym The tidy_symbol for \a sym_csr.
+ * @param sym_csr The cursor for the definition of \a sym.
+ * @param sym_loc The source location of \a sym_csr.
+ * @param svd The symbols_visit_data to use.
+ */
+static void symbol_update_dec_loc( tidy_symbol *sym, CXCursor sym_csr,
+                                   CXSourceLocation sym_loc,
+                                   symbols_visit_data const *svd ) {
+  assert( sym != NULL );
+  assert( svd != NULL );
+
+  if ( svd->ignore_extern ) {
+    //
+    // Checking is disabled for this TU, so sym can't be a candidate.  A
+    // reference from this TU to a symbol defined elsewhere is still counted as
+    // a reference from another file by symbol_update_ref_origin().
+    //
+    return;
+  }
+
+  sym->def_tsid = svd->source->tsid;
+  sym->is_def_in_tu_main_file =
+    tidy_Location_isFromFile( sym_loc, svd->source->file );
+
+  if ( !sym->is_def_in_tu_main_file || !cursor_is_maybe_internal( sym_csr ) )
+    return;
+  sym->is_maybe_internal = true;
+
+  //
+  // The canonical cursor is the first declaration.  If it's in a header, then
+  // that declaration has to be deleted or moved if the symbol is made static.
+  //
+  CXCursor const canon_csr = clang_getCanonicalCursor( sym_csr );
+  if ( clang_equalCursors( canon_csr, sym_csr ) )
+    return;
+  CXSourceLocation const canon_loc = clang_getCursorLocation( canon_csr );
+  if ( tidy_Location_isFromFile( canon_loc, svd->source->file ) )
+    return;
+
+  CXFile dec_file;
+  unsigned dec_line, dec_col;
+  clang_getSpellingLocation(
+    canon_loc, &dec_file, &dec_line, &dec_col, /*offset=*/NULL
+  );
+  if ( dec_file == NULL )
+    return;
+  char *const dec_path = dup_if_source_path( dec_file );
+  if ( dec_path == NULL )
+    return;
+
+  loc_cleanup( &sym->dec_loc );
+  sym->dec_loc = (tidy_loc){
+    .path = dec_path,
+    .line = dec_line,
+    .col  = dec_col
+  };
+}
+
+/**
+ * Updates \a to_sym's reference-origin information given that it's referenced
+ * by \a from_sym in the current translation unit.
+ *
+ * @remarks A reference from anything not defined in the current TU's main file
+ * (i.e., a header) counts as a reference from "elsewhere" since the header may
+ * be included by other translation units.
+ *
+ * @param from_sym The referencing symbol.
+ * @param to_sym The referenced symbol.
+ * @param svd The symbols_visit_data to use.
+ */
+static void symbol_update_ref_origin( tidy_symbol const *from_sym,
+                                      tidy_symbol *to_sym,
+                                      symbols_visit_data const *svd ) {
+  assert( from_sym != NULL );
+  assert( to_sym != NULL );
+  assert( svd != NULL );
+
+  if ( to_sym->is_ref_from_other_file )
+    return;
+
+  if ( !from_sym->is_def_in_tu_main_file ||
+       from_sym->def_tsid != svd->source->tsid ||
+       (to_sym->ref_tsid != 0 && to_sym->ref_tsid != svd->source->tsid) ) {
+    to_sym->is_ref_from_other_file = true;
+  }
+  else {
+    to_sym->ref_tsid = svd->source->tsid;
   }
 }
 
@@ -1212,9 +1534,10 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
     if ( cursor_is_definition( cursor ) ) {
       tidy_symbol *const sym = symbol_add( cursor, svd->source );
       if ( likely( sym != NULL ) ) {
-        symbol_add_def( sym, sym_loc );
+        symbol_add_def( sym, sym_loc, svd );
         if ( sym->parent_sym == NULL )
           sym->parent_sym = svd->curr_sym;
+        symbol_update_dec_loc( sym, cursor, sym_loc, svd );
         cursor_visit_def( cursor, sym, svd );
       }
     }
@@ -1393,7 +1716,7 @@ static void visit_CXXMethod( CXCursor method_csr, symbols_visit_data *svd ) {
   for ( unsigned i = 0; i < overridden_csrs_count; ++i ) {
     tidy_symbol *const base_sym = symbol_add( overridden_csrs[i], svd->source );
     if ( base_sym != NULL )
-      symbol_add_ref( base_sym, svd->curr_sym );
+      symbol_add_ref( base_sym, svd->curr_sym, svd );
     //
     // Standard library code can call a virtual function on an object of a
     // user-defined derived class, but nothing in the AST shows the call.
@@ -1405,7 +1728,7 @@ static void visit_CXXMethod( CXCursor method_csr, symbols_visit_data *svd ) {
       CXCursor const parent_sym = clang_getCursorSemanticParent( method_csr );
       tidy_symbol *const cls_sym = symbol_add( parent_sym, svd->source );
       if ( cls_sym != NULL ) {
-        symbol_add_ref( cls_sym, svd->curr_sym );
+        symbol_add_ref( cls_sym, svd->curr_sym, svd );
       }
       else {
         // If the class was excluded, just mark the method as a root.
@@ -1539,7 +1862,7 @@ static void visit_FieldDecl( CXCursor field_csr, symbols_visit_data *svd ) {
     //
     tidy_symbol *const cls_sym = svd->curr_sym->parent_sym;
     if ( cls_sym != NULL && svd->curr_sym->ref_sym_set.size > prev_num_refs )
-      symbol_add_ref( cls_sym, svd->curr_sym );
+      symbol_add_ref( cls_sym, svd->curr_sym, svd );
   }
 }
 
@@ -1653,7 +1976,7 @@ static void visit_most_Ref( CXCursor cursor, symbols_visit_data *svd ) {
 
   tidy_symbol *const ref_sym = symbol_add( ref_csr, svd->source );
   if ( ref_sym != NULL ) {
-    symbol_add_ref( svd->curr_sym, ref_sym );
+    symbol_add_ref( svd->curr_sym, ref_sym, svd );
     if ( svd->source->lang == CXLanguage_CPlusPlus )
       cxx_member_def_ctor_add_ref( ref_csr, ref_sym, svd );
   }
@@ -1795,7 +2118,7 @@ static void visit_VarDecl( CXCursor var_decl_csr, symbols_visit_data *svd ) {
       // The constructor and destructor run only if the enclosing function
       // does, so add a reference from the function to the variable.
       //
-      symbol_add_ref( parent_sym, svd->curr_sym );
+      symbol_add_ref( parent_sym, svd->curr_sym, svd );
     }
     else {
       //
@@ -1814,7 +2137,7 @@ void cursor_add_ref( CXCursor to_csr, symbols_visit_data *svd ) {
 
   tidy_symbol *const to_sym = symbol_add( to_csr, svd->source );
   if ( to_sym != NULL )
-    symbol_add_ref( svd->curr_sym, to_sym );
+    symbol_add_ref( svd->curr_sym, to_sym, svd );
 }
 
 tidy_symbol* symbol_add( CXCursor sym_csr, tidy_source const *source ) {
@@ -1869,13 +2192,18 @@ done:
   return sym;
 }
 
-void symbol_add_ref( tidy_symbol *from_sym, tidy_symbol *to_sym ) {
+void symbol_add_ref( tidy_symbol *from_sym, tidy_symbol *to_sym,
+                     symbols_visit_data const *svd ) {
   assert( to_sym != NULL );
+  assert( svd != NULL );
 
-  if ( from_sym == NULL )
+  if ( from_sym == NULL ) {
     to_sym->is_root = true;
-  else
+  }
+  else {
     ht_table_insert( &from_sym->ref_sym_set, to_sym, 0 );
+    symbol_update_ref_origin( from_sym, to_sym, svd );
+  }
 }
 
 void symbols_init( void ) {
@@ -1919,50 +2247,11 @@ unsigned symbols_print_unused( void ) {
   for ( size_t i = 0; i < symbol_array.len; ++i ) {
     tidy_symbol const *const sym = array_at_nc( &symbol_array, i );
     if ( strcmp( sym->loc.path, prev_path ) != 0 ) {
-      color_start( stderr, sgr_locus );
-      EPRINTF( "\"%s\"", sym->loc.path );
-      color_end( stderr, sgr_locus );
-      EPUTS( ": " );
       prev_path = sym->loc.path;
-
-      color_start( stderr, sgr_warning );
-      EPUTS( "warning" );
-      color_end( stderr, sgr_warning );
+      symbol_print_path( sym );
       EPUTS( ": unused symbols:\n" );
     }
-
-    bool const is_defined_in_macro = sym->macro_loc.line > 0;
-
-    color_start( stderr, sgr_locus );
-    EPRINTF( "%5u", sym->loc.line );
-    color_end( stderr, sgr_locus );
-    if ( is_defined_in_macro ) {
-      EPUTS( "   " );                   // same width as ",%2u"
-    }
-    else {
-      EPUTC( ',' );
-      color_start( stderr, sgr_locus );
-      EPRINTF( "%2u", sym->loc.col );
-      color_end( stderr, sgr_locus );
-    }
-
-    EPRINTF( " | \"%s\"", symbol_name_for_print( sym ) );
-    if ( is_defined_in_macro ) {
-      EPUTS( " (defined at " );
-      if ( sym->macro_loc.path != NULL ) {
-        color_start( stderr, sgr_locus );
-        EPRINTF( "\"%s\":", sym->macro_loc.path );
-        color_end( stderr, sgr_locus );
-      }
-      color_start( stderr, sgr_locus );
-      EPRINTF( "%u", sym->macro_loc.line );
-      color_end( stderr, sgr_locus );
-      EPUTC( ',' );
-      color_start( stderr, sgr_locus );
-      EPRINTF( "%u", sym->macro_loc.col );
-      color_end( stderr, sgr_locus );
-      EPUTC( ')' );
-    }
+    symbol_print( sym );
     EPUTC( '\n' );
   } // for
 
@@ -1970,9 +2259,72 @@ unsigned symbols_print_unused( void ) {
   return unused_count;
 }
 
+unsigned symbols_print_unneeded_external( void ) {
+  if ( !print_unneeded_external )
+    return 0;
+
+  ht_iterator_t iter;
+  unsigned unneeded_count = 0;
+
+  ht_iterator_init( &iter, &tidy_symbol_set );
+  for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
+    if ( symbol_is_unneeded_extern( sym ) )
+      ++unneeded_count;
+  } // for
+  if ( unneeded_count == 0 )
+    return 0;
+
+  array_t symbol_array = ARRAY_INIT( sizeof(tidy_symbol) );
+  array_reserve( &symbol_array, unneeded_count );
+
+  ht_iterator_init( &iter, &tidy_symbol_set );
+  for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
+    if ( symbol_is_unneeded_extern( sym ) )
+      *(tidy_symbol*)array_push_back( &symbol_array ) = *sym;
+  } // for
+
+  array_qsort(
+    &symbol_array,
+    POINTER_CAST( array_cmp_fn_t, &symbol_cmp_by_path )
+  );
+
+  char const *prev_path = "";
+  for ( size_t i = 0; i < symbol_array.len; ++i ) {
+    tidy_symbol const *const sym = array_at_nc( &symbol_array, i );
+    if ( strcmp( sym->loc.path, prev_path ) != 0 ) {
+      prev_path = sym->loc.path;
+      symbol_print_path( sym );
+      EPUTS( ": unneeded external linkage:\n" );
+    }
+    symbol_print( sym );
+
+    if ( sym->dec_loc.path != NULL ) {
+      EPUTS( " (delete or move declaration at " );
+      color_start( stderr, sgr_locus );
+      EPRINTF( "\"%s\":%u,%u", sym->dec_loc.path,
+        sym->dec_loc.line, sym->dec_loc.col );
+      color_end( stderr, sgr_locus );
+      EPUTC( ')' );
+    }
+    EPUTC( '\n' );
+  } // for
+
+  array_cleanup( &symbol_array, /*free_fn=*/NULL );
+  return unneeded_count;
+}
+
 unsigned symbols_visit( tidy_source *source ) {
+  assert( source != NULL );
+
+  bool const ignore_extern =
+    config_bool_value( &opt_ignore_extern, source->path );
+
+  if ( !ignore_extern )
+    print_unneeded_external = true;
+
   symbols_visit_data svd = {
     .source = source,
+    .ignore_extern = ignore_extern,
     .cxx_constructor = {
       .ctor_csr = clang_getNullCursor()
     },
@@ -1980,11 +2332,12 @@ unsigned symbols_visit( tidy_source *source ) {
       .cls_csr = clang_getNullCursor(),
       .begin_csr = clang_getNullCursor(),
       .end_csr = clang_getNullCursor()
-    }
+    },
+    .macro_exp_csr = clang_getNullCursor()
   };
   CXCursor const cursor = clang_getTranslationUnitCursor( source->tu );
   clang_visitChildren( cursor, &symbols_visitor, &svd );
-  return fwd_decs_print_unnecessary( source );
+  return fwd_decs_print_unneeded( source );
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -1,10 +1,10 @@
 #include <stdio.h>
 
-void hello( void ) {
+static void hello( void ) {
   printf( "hello, world\n" );
 }
 
-void f( void ) {
+static void f( void ) {
   unused_label: hello();
 }
 

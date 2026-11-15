@@ -668,6 +668,40 @@ bool tidy_isEscapedNewline( CXTranslationUnit tu, CXToken const *tokens,
                             unsigned token_idx );
 
 /**
+ * Gets whether \a loc is in \a file.
+ *
+ * @remarks
+ * @parblock
+ * This is a generalization of `clang_Location_isFromMainFile()` to any file,
+ * but it differs in how it treats macros: it uses the _file location_ of \a
+ * loc (via `clang_getFileLocation()`), not the _spelling location_.
+ *
+ * For a location inside a macro expansion, the file location is where the
+ * macro was _expanded_, whereas the spelling location is where the token was
+ * _written_ (e.g., in the header that defines the macro).  Consider:
+ *
+ *      // foo.h
+ *      #define DEFINE_FN(N)      int N( void ) { return 0; }
+ *
+ *      // foo.c
+ *      #include "foo.h"
+ *      DEFINE_FN( f )
+ *
+ * The location of `f`'s definition is in `foo.c` even if a spelling-based
+ * check were to place the macro's body in `foo.h`.
+ * @endparblock
+ *
+ * @param loc The location to check.
+ * @param file The file to check against.  May be NULL.
+ * @return Returns `true` only if \a file is not NULL, \a loc has a file
+ * location, and that file is the same as \a file.
+ *
+ * @sa tidy_getFileLocation_File()
+ */
+NODISCARD
+bool tidy_Location_isFromFile( CXSourceLocation loc, CXFile file );
+
+/**
  * Gets a pointer to the next non-comment token in \a tokens, if any.
  *
  * @param tokens The array of tokens.

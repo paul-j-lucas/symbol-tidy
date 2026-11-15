@@ -20,7 +20,7 @@
 
 /**
  * @file
- * Defines functions for finding and printing unnecessary forward function
+ * Defines functions for finding and printing unneeded forward function
  * declarations within a single translation unit.
  */
 
@@ -66,7 +66,7 @@ typedef struct fwd_statistics fwd_statistics;
 ////////// structs ////////////////////////////////////////////////////////////
 
 /**
- * A possibly unnecessary forward declaration.
+ * A possibly unneeded forward declaration.
  *
  * @remarks All `*_visit_id` members are values of \ref
  * symbols_visit_data::visit_id, which starts at 1, so 0 means "not seen."
@@ -117,7 +117,7 @@ static void         print_statistics( verbose_stat_ctx* );
 static array_t        fwd_dec_redundant = ARRAY_INIT( sizeof(fwd_dec) );
 
 /**
- * The set of possibly unnecessary forward declarations for the current
+ * The set of possibly unneeded forward declarations for the current
  * translation unit.
  */
 static hash_table_t   fwd_dec_set;
@@ -210,7 +210,7 @@ static bool fwd_dec_is_necessary( fwd_dec const *fwd ) {
     //
     if ( fwd->first_ref_visit_id == 0 ) {
       //
-      // Nothing references it, so the declaration is unnecessary.
+      // Nothing references it, so the declaration is unneeded.
       //
       return false;
     }
@@ -241,8 +241,7 @@ static bool fwd_dec_is_necessary( fwd_dec const *fwd ) {
       //
       // Since the function has internal linkage, it's never used, so it will
       // be reported as an unused symbol, so return true here to pretend it's
-      // necessary so it won't also be reported as unnecessary, i.e., reported
-      // twice.
+      // needed so it won't also be reported as unneeded, i.e., reported twice.
       //
       return true;
     }
@@ -250,7 +249,7 @@ static bool fwd_dec_is_necessary( fwd_dec const *fwd ) {
       //
       // Since it has external linkage, another translation unit may reference
       // it, so it may not reported as unused, so return the truth that its
-      // forward declaration is really unnecessary.
+      // forward declaration is really unneeded.
       //
       return false;
     }
@@ -363,8 +362,7 @@ static void print_statistics( verbose_stat_ctx *vsc ) {
 
 ////////// extern functions ///////////////////////////////////////////////////
 
-void fwd_dec_maybe_unnecessary( CXCursor fn_csr,
-                                symbols_visit_data const *svd ) {
+void fwd_dec_maybe_unneeded( CXCursor fn_csr, symbols_visit_data const *svd ) {
   assert( svd != NULL );
 
   CXSourceLocation const fn_loc = clang_getCursorLocation( fn_csr );
@@ -435,24 +433,23 @@ void fwd_decs_init( void ) {
   ATEXIT( &fwd_decs_cleanup );
 }
 
-unsigned fwd_decs_print_unnecessary( tidy_source const *source ) {
+unsigned fwd_decs_print_unneeded( tidy_source const *source ) {
   assert( source != NULL );
 
-  unsigned unnecessary_count =
-    STATIC_CAST( unsigned, fwd_dec_redundant.len );
+  unsigned unneeded_count = STATIC_CAST( unsigned, fwd_dec_redundant.len );
 
   ht_iterator_t iter;
   ht_iterator_init( &iter, &fwd_dec_set );
   for ( fwd_dec const *fwd; (fwd = ht_iterator_next( &iter )) != NULL; ) {
     if ( !fwd_dec_is_necessary( fwd ) )
-      ++unnecessary_count;
+      ++unneeded_count;
   } // for
 
-  if ( unnecessary_count == 0 )
+  if ( unneeded_count == 0 )
     goto done;
 
   array_t fwd_array = ARRAY_INIT( sizeof(fwd_dec) );
-  array_reserve( &fwd_array, unnecessary_count );
+  array_reserve( &fwd_array, unneeded_count );
 
   for ( size_t i = 0; i < fwd_dec_redundant.len; ++i ) {
     fwd_dec const *const fwd = array_at_nc( &fwd_dec_redundant, i );
@@ -483,7 +480,7 @@ unsigned fwd_decs_print_unnecessary( tidy_source const *source ) {
   color_start( stderr, sgr_warning );
   EPUTS( "warning" );
   color_end( stderr, sgr_warning );
-  EPUTS( ": unnecessary declarations:\n" );
+  EPUTS( ": unneeded declarations:\n" );
 
   for ( size_t i = 0; i < fwd_array.len; ++i ) {
     fwd = array_at_nc( &fwd_array, i );
@@ -542,7 +539,7 @@ next:
 
 done:
   fwd_decs_reset();
-  return unnecessary_count;
+  return unneeded_count;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

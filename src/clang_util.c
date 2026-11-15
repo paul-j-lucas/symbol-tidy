@@ -1303,6 +1303,13 @@ bool tidy_isEscapedNewline( CXTranslationUnit tu, CXToken const *tokens,
   return true;
 }
 
+bool tidy_Location_isFromFile( CXSourceLocation loc, CXFile file ) {
+  if ( file == NULL )
+    return false;
+  CXFile const loc_file = tidy_getFileLocation_File( loc );
+  return loc_file != NULL && clang_File_isEqual( loc_file, file );
+}
+
 CXToken const* tidy_Token_getNext( CXToken const tokens[], unsigned token_count,
                                    unsigned *ptoken_idx ) {
   assert( ptoken_idx != NULL );

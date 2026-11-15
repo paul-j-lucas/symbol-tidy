@@ -7,12 +7,12 @@ struct [[maybe_unused]] unused_struct {
 [[maybe_unused]] void unused_func() {
 }
 
-int f( char const *config ) {
+static int f( char const *config ) {
   (void)config;
   return 0;
 }
 
-void g( char const *config ) {
+static void g( char const *config ) {
   PJL_DISCARD_RV( f( config ) );
 }
 

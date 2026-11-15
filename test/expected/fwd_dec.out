@@ -1,5 +1,5 @@
 $ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers fwd_dec.c
-"fwd_dec.c": warning: unnecessary declarations:
+"fwd_dec.c": warning: unneeded declarations:
     2,13 | "unnecessary_plain"
     8,13 | "unnecessary_attr" (move attributes to definition at line 9)
    12,12 | "unnecessary_recursive"
@@ -12,13 +12,16 @@ $ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers fwd_dec.c
    49,13 | "necessary_mutual_a"
    50,13 | "necessary_mutual_b"
    59,13 | "necessary_dead"
-symbol-tidy: 3 unused symbols; 8 unnecessary declarations
+"fwd_dec.c": warning: unneeded external linkage:
+   19, 6 | "unnecessary_extern"
+   27, 5 | "abs"
+symbol-tidy: 3 unused symbols; 8 unneeded declarations; 2 unneeded external linkage
 
 $ symbol-tidy -std=c++20 -Xtidy --directory=data -Xtidy --no-config-layers fwd_dec.cpp
-"fwd_dec.cpp": warning: unnecessary declarations:
-    3,17 | "lk_moved(int)" (move linkage specification to definition at line 4)
-    8,17 | "lk_both(int)"
-   14,17 | "lk_attr(int)" (move attributes and linkage specification to definition at line 15)
-   18,26 | "cpp_attr(int)" (move attributes to definition at line 19)
-symbol-tidy: 4 unnecessary declarations
+"fwd_dec.cpp": warning: unneeded declarations:
+    4,15 | "lk_moved(int)" (move linkage specification to definition at line 6)
+   11,15 | "lk_both(int)"
+   19,15 | "lk_attr(int)" (move attributes and linkage specification to definition at line 21)
+   24,26 | "cpp_attr(int)" (move attributes to definition at line 25)
+symbol-tidy: 4 unneeded declarations
 

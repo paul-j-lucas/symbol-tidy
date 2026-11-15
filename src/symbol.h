@@ -76,8 +76,16 @@ struct tidy_symbol {
   char const   *cxx_prototype;          ///< C++ prototype.
   tidy_loc      loc;                    ///< Source file location.
   tidy_loc      macro_loc;              ///< Location if defined in a macro.
+  tidy_loc      macro_def_loc;          ///< Macro's definition location.
   tidy_symbol  *parent_sym;             ///< Parent symbol, if any.
   hash_table_t  ref_sym_set;            ///< Symbol(s) referenced from this.
+
+  bool          is_def_in_tu_main_file; ///< Defined in a TU's main file?
+  bool          is_maybe_internal;      ///< Could maybe be static?
+  bool          is_ref_from_other_file; ///< Referenced from other file?
+  tidy_loc      dec_loc;                ///< Location if declared in a header.
+  unsigned      def_tsid;               ///< TU of the most recent definition.
+  unsigned      ref_tsid;               ///< The one TU that referenced it.
 
   /**
    * For C++ functions only, USRs of user-defined classes and enumerations that
@@ -185,6 +193,8 @@ struct tidy_symbol {
 struct symbols_visit_data {
   tidy_source const  *source;           ///< Source file being tidied.
   tidy_symbol        *curr_sym;         ///< Current symbol, if any.
+  bool                ignore_extern;    ///< Ignore unneeded external linkage?
+  CXCursor            macro_exp_csr;    ///< Recent macro expansion, if any.
 
   /**
    * A unique ID for every non-standard-header cursor visited by
@@ -197,11 +207,11 @@ struct symbols_visit_data {
    * @note This relies on clang_visitChildren() visiting cursors in source code
    * order (including `#include`d files).
    *
-   * @note It is currently used only for detecting unnecessary forward
+   * @note It is currently used only for detecting unneeded forward
    * declarations, specifically whether one cursor comes before another, e.g.,
    * whether a function is referenced before its definition.
    *
-   * @sa fwd_dec_maybe_unnecessary()
+   * @sa fwd_dec_maybe_unneeded()
    * @sa fwd_dec_visit_def()
    * @sa fwd_dec_visit_ref()
    */
@@ -292,10 +302,12 @@ tidy_symbol* symbol_add( CXCursor sym_csr, tidy_source const *source );
  * marked as a \ref tidy_symbol::is_root "root".
  * @param to_sym The symbol to add a reference to or be marked as a \ref
  * tidy_symbol::is_root "root".
+ * @param svd The symbols_visit_data to use.
  *
  * @sa cursor_add_ref()
  */
-void symbol_add_ref( tidy_symbol *from_sym, tidy_symbol *to_sym );
+void symbol_add_ref( tidy_symbol *from_sym, tidy_symbol *to_sym,
+                     symbols_visit_data const *svd );
 
 /**
  * Initializes the internal set of all symbols in the translation unit.
@@ -303,6 +315,15 @@ void symbol_add_ref( tidy_symbol *from_sym, tidy_symbol *to_sym );
  * @note This function must be called exactly once.
  */
 void symbols_init( void );
+
+/**
+ * Determines the number of symbols that have external linkage unnecessarily
+ * and prints them.
+ *
+ * @return Returns the number of symbols that have external linkage
+ * unnecessarily.
+ */
+unsigned symbols_print_unneeded_external( void );
 
 /**
  * Determines the number of unused symbols and prints them.
@@ -315,7 +336,7 @@ unsigned symbols_print_unused( void );
  * Visits all symbols in \a source.
  *
  * @param source The source file to visit.
- * @return Returns the number of unnecessary forward declarations for \a source.
+ * @return Returns the number of unneeded forward declarations for \a source.
  */
 unsigned symbols_visit( tidy_source *source );
 

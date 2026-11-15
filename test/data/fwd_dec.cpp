@@ -1,18 +1,24 @@
 // Declaration in extern "C", definition outside it: expect "(move linkage
 // specification to definition at line N)".
-extern "C" void lk_moved( int );
-void lk_moved( int ) {
+extern "C" {
+  static void lk_moved( int );
+}
+static void lk_moved( int ) {
 }
 
 // Declaration and definition both in extern "C": expect no annotation.
-extern "C" void lk_both( int );
-extern "C" void lk_both( int ) {
+extern "C" {
+  static void lk_both( int );
+  static void lk_both( int ) {
+  }
 }
 
 // The same with attributes as well: expect "(move attributes and linkage
 // specification to definition ...)".
-extern "C" void lk_attr( int ) __attribute__((nothrow));
-void lk_attr( int ) {
+extern "C" {
+  static void lk_attr( int ) __attribute__((nothrow));
+}
+static void lk_attr( int ) {
 }
 
 [[noreturn]] static void cpp_attr( int );

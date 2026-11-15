@@ -14,13 +14,13 @@ static int unnecessary_recursive( int n ) {
   return n <= 1 ? 1 : n * unnecessary_recursive( n - 1 );
 }
 
-// External linkage: no annotation.
+// External linkage: expect unnecessary external linkage.
 void unnecessary_extern( int );
 void unnecessary_extern( int n ) {
   (void)n;
 }
 
-// Redeclaration of a library builtin: expect NO annotation.  If
+// Redeclaration of a library builtin: expect unnecessary external linkage.  If
 // clang_Cursor_hasAttrs() counts implicit attributes (e.g., nothrow, const)
 // you'll get a spurious "(move attributes to definition ...)" here.
 int abs( int );

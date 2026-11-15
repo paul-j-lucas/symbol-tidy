@@ -991,7 +991,7 @@ void cxx_field_def_ctor_add_ref( CXCursor field_csr, symbols_visit_data *svd ) {
       //
       tidy_symbol *const ctor_sym = symbol_add( init_csr, svd->source );
       if ( ctor_sym != NULL )
-        symbol_add_ref( svd->curr_sym, ctor_sym );
+        symbol_add_ref( svd->curr_sym, ctor_sym, svd );
     }
     //
     // Otherwise the field is explicitly initialized via an in-class
@@ -1198,7 +1198,7 @@ void cxx_member_def_ctor_add_ref( CXCursor member_csr, tidy_symbol *member_sym,
   tidy_symbol *const def_ctor_sym =
     symbol_add( ctor_info.def_ctor_csr, svd->source );
   if ( def_ctor_sym != NULL )
-    symbol_add_ref( member_sym, def_ctor_sym );
+    symbol_add_ref( member_sym, def_ctor_sym, svd );
 }
 
 bool cxx_operator_add_refs( CXCursor cls_csr, char const *name,

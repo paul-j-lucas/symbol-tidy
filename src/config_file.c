@@ -176,6 +176,7 @@ static void   ignore_paths_parse_string( config_parse_fn_args const* );
 static void   ignore_symbol_cleanup( ignore_symbol* );
 static void   ignore_symbols_parse( config_parse_fn_args const* );
 static void   ignore_symbols_parse_string( config_parse_fn_args const* );
+static void   ignore_unneeded_extern_parse( config_parse_fn_args const* );
 static void   print_statistics( verbose_stat_ctx* );
 static void   print_invalid_value( config_parse_fn_args const*,
                                    toml_value const*, toml_type );
@@ -198,6 +199,8 @@ static config_key const CONFIG_KEYS[] = {
                                 &ignore_cxx_move_assigns_parse              },
   { "ignore-cxx-move-ctors",    TABLE_TIDY_OR_SYMBOL,
                                 &ignore_cxx_move_ctors_parse                },
+  { "ignore-unneeded-extern",   TABLE_TIDY_OR_SOURCE,
+                                &ignore_unneeded_extern_parse               },
   { "ignore-paths",             TABLE_SYMBOL_TIDY,    &ignore_paths_parse   },
   { "ignore-symbols",           TABLE_TIDY_OR_SOURCE, &ignore_symbols_parse },
 };
@@ -418,6 +421,15 @@ void ignore_cxx_move_assigns_parse( config_parse_fn_args const *config ) {
  */
 static void ignore_cxx_move_ctors_parse( config_parse_fn_args const *config ) {
   config_bool_parse( config, &opt_ignore_cxx_move_ctors );
+}
+
+/**
+ * Parses the value of an `"ignore-unneeded-extern"` key.
+ *
+ * @param config The config_parse_fn_args to use.
+ */
+static void ignore_unneeded_extern_parse( config_parse_fn_args const *config ) {
+  config_bool_parse( config, &opt_ignore_extern );
 }
 
 /**

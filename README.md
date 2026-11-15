@@ -23,7 +23,10 @@ Specifically,
   parameters, types, and variable, that are not used at least once
   in any source file comprising a program.
 
-+ Unnecessary function forward declarations in any source file.
++ Functions or variables with unnecessary external linkage
+  that could instead be declared `static`.
+
++ Unnecessary function forward declarations.
 
 That means **Tidy** will print a warning for those that aren't.
 

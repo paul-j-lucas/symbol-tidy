@@ -22,12 +22,12 @@ struct class_without_begin_end {
   static constexpr char MESSAGE[] = "hello, world\n";
 };
 
-inline class_without_begin_end::const_iterator
+static inline class_without_begin_end::const_iterator
 begin( class_without_begin_end const &obj ) {
   return obj.MESSAGE;
 }
 
-inline class_without_begin_end::const_iterator
+static inline class_without_begin_end::const_iterator
 end( class_without_begin_end const &obj ) {
   return obj.MESSAGE + (sizeof(obj.MESSAGE) / sizeof(obj.MESSAGE[0]));
 }

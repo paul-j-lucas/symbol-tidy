@@ -23,7 +23,7 @@
 
 /**
  * @file
- * Declares functions for finding and printing unnecessary forward function
+ * Declares functions for finding and printing unneeded forward function
  * declarations within a single translation unit.
  */
 
@@ -41,15 +41,15 @@
 
 /**
  * @defgroup tidy-fwd-dec-group Forward Declarations
- * Functions for finding unnecessary forward function declarations.
+ * Functions for finding unneeded forward function declarations.
  *
  * @remarks
  * @parblock
- * A forward declaration of a function is unnecessary if it's not referenced
+ * A forward declaration of a function is unneeded if it's not referenced
  * anywhere between its declaration and definition in the same file.
  *
- * Unlike unused symbols, unnecessary forward declarations are reported on a
- * per-translation unit basis since they can't span translation units.
+ * Unlike unused symbols, unneeded forward declarations are reported on a per-
+ * translation unit basis since they can't span translation units.
  * @endparblock
  * @{
  */
@@ -57,8 +57,8 @@
 ////////// extern functions ///////////////////////////////////////////////////
 
 /**
- * Records \a fn_csr as a candidate unnecessary forward declaration, but only
- * if it passes all the filters.
+ * Records \a fn_csr as a candidate unneeded forward declaration, but only if
+ * it passes all the filters.
  *
  * @param fn_csr The cursor for a `CXCursor_FunctionDecl` that is _not_ a
  * definition.
@@ -66,8 +66,7 @@
  *
  * @sa fwd_dec_visit_ref()
  */
-void fwd_dec_maybe_unnecessary( CXCursor fn_csr,
-                                symbols_visit_data const *svd );
+void fwd_dec_maybe_unneeded( CXCursor fn_csr, symbols_visit_data const *svd );
 
 /**
  * Records the definition of a function.  If the function is a candidate,
@@ -76,7 +75,7 @@ void fwd_dec_maybe_unnecessary( CXCursor fn_csr,
  * @param fn_csr The cursor for a function definition.
  * @param svd The symbols_visit_data to use.
  *
- * @sa fwd_dec_maybe_unnecessary()
+ * @sa fwd_dec_maybe_unneeded()
  * @sa fwd_dec_visit_ref()
  */
 void fwd_dec_visit_def( CXCursor fn_csr, symbols_visit_data const *svd );
@@ -100,14 +99,14 @@ void fwd_dec_visit_ref( CXCursor ref_csr, symbols_visit_data const *svd );
 void fwd_decs_init( void );
 
 /**
- * Prints all unnecessary forward declarations found in the current translation
+ * Prints all unneeded forward declarations found in the current translation
  * unit, then discards all state for it.
  *
  * @param source The tidy_source for the translation unit.
- * @return Returns the number of unnecessary forward declarations for \a source.
+ * @return Returns the number of unneeded forward declarations for \a source.
  */
 NODISCARD
-unsigned fwd_decs_print_unnecessary( tidy_source const *source );
+unsigned fwd_decs_print_unneeded( tidy_source const *source );
 
 ///////////////////////////////////////////////////////////////////////////////
 
