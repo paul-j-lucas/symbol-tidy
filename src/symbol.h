@@ -83,6 +83,18 @@ struct tidy_symbol {
   tidy_loc      loc;
 
   /**
+   * Fields only for detecting unneeded external linkage.
+   */
+  struct {
+    tidy_loc    dec_loc;                ///< Location if declared in a header.
+    unsigned    def_tsid;               ///< TU of the most recent definition.
+    unsigned    ref_tsid;               ///< The one TU that referenced it.
+    bool        is_def_in_tu_main_file; ///< Defined in a TU's main file?
+    bool        is_maybe_internal;      ///< Could maybe be static?
+    bool        is_ref_from_other_file; ///< Referenced from other file?
+  } ext;
+
+  /**
    * If the symbol was defined via a macro expansion, these fields give
    * details; otherwise they're all zero or equivalent.
    */
@@ -91,13 +103,6 @@ struct tidy_symbol {
     char const *name;                   ///< Macro's name.
     tidy_loc    def_loc;                ///< Where macro is defined.
   } macro;
-
-  bool          is_def_in_tu_main_file; ///< Defined in a TU's main file?
-  bool          is_maybe_internal;      ///< Could maybe be static?
-  bool          is_ref_from_other_file; ///< Referenced from other file?
-  tidy_loc      dec_loc;                ///< Location if declared in a header.
-  unsigned      def_tsid;               ///< TU of the most recent definition.
-  unsigned      ref_tsid;               ///< The one TU that referenced it.
 
   /**
    * For C++ functions only, USRs of user-defined classes and enumerations that

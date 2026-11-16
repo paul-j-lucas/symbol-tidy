@@ -1001,7 +1001,7 @@ static void symbol_cleanup( tidy_symbol *sym ) {
     FREE( sym->name );
     FREE( sym->cxx_prototype );
     loc_cleanup( &sym->loc );
-    loc_cleanup( &sym->dec_loc );
+    loc_cleanup( &sym->ext.dec_loc );
 
     loc_cleanup( &sym->macro.spelling_loc );
     loc_cleanup( &sym->macro.def_loc );
@@ -1113,7 +1113,7 @@ static bool symbol_is_unneeded_extern( tidy_symbol const *sym ) {
   assert( sym != NULL );
 
   // These checks can be in any order.
-  if ( !sym->is_maybe_internal )
+  if ( !sym->ext.is_maybe_internal )
     return false;                       // Not a candidate for internal.
   if ( sym->is_dead )
     return false;                       // Dead symbols are ignored.
@@ -1121,15 +1121,15 @@ static bool symbol_is_unneeded_extern( tidy_symbol const *sym ) {
     return false;                       // Roots must have external linkage.
   if ( !sym->is_used )
     return false;                       // Unused are reported separately.
-  if ( sym->is_ref_from_other_file )
+  if ( sym->ext.is_ref_from_other_file )
     return false;                       // Referenced from another file.
 
   // But this check must come after those.
-  if ( sym->ref_tsid == 0 )
+  if ( sym->ext.ref_tsid == 0 )
     return true;                        // Used, but referenced indirectly.
 
   // And this check must come after the one above.
-  if ( sym->ref_tsid != sym->def_tsid )
+  if ( sym->ext.ref_tsid != sym->ext.def_tsid )
     return false;                       // Referenced from another TU.
 
   return true;                          // Referenced only from defining TU.
@@ -1233,13 +1233,15 @@ static void symbol_update_dec_loc( tidy_symbol *sym, CXCursor sym_csr,
     return;
   }
 
-  sym->def_tsid = svd->source->tsid;
-  sym->is_def_in_tu_main_file =
+  sym->ext.def_tsid = svd->source->tsid;
+  sym->ext.is_def_in_tu_main_file =
     tidy_Location_isFromFile( sym_loc, svd->source->file );
 
-  if ( !sym->is_def_in_tu_main_file || !cursor_is_maybe_internal( sym_csr ) )
+  if ( !sym->ext.is_def_in_tu_main_file ||
+       !cursor_is_maybe_internal( sym_csr ) ) {
     return;
-  sym->is_maybe_internal = true;
+  }
+  sym->ext.is_maybe_internal = true;
 
   //
   // The canonical cursor is the first declaration.  If it's in a header, then
@@ -1263,8 +1265,8 @@ static void symbol_update_dec_loc( tidy_symbol *sym, CXCursor sym_csr,
   if ( dec_path == NULL )
     return;
 
-  loc_cleanup( &sym->dec_loc );
-  sym->dec_loc = (tidy_loc){
+  loc_cleanup( &sym->ext.dec_loc );
+  sym->ext.dec_loc = (tidy_loc){
     .path = dec_path,
     .line = dec_line,
     .col  = dec_col
@@ -1370,16 +1372,17 @@ static void symbol_update_ref_origin( tidy_symbol const *from_sym,
   assert( to_sym != NULL );
   assert( svd != NULL );
 
-  if ( to_sym->is_ref_from_other_file )
+  if ( to_sym->ext.is_ref_from_other_file )
     return;
 
-  if ( !from_sym->is_def_in_tu_main_file ||
-       from_sym->def_tsid != svd->source->tsid ||
-       (to_sym->ref_tsid != 0 && to_sym->ref_tsid != svd->source->tsid) ) {
-    to_sym->is_ref_from_other_file = true;
+  if ( !from_sym->ext.is_def_in_tu_main_file ||
+       from_sym->ext.def_tsid != svd->source->tsid ||
+       (to_sym->ext.ref_tsid != 0 &&
+        to_sym->ext.ref_tsid != svd->source->tsid) ) {
+    to_sym->ext.is_ref_from_other_file = true;
   }
   else {
-    to_sym->ref_tsid = svd->source->tsid;
+    to_sym->ext.ref_tsid = svd->source->tsid;
   }
 }
 
@@ -2323,11 +2326,11 @@ unsigned symbols_print_unneeded_external( void ) {
     }
     symbol_print( sym );
 
-    if ( sym->dec_loc.path != NULL ) {
+    if ( sym->ext.dec_loc.path != NULL ) {
       EPUTS( " (delete or move declaration at " );
       color_start( stderr, sgr_locus );
-      EPRINTF( "\"%s\":%u,%u", sym->dec_loc.path,
-        sym->dec_loc.line, sym->dec_loc.col );
+      EPRINTF( "\"%s\":%u,%u", sym->ext.dec_loc.path,
+        sym->ext.dec_loc.line, sym->ext.dec_loc.col );
       color_end( stderr, sgr_locus );
       EPUTC( ')' );
     }
