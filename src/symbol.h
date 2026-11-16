@@ -74,6 +74,8 @@ struct tidy_symbol {
   char const   *key;                    ///< Unique key.
   char const   *name;                   ///< Symbol's name.
   char const   *cxx_prototype;          ///< C++ prototype.
+  tidy_symbol  *parent_sym;             ///< Parent symbol, if any.
+  hash_table_t  ref_sym_set;            ///< Symbol(s) referenced from this.
 
   /**
    * Location where defined; if via a macro, where expanded.
@@ -85,13 +87,10 @@ struct tidy_symbol {
    * details; otherwise they're all zero or equivalent.
    */
   struct {
-    tidy_loc      spelling_loc;         ///< Location if defined in a macro.
-    char const   *name;                 ///< Macro's name.
-    tidy_loc      def_loc;              ///< Where macro is defined.
+    tidy_loc    spelling_loc;           ///< Location if defined in a macro.
+    char const *name;                   ///< Macro's name.
+    tidy_loc    def_loc;                ///< Where macro is defined.
   } macro;
-
-  tidy_symbol  *parent_sym;             ///< Parent symbol, if any.
-  hash_table_t  ref_sym_set;            ///< Symbol(s) referenced from this.
 
   bool          is_def_in_tu_main_file; ///< Defined in a TU's main file?
   bool          is_maybe_internal;      ///< Could maybe be static?
