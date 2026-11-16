@@ -1,5 +1,9 @@
 2026-11-15  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * man/man1/symbol-tidy.1, config_file.c, options.c, options.h, symbol.c,
+     symbol.h: Added ignore-unneeded-forwards.
+   * config_file.c, config_file.h: Now doing path_no_dot_slash().
+   * symbol-tidy.c, fwd_dec.out: s/declarations/forwards/
    * man/man1/symbol-tidy.1, clang_util.c, clang_util.h, config_file.c,
      cxx_symbol.c, fwd_dec.c, fwd_dec.h, options.c, options.h, symbol-tidy.c,
      symbol.c, symbol.h, functor.cpp, fwd_dec.c, fwd_dec.cpp, labels.c,
