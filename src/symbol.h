@@ -74,7 +74,11 @@ struct tidy_symbol {
   char const   *key;                    ///< Unique key.
   char const   *name;                   ///< Symbol's name.
   char const   *cxx_prototype;          ///< C++ prototype.
-  tidy_loc      loc;                    ///< Source file location.
+
+  /**
+   * Location where defined; if via a macro, where expanded.
+   */
+  tidy_loc      loc;
 
   /**
    * If the symbol was defined via a macro expansion, these fields give
@@ -83,7 +87,7 @@ struct tidy_symbol {
   struct {
     tidy_loc      spelling_loc;         ///< Location if defined in a macro.
     char const   *name;                 ///< Macro's name.
-    tidy_loc      def_loc;              ///< Macro's definition location.
+    tidy_loc      def_loc;              ///< Where macro is defined.
   } macro;
 
   tidy_symbol  *parent_sym;             ///< Parent symbol, if any.
