@@ -51,6 +51,10 @@ TESTS+=	tests/config-bad-semantics-1.test \
 TESTS+=	tests/enoent.test \
 	tests/error.test
 
+
+# C tests.
+TESTS+=	tests/extern-macro.test
+
 # C++ tests.
 TESTS+=	tests/auto_delete_pool.test \
 	tests/constructors.test \

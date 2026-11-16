@@ -548,9 +548,6 @@ static void cursor_visit_ref( CXCursor cursor, symbols_visit_data *svd ) {
 
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
   switch ( kind ) {
-    case CXCursor_MacroExpansion:
-      svd->macro_exp_csr = cursor;
-      FALLTHROUGH;
     case CXCursor_CallExpr:
     case CXCursor_CXXFunctionalCastExpr:
     case CXCursor_CXXStaticCastExpr:
@@ -559,6 +556,7 @@ static void cursor_visit_ref( CXCursor cursor, symbols_visit_data *svd ) {
     case CXCursor_CXXDynamicCastExpr:
     case CXCursor_DeclRefExpr:
     case CXCursor_LabelRef:
+    case CXCursor_MacroExpansion:
     case CXCursor_MemberRefExpr:
     case CXCursor_TemplateRef:
     case CXCursor_TypeRef:
@@ -953,13 +951,12 @@ static void svd_set_macro_def_loc( symbols_visit_data const *svd,
   if ( clang_equalLocations( sym_exp_loc, clang_getNullLocation() ) )
     return;
 
-  CXSourceLocation const macro_exp_loc =
-    clang_getCursorLocation( svd->macro_exp_csr );
-  if ( !clang_equalLocations( sym_exp_loc, macro_exp_loc ) )
+  CXCursor const macro_exp_csr =
+    clang_getCursor( svd->source->tu, sym_exp_loc );
+  if ( clang_getCursorKind( macro_exp_csr ) != CXCursor_MacroExpansion )
     return;
 
-  CXCursor const macro_def_csr =
-    clang_getCursorReferenced( svd->macro_exp_csr );
+  CXCursor const macro_def_csr = clang_getCursorReferenced( macro_exp_csr );
   if ( tidy_Cursor_isInvalid( macro_def_csr ) )
     return;
 
@@ -2334,8 +2331,7 @@ unsigned symbols_visit( tidy_source *source ) {
       .cls_csr = clang_getNullCursor(),
       .begin_csr = clang_getNullCursor(),
       .end_csr = clang_getNullCursor()
-    },
-    .macro_exp_csr = clang_getNullCursor()
+    }
   };
   CXCursor const cursor = clang_getTranslationUnitCursor( source->tu );
   clang_visitChildren( cursor, &symbols_visitor, &svd );

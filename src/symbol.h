@@ -195,7 +195,6 @@ struct symbols_visit_data {
   tidy_symbol        *curr_sym;         ///< Current symbol, if any.
   bool                ignore_extern;    ///< Ignore unneeded external linkage?
   bool                ignore_forwards;  ///< Ignore unneeded forward decl's?
-  CXCursor            macro_exp_csr;    ///< Recent macro expansion, if any.
 
   /**
    * A unique ID for every non-standard-header cursor visited by
