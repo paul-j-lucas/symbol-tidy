@@ -2318,7 +2318,7 @@ unsigned symbols_visit( tidy_source *source ) {
   assert( source != NULL );
 
   bool const ignore_extern =
-    config_bool_value( &opt_ignore_extern, source->path );
+    config_bool_value( &opt_ignore_externs, source->path );
 
   if ( !ignore_extern )
     print_unneeded_external = true;

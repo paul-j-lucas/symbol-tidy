@@ -432,7 +432,7 @@ static void ignore_cxx_move_ctors_parse( config_parse_fn_args const *config ) {
  * @param config The config_parse_fn_args to use.
  */
 static void ignore_unneeded_extern_parse( config_parse_fn_args const *config ) {
-  config_bool_parse( config, &opt_ignore_extern );
+  config_bool_parse( config, &opt_ignore_externs );
 }
 
 /**
