@@ -66,6 +66,15 @@ bool str_is_any( char const *s, char const *const strings[static 1] ) {
   } // for
 }
 
+// See comment for NONCONST_OVERLOAD regarding ().
+char const* (str_move)( char const **ps ) {
+  if ( ps == NULL )
+    return NULL;
+  char const *const rv_s = *ps;
+  *ps = NULL;
+  return rv_s;
+}
+
 char* strndup_or_exit( char const *s, size_t n ) {
   assert( s != NULL );
   char *const dup = strndup( s, n );

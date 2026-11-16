@@ -149,6 +149,27 @@ bool str_is_any( char const *s, char const *const strings[static 1] );
                                (void*)0 } )
 
 /**
+ * "Moves" the string pointed to by \a *ps by setting it to NULL, but returning
+ * its former value.
+ *
+ * @param ps The pointer to the string pointer to move.
+ * @return Returns the former value of \a *ps.
+ */
+NODISCARD
+char const* str_move( char const **ps );
+
+/// @cond DOXYGEN_IGNORE
+// LCOV_EXCL_START
+NODISCARD
+inline char* nonconst_str_move( char **ps ) {
+  return CONST_CAST( char*, str_move( CONST_CAST( char const**, ps ) ) );
+}
+// LCOV_EXCL_STOP
+
+#define str_move(S)               NONCONST_OVERLOAD( str_move, (S) )
+/// @endcond
+
+/**
  * Calls **strndup**(3) and checks for failure.
  *
  * @remarks If memory allocation fails, prints an error message and exits.

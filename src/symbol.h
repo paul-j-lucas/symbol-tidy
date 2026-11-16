@@ -80,28 +80,48 @@ struct tidy_symbol {
   /**
    * Location where defined; if via a macro, where expanded.
    */
-  tidy_loc      loc;
+  tidy_loc      def_loc;
 
   /**
    * Fields only for detecting unneeded external linkage.
    */
-  struct {
-    tidy_loc    dec_loc;                ///< Location if declared in a header.
+  struct ts_ext_link {
+    /**
+     * Location where declared, but only if in a header.
+     *
+     * @remarks
+     * @parblock
+     * To see the difference between \ref header_dec_loc and \ref def_loc,
+     * consider:
+     *
+     *      // foo.h
+     *      int f( void );              // header_dec_loc: "foo.h":2,5
+     *
+     *      // foo.c
+     *      #include "foo.h"
+     *
+     *      int f( void ) {             // def_loc: "foo.c":4,5
+     *        return 42;
+     *      }
+     *
+     * @endparblock
+     */
+    tidy_loc    header_dec_loc;
+
     unsigned    def_tsid;               ///< TU of the most recent definition.
     unsigned    ref_tsid;               ///< The one TU that referenced it.
     bool        is_def_in_tu_main_file; ///< Defined in a TU's main file?
     bool        is_maybe_internal;      ///< Could maybe be static?
     bool        is_ref_from_other_file; ///< Referenced from other file?
-  } ext;
+  } ext_link;
 
   /**
-   * If the symbol was defined via a macro expansion, these fields give
-   * details; otherwise they're all zero or equivalent.
+   * Fields only for when a symbol was defined via a macro expansion.
    */
-  struct {
+  struct ts_macro {
     tidy_loc    spelling_loc;           ///< Location if defined in a macro.
     char const *name;                   ///< Macro's name.
-    tidy_loc    def_loc;                ///< Where macro is defined.
+    tidy_loc    name_loc;               ///< Location of \ref name.
   } macro;
 
   /**
@@ -169,9 +189,10 @@ struct tidy_symbol {
    * A "dead" symbol is one that is excluded from being considered unused (even
    * if it is unused).  A symbol becomes dead if any of the following are true:
    *
-   *  1. Its \ref tidy_symbol::loc "loc"<tt>.</tt>\ref tidy_loc::path "path" is
-   *     NULL or its \ref tidy_symbol::loc "loc"<tt>.</tt>\ref tidy_loc::line
-   *     "line" is 0 (as they would be for symbols in system headers).
+   *  1. Its \ref tidy_symbol::def_loc "def_loc"<tt>.</tt>\ref tidy_loc::path
+   *     "path" is NULL or its \ref tidy_symbol::def_loc
+   *     "def_loc"<tt>.</tt>\ref tidy_loc::line "line" is 0 (as they would be
+   *     for symbols in system headers).
    *
    *  2. It's within an unused scope.
    * @endparblock
@@ -238,7 +259,7 @@ struct symbols_visit_data {
    * Mini file_previously_seen() result cache that allows cursors from header
    * files we've already visited to be skipped.
    */
-  struct {
+  struct svd_fps {
     CXFile            last_file;        ///< The file for the last cursor.
     bool              last_seen;        ///< Saw \ref last_file?
   } fps;
