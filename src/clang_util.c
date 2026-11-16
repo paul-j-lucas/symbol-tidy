@@ -1050,6 +1050,19 @@ int tidy_Cursor_isSpellingEqualToAny_impl( CXCursor cursor,
   return equal_idx;
 }
 
+char* tidy_dupCursorSpelling( CXCursor cursor ) {
+  if ( tidy_Cursor_isInvalid( cursor ) )
+    return NULL;
+
+  CXString const    name_cxs = clang_getCursorSpelling( cursor );
+  char const *const name_cs = clang_getCString( name_cxs );
+  char *const       rv_name = name_cs != NULL && name_cs[0] != '\0' ?
+                      strdup_or_exit( name_cs ) : NULL;
+
+  clang_disposeString( name_cxs );
+  return rv_name;
+}
+
 CXString tidy_File_getRealPathName( CXFile file ) {
   assert( file != NULL );
 

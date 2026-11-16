@@ -89,6 +89,9 @@ struct tidy_header_stats {
 
 ////////// local functions ////////////////////////////////////////////////////
 
+static void symbol_update_macro_def_loc( tidy_symbol*, CXFile,
+                                         symbols_visit_data const* );
+
 static void visit_Constructor( CXCursor, symbols_visit_data* );
 static void visit_CXXDeleteExpr( CXCursor, symbols_visit_data* );
 static void visit_CXXForRangeStmt( CXCursor, symbols_visit_data* );
@@ -929,65 +932,6 @@ static void print_statistics( verbose_stat_ctx *vsc ) {
 // LCOV_EXCL_STOP
 
 /**
- * If \a sym was defined by the most recent macro expansion visited, sets
- * \a sym's \ref tidy_symbol::macro_def_loc "macro_def_loc" to the location
- * of the macro's name in its definition.
- *
- * @remarks If the expansion can't be matched to \a sym or the macro isn't
- * defined in a source file (e.g., it's from a system header), does nothing.
- *
- * @param sym The tidy_symbol to set the macro name location of.
- * @param sym_file The file \a sym's expansion location is in.
- * @param svd The symbols_visit_data to use.
- */
-static void svd_set_macro_def_loc( symbols_visit_data const *svd,
-                                   tidy_symbol *sym, CXFile sym_file ) {
-  assert( sym != NULL );
-  assert( svd != NULL );
-
-  CXSourceLocation const sym_exp_loc = clang_getLocation(
-    svd->source->tu, sym_file, sym->loc.line, sym->loc.col
-  );
-  if ( clang_equalLocations( sym_exp_loc, clang_getNullLocation() ) )
-    return;
-
-  CXCursor const macro_exp_csr =
-    clang_getCursor( svd->source->tu, sym_exp_loc );
-  if ( clang_getCursorKind( macro_exp_csr ) != CXCursor_MacroExpansion )
-    return;
-
-  CXCursor const macro_def_csr = clang_getCursorReferenced( macro_exp_csr );
-  if ( tidy_Cursor_isInvalid( macro_def_csr ) )
-    return;
-
-  CXSourceLocation const macro_def_loc =
-    clang_getCursorLocation( macro_def_csr );
-
-  CXFile macro_def_file;
-  unsigned macro_def_line, macro_def_col;
-  clang_getSpellingLocation(
-    macro_def_loc, &macro_def_file, &macro_def_line, &macro_def_col,
-    /*offset=*/NULL
-  );
-  if ( macro_def_file == NULL )
-    return;
-
-  char *macro_def_path = NULL;          // NULL means same file as sym
-  if ( !clang_File_isEqual( macro_def_file, sym_file ) ) {
-    macro_def_path = dup_if_source_path( macro_def_file );
-    if ( macro_def_path == NULL )       // e.g., defined in a system header
-      return;
-  }
-
-  loc_cleanup( &sym->macro_def_loc );
-  sym->macro_def_loc = (tidy_loc){
-    .path = macro_def_path,
-    .line = macro_def_line,
-    .col  = macro_def_col
-  };
-}
-
-/**
  * Add the symbol's path, line, and column to \a sym.
  *
  * @param sym The tidy_symbol to add the definition for.
@@ -1038,11 +982,11 @@ static void symbol_add_def( tidy_symbol *sym, CXSourceLocation sym_loc,
   sym->loc.path = path;
 
   if ( is_defined_in_macro ) {
-    FREE( sym->macro_loc.path );        // just in case
-    sym->macro_loc.path = macro_path;
-    sym->macro_loc.line = def_line;
-    sym->macro_loc.col  = def_col;
-    svd_set_macro_def_loc( svd, sym, ref_file );
+    FREE( sym->macro.spelling_loc.path );  // just in case
+    sym->macro.spelling_loc.path = macro_path;
+    sym->macro.spelling_loc.line = def_line;
+    sym->macro.spelling_loc.col  = def_col;
+    symbol_update_macro_def_loc( sym, ref_file, svd );
   }
 }
 
@@ -1058,8 +1002,11 @@ static void symbol_cleanup( tidy_symbol *sym ) {
     FREE( sym->cxx_prototype );
     loc_cleanup( &sym->loc );
     loc_cleanup( &sym->dec_loc );
-    loc_cleanup( &sym->macro_loc );
-    loc_cleanup( &sym->macro_def_loc );
+
+    loc_cleanup( &sym->macro.spelling_loc );
+    loc_cleanup( &sym->macro.def_loc );
+    FREE( sym->macro.name );
+
     ht_table_cleanup( &sym->ref_sym_set, /*free_fn=*/NULL );
     ht_table_cleanup( &sym->cxx_adl_usr_set, /*free_fn=*/NULL );
   }
@@ -1217,7 +1164,7 @@ static void symbol_mark_used( tidy_symbol *sym ) {
 static void symbol_print( tidy_symbol const *sym ) {
   assert( sym != NULL );
 
-  bool const is_defined_in_macro = sym->macro_loc.line > 0;
+  bool const is_defined_in_macro = sym->macro.spelling_loc.line > 0;
 
   color_start( stderr, sgr_locus );
   EPRINTF( "%5u", sym->loc.line );
@@ -1235,10 +1182,10 @@ static void symbol_print( tidy_symbol const *sym ) {
   EPRINTF( " | \"%s\"", symbol_name_for_print( sym ) );
   if ( is_defined_in_macro ) {
     EPUTS( " (defined at " );
-    loc_print( &sym->macro_loc );
-    if ( sym->macro_def_loc.line > 0 ) {
-      EPUTS( " via macro at " );
-      loc_print( &sym->macro_def_loc );
+    loc_print( &sym->macro.spelling_loc );
+    if ( sym->macro.def_loc.line > 0 ) {
+      EPRINTF( " via macro \"%s\" at ", sym->macro.name );
+      loc_print( &sym->macro.def_loc );
     }
     EPUTC( ')' );
   }
@@ -1321,6 +1268,86 @@ static void symbol_update_dec_loc( tidy_symbol *sym, CXCursor sym_csr,
     .path = dec_path,
     .line = dec_line,
     .col  = dec_col
+  };
+}
+
+/**
+ * Updates \a sym's \ref tidy_symbol::macro_def_loc "macro_def_loc" to the
+ * location of the name of the macro whose expansion defined \a sym, i.e., the
+ * macro's name in its `#define`.
+ *
+ * @remarks
+ * @parblock
+ * The macro is found by asking libclang for the macro expansion at \a sym's
+ * expansion location (where the macro was invoked, as opposed to where \a
+ * sym's name was written).  This doesn't depend on the order in which cursors
+ * are visited, which isn't reliable: libclang doesn't visit a macro expansion
+ * cursor just before the declaration it generates.
+ *
+ * If a macro in the same file as \a sym defined it, the path of \a sym's \ref
+ * tidy_symbol::macro_def_loc "macro_def_loc" is set to NULL.
+ *
+ * Does nothing if there's no macro expansion at \a sym's expansion location,
+ * the macro's definition can't be found, or the macro isn't defined in a source
+ * file (e.g., it's from a system header).
+ * @endparblock
+ *
+ * @param sym The tidy_symbol to update the macro defintion location of.
+ * @param sym_file The file \a sym's expansion location is in.
+ * @param svd The symbols_visit_data to use.
+ */
+static void symbol_update_macro_def_loc( tidy_symbol *sym, CXFile sym_file,
+                                         symbols_visit_data const *svd ) {
+  assert( sym != NULL );
+  assert( svd != NULL );
+
+  CXSourceLocation const sym_exp_loc = clang_getLocation(
+    svd->source->tu, sym_file, sym->loc.line, sym->loc.col
+  );
+  if ( clang_equalLocations( sym_exp_loc, clang_getNullLocation() ) )
+    return;
+
+  CXCursor const macro_exp_csr =
+    clang_getCursor( svd->source->tu, sym_exp_loc );
+  if ( clang_getCursorKind( macro_exp_csr ) != CXCursor_MacroExpansion )
+    return;
+
+  CXCursor const macro_def_csr = clang_getCursorReferenced( macro_exp_csr );
+  if ( tidy_Cursor_isInvalid( macro_def_csr ) )
+    return;
+
+  CXSourceLocation const macro_def_loc =
+    clang_getCursorLocation( macro_def_csr );
+
+  CXFile macro_def_file;
+  unsigned macro_def_line, macro_def_col;
+  clang_getSpellingLocation(
+    macro_def_loc, &macro_def_file, &macro_def_line, &macro_def_col,
+    /*offset=*/NULL
+  );
+  if ( macro_def_file == NULL )
+    return;
+
+  char *macro_def_path = NULL;          // NULL means same file as sym
+  if ( !clang_File_isEqual( macro_def_file, sym_file ) ) {
+    macro_def_path = dup_if_source_path( macro_def_file );
+    if ( macro_def_path == NULL )       // e.g., defined in a system header
+      return;
+  }
+
+  char *const macro_name = tidy_dupCursorSpelling( macro_def_csr );
+  if ( unlikely( macro_name == NULL ) ) {
+    free( macro_def_path );
+    return;
+  }
+
+  FREE( sym->macro.name );
+  sym->macro.name = macro_name;
+  loc_cleanup( &sym->macro.def_loc );
+  sym->macro.def_loc = (tidy_loc){
+    .path = macro_def_path,
+    .line = macro_def_line,
+    .col  = macro_def_col
   };
 }
 

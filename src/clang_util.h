@@ -426,6 +426,19 @@ bool tidy_Cursor_isSpellingEqualTo( CXCursor cursor, char const *value );
 NODISCARD
 int tidy_Cursor_isSpellingEqualToAny_impl( CXCursor cursor,
                                            char const *values[] );
+
+/**
+ * Similar to `clang_getCursorSpelling()` except the spelling is duplicated.
+ *
+ * @param cursor The cursor to get the spelling of.
+ * @return Returns a copy of \a cursor's spelling or NULL if \a cursor is
+ * either invalid or it's spelling is empty.
+ *
+ * @note The caller is responsible for freeing the returned string.
+ */
+NODISCARD
+char* tidy_dupCursorSpelling( CXCursor cursor );
+
 /**
  * Gets the real path of \a file.
  *

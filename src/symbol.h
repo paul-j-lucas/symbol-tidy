@@ -72,11 +72,20 @@ struct tidy_loc {
  */
 struct tidy_symbol {
   char const   *key;                    ///< Unique key.
-  char const   *name;                   ///< Name.
+  char const   *name;                   ///< Symbol's name.
   char const   *cxx_prototype;          ///< C++ prototype.
   tidy_loc      loc;                    ///< Source file location.
-  tidy_loc      macro_loc;              ///< Location if defined in a macro.
-  tidy_loc      macro_def_loc;          ///< Macro's definition location.
+
+  /**
+   * If the symbol was defined via a macro expansion, these fields give
+   * details; otherwise they're all zero or equivalent.
+   */
+  struct {
+    tidy_loc      spelling_loc;         ///< Location if defined in a macro.
+    char const   *name;                 ///< Macro's name.
+    tidy_loc      def_loc;              ///< Macro's definition location.
+  } macro;
+
   tidy_symbol  *parent_sym;             ///< Parent symbol, if any.
   hash_table_t  ref_sym_set;            ///< Symbol(s) referenced from this.
 
