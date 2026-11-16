@@ -1,3 +1,10 @@
+2026-11-16  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * clang_util.c, clang_util.h, symbol.c, symbol.h, extern-macro.out: Now
+     including macro's name.
+   * symbol.c, symbol.h, test/Makefile.am, extern-macro.c, extern-macro.h,
+     extern-macro.out, extern-macro.test: Fixed setting of macro_def_loc.
+
 2026-11-15  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
    * man/man1/symbol-tidy.1, config_file.c, options.c, options.h, symbol.c,
