@@ -194,6 +194,7 @@ struct symbols_visit_data {
   tidy_source const  *source;           ///< Source file being tidied.
   tidy_symbol        *curr_sym;         ///< Current symbol, if any.
   bool                ignore_extern;    ///< Ignore unneeded external linkage?
+  bool                ignore_forwards;  ///< Ignore unneeded forward decl's?
   CXCursor            macro_exp_csr;    ///< Recent macro expansion, if any.
 
   /**

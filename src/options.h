@@ -118,6 +118,7 @@ extern config_bool  opt_ignore_cxx_copy_ctors;   ///< Ignore copy constructors?
 extern config_bool  opt_ignore_cxx_move_assigns; ///< Ignore move assignments?
 extern config_bool  opt_ignore_cxx_move_ctors;   ///< Ignore move constructors?
 extern config_bool  opt_ignore_extern;  ///< Ignore unneeded external linkage?
+extern config_bool  opt_ignore_forwards;///< Ignore unneeded forwards?
 extern tidy_test    opt_test;           ///< Is **symbol-tidy** under test?
 extern tidy_verbose opt_verbose;        ///< Print verbose output?
 

@@ -663,6 +663,10 @@ or variables
 that have external linkage
 but could have internal linkage
 (\f(CWstatic\fP) instead.
+.TP
+.BI ignore-unneeded-forwards " \f1=\fP b"
+If true,
+this option ignores unneeded forward declarations.
 .SS Source Tables
 This type of table specifies a source file,
 either a \f(CW.c\fP or \f(CW.cpp\fP
@@ -701,6 +705,11 @@ Same as in the
 but only for the source file given for the table name.
 .TP
 .BI ignore-unneeded-extern " \f1=\fP b"
+Same as in the
+.BR "symbol-tidy Table" ,
+but only for the source file given for the table name.
+.TP
+.BI ignore-unneeded-forwards " \f1=\fP b"
 Same as in the
 .BR "symbol-tidy Table" ,
 but only for the source file given for the table name.

@@ -578,7 +578,8 @@ static void cursor_visit_ref( CXCursor cursor, symbols_visit_data *svd ) {
       break;
 
     case CXCursor_FunctionDecl:
-      fwd_dec_maybe_unneeded( cursor, svd );
+      if ( !svd->ignore_forwards )
+        fwd_dec_maybe_unneeded( cursor, svd );
       break;
 
     case CXCursor_OverloadedDeclRef:
@@ -2325,6 +2326,7 @@ unsigned symbols_visit( tidy_source *source ) {
   symbols_visit_data svd = {
     .source = source,
     .ignore_extern = ignore_extern,
+    .ignore_forwards = config_bool_value( &opt_ignore_forwards, source->path ),
     .cxx_constructor = {
       .ctor_csr = clang_getNullCursor()
     },
