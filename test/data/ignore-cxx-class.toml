@@ -1,0 +1,5 @@
+[S]
+ignore-cxx-copy-ctors = true
+ignore-cxx-move-ctors = true
+ignore-cxx-copy-assigns = true
+ignore-cxx-move-assigns = true

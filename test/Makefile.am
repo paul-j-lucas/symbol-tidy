@@ -63,7 +63,7 @@ TESTS+=	tests/auto_delete_pool.test \
 	tests/exception-unused.test \
 	tests/exception-used.test \
 	tests/functor.test \
-	tests/fwd_dec.test \
+	tests/ignore-cxx.test \
 	tests/new-delete.test \
 	tests/range-for.test \
 	tests/std-exclude.test \
@@ -77,6 +77,7 @@ TESTS+=	tests/auto_delete_pool.test \
 # Miscellaneous tests.
 TESTS+=	tests/c-cxx-1.test \
 	tests/c-cxx-2.test \
+	tests/fwd_dec.test \
 	tests/maybe_unused.test
 
 ###############################################################################
