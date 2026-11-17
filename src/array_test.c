@@ -22,6 +22,7 @@
 #include "pjl_config.h"                 /* must go first */
 #include "array.h"
 #include "unit_test.h"
+#include "util.h"
 
 /// @cond DOXYGEN_IGNORE
 
@@ -149,6 +150,137 @@ static bool test_array_grow( void ) {
   TEST_FUNC_END();
 }
 
+static bool test_insert( void ) {
+  TEST_FUNC_BEGIN();
+
+  array_t a = ARRAY_INIT( sizeof(int) );
+  int *e;
+
+  // Insert 0 elements.
+  TEST( array_insert( &a, 0, 0 ) == NULL );
+  TEST( a.elements == NULL );
+  TEST( a.len == 0 );
+
+  // Insert 1 element into an empty array.
+  e = array_insert( &a, 0, 1 );
+  TEST( a.elements != NULL );
+  TEST( a.len == 1 );
+  TEST( a.cap >= a.len );
+  if ( TEST( e != NULL ) )
+    *e = 10;
+  if ( TEST( (e = array_at_nc( &a, 0 )) != NULL ) )
+    TEST( *e == 10 );
+
+  array_cleanup( &a, NULL );
+
+  // Insert >1 elements into an empty array.
+  e = array_insert( &a, 0, 2 );
+  TEST( a.elements != NULL );
+  TEST( a.len == 2 );
+  TEST( a.cap >= a.len );
+  if ( TEST( e != NULL ) ) {
+    e[0] = 10;
+    e[1] = 40;
+  }
+  if ( TEST( (e = array_at_nc( &a, 0 )) != NULL ) )
+    TEST( *e == 10 );
+  if ( TEST( (e = array_at_nc( &a, 1 )) != NULL ) )
+    TEST( *e == 40 );
+
+  // Insert 1 element in the middle: [10, 40] -> [10, 20, 40].
+  e = array_insert( &a, 1, 1 );
+  TEST( a.len == 3 );
+  if ( TEST( e != NULL ) )
+    *e = 20;
+  if ( TEST( (e = array_at_nc( &a, 0 )) != NULL ) )
+    TEST( *e == 10 );
+  if ( TEST( (e = array_at_nc( &a, 1 )) != NULL ) )
+    TEST( *e == 20 );
+  if ( TEST( (e = array_at_nc( &a, 2 )) != NULL ) )
+    TEST( *e == 40 );
+
+  // Insert >1 elements in the middle: [10, 20, 40] -> [10, 20, 30, 35, 40].
+  e = array_insert( &a, 2, 2 );
+  TEST( a.len == 5 );
+  if ( TEST( e != NULL ) ) {
+    e[0] = 30;
+    e[1] = 35;
+  }
+  if ( TEST( (e = array_at_nc( &a, 0 )) != NULL ) )
+    TEST( *e == 10 );
+  if ( TEST( (e = array_at_nc( &a, 1 )) != NULL ) )
+    TEST( *e == 20 );
+  if ( TEST( (e = array_at_nc( &a, 2 )) != NULL ) )
+    TEST( *e == 30 );
+  if ( TEST( (e = array_at_nc( &a, 3 )) != NULL ) )
+    TEST( *e == 35 );
+  if ( TEST( (e = array_at_nc( &a, 4 )) != NULL ) )
+    TEST( *e == 40 );
+
+  // Insert 1 element at the end: [10, 20, 30, 35, 40] -> [..., 50].
+  e = array_insert( &a, a.len, 1 );
+  TEST( a.len == 6 );
+  if ( TEST( e != NULL ) )
+    *e = 50;
+  if ( TEST( (e = array_at_nc( &a, 5 )) != NULL ) )
+    TEST( *e == 50 );
+
+  // Insert >1 elements at the end: [..., 50] -> [..., 50, 60, 70].
+  e = array_insert( &a, a.len, 2 );
+  TEST( a.len == 8 );
+  if ( TEST( e != NULL ) ) {
+    e[0] = 60;
+    e[1] = 70;
+  }
+  if ( TEST( (e = array_at_nc( &a, 6 )) != NULL ) )
+    TEST( *e == 60 );
+  if ( TEST( (e = array_at_nc( &a, 7 )) != NULL ) )
+    TEST( *e == 70 );
+
+  // Insert 1 element past the end: [..., 70] -> [..., 70, 80].
+  e = array_insert( &a, a.len + 5, 1 );
+  TEST( a.len == 9 );
+  if ( TEST( e != NULL ) )
+    *e = 80;
+  if ( TEST( (e = array_at_nc( &a, 8 )) != NULL ) )
+    TEST( *e == 80 );
+
+  // Insert >1 elements past the end: [..., 80] -> [..., 80, 90, 100].
+  e = array_insert( &a, a.len + 10, 2 );
+  TEST( a.len == 11 );
+  if ( TEST( e != NULL ) ) {
+    e[0] = 90;
+    e[1] = 100;
+  }
+
+  static int const EXPECTED[] = {
+    10, 20, 30, 35, 40, 50, 60, 70, 80, 90, 100
+  };
+  TEST( a.len == ARRAY_SIZE( EXPECTED ) );
+  for ( size_t i = 0; i < a.len; ++i ) {
+    if ( TEST( (e = array_at_nc( &a, i )) != NULL ) )
+      TEST( *e == EXPECTED[i] );
+  }
+
+  array_cleanup( &a, NULL );
+
+  // Insert >1 elements past the end of an empty array.
+  e = array_insert( &a, 5, 2 );
+  TEST( a.elements != NULL );
+  TEST( a.len == 2 );
+  if ( TEST( e != NULL ) ) {
+    e[0] = 1;
+    e[1] = 2;
+  }
+  if ( TEST( (e = array_at_nc( &a, 0 )) != NULL ) )
+    TEST( *e == 1 );
+  if ( TEST( (e = array_at_nc( &a, 1 )) != NULL ) )
+    TEST( *e == 2 );
+
+  array_cleanup( &a, NULL );
+  TEST_FUNC_END();
+}
+
 static bool test_array_push_array_back( void ) {
   TEST_FUNC_BEGIN();
 
@@ -239,6 +371,7 @@ int main( int argc, char const *const argv[] ) {
   if ( test_array_basics() ) {
     test_array_cleanup();
     test_array_grow();
+    test_insert();
     test_array_push_array_back();
     test_array_sort_unique_bsearch();
   }
