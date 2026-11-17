@@ -89,20 +89,25 @@ struct tidy_symbol {
     /**
      * Location where declared, but only if in a header.
      *
-     * @remarks
+     * @par Example
      * @parblock
      * To see the difference between \ref header_dec_loc and \ref def_loc,
      * consider:
      *
      *      // foo.h
-     *      int f( void );              // header_dec_loc: "foo.h":2,5
+     *      int f( void );              // line 2
      *
      *      // foo.c
      *      #include "foo.h"
      *
-     *      int f( void ) {             // def_loc: "foo.c":4,5
+     *      int f( void ) {             // line 4
      *        return 42;
      *      }
+     *
+     * Then:
+     *
+     *  + header_dec_loc = `"foo.h":2,5`
+     *  + def_loc = `"foo.c":4,5`
      *
      * @endparblock
      */
@@ -117,6 +122,26 @@ struct tidy_symbol {
 
   /**
    * Fields only for when a symbol was defined via a macro expansion.
+   *
+   * @par Example
+   * @parblock
+   * To see the difference between \ref spelling_loc and \ref def_loc,
+   * consider:
+   *
+   *      // foo.h
+   *      #define DEF_FN(FN)      int FN( void ) { return 42; }
+   *
+   *      // foo.c
+   *      #include "foo.h"
+   *
+   *      DEF_FN( bar )                 // line 4
+   *
+   * Then
+   *
+   *  + loc = `"foo.c":4,1`
+   *  + spelling_loc = `"foo.c":4,9`
+   *
+   * @endparblock
    */
   struct ts_macro {
     tidy_loc    spelling_loc;           ///< Location if defined in a macro.
