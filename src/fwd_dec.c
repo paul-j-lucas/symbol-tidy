@@ -166,8 +166,6 @@ static int fwd_dec_cmp_by_visit_id( fwd_dec const *i_fwd,
  */
 NODISCARD
 static fwd_dec* fwd_dec_find( CXCursor canon_csr ) {
-  if ( fwd_dec_set.size == 0 )
-    return NULL;
   fwd_dec const find_fwd = { .canon_csr = canon_csr };
   ht_entry_t const *const entry = ht_table_find( &fwd_dec_set, &find_fwd );
   return entry != NULL ? HT_DINT( entry ) : NULL;
@@ -292,6 +290,7 @@ static void fwd_decs_reset( void ) {
   if ( !IS_VERBOSE( STATISTICS ) )
     goto skip;
 
+  // LCOV_EXCL_START
   fwd_dec const *fwd = NULL;
 
   double const lf = ht_table_load_factor( &fwd_dec_set );
@@ -309,6 +308,7 @@ static void fwd_decs_reset( void ) {
     free( fwd_stats.max_size_path );
     fwd_stats.max_size_path = tidy_Cursor_dupFileName( fwd->dec_csr );
   }
+  // LCOV_EXCL_STOP
 
 skip:
   ht_table_clear( &fwd_dec_set, /*free_fn=*/NULL );
@@ -327,6 +327,7 @@ static void fwd_statistics_cleanup( fwd_statistics *stats ) {
   }
 }
 
+// LCOV_EXCL_START -- called only by fwd_decs_reset() when printing statistics
 /**
  * Gets the data of an arbitrary entry of \a table.
  *
@@ -340,6 +341,7 @@ static void const* ht_table_get_any( hash_table_t const *table ) {
   ht_iterator_init( &iter, table );
   return ht_iterator_next( &iter );
 }
+// LCOV_EXCL_STOP
 
 // LCOV_EXCL_START
 /**

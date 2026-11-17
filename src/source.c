@@ -87,14 +87,14 @@ static void include_visitor( CXFile included_file,
   (void)inclusion_stack;
   (void)inclusion_len;
 
-  if ( included_file == NULL )
-    return;
+  if ( unlikely( included_file == NULL ) )
+    return;                             // LCOV_EXCL_LINE
 
   CXString const  path_cxs = clang_getFileName( included_file );
   char const     *path_cs = clang_getCString( path_cxs );
 
-  if ( path_cs == NULL || path_cs[0] == '\0' )
-    goto skip;
+  if ( unlikely( path_cs == NULL || path_cs[0] == '\0' ) )
+    goto skip;                              // LCOV_EXCL_LINE
   if ( path_is_absolute( path_cs ) )
     goto skip;
   path_cs = path_no_dot_slash( path_cs );
@@ -352,7 +352,7 @@ static void sources_cleanup( void ) {
 
 bool is_source_path( char const *path ) {
   if ( path == NULL || path[0] == '\0' )
-    return false;
+    return false;                       // LCOV_EXCL_LINE
   path = path_no_dot_slash( path );
   ht_entry_t const *const found_ht = ht_table_find( &source_file_set, path );
   return found_ht != NULL;
