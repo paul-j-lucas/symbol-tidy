@@ -228,7 +228,7 @@
 
 /**
  * Casts the result of \a N to an unsigned type whose size is
- * <code>sizeof(</code>\a N<code>)</code>.
+ * <code>sizeof(</code><i>N</i><code>)</code>.
  *
  * @param N An integral expression.
  * @return Returns \a N cast to an unsigned type.
