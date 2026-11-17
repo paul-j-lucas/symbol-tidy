@@ -120,6 +120,7 @@ char* strn_trim( char *s, size_t n ) {
 extern inline char const* (empty_if_null)( char const* );
 extern inline char* (nonconst_null_if_empty)( char* );
 extern inline char* (nonconst_empty_if_null)( char* );
+extern inline char* (nonconst_str_move)( char** );
 extern inline char* (nonconst_strnrchr)( char*, size_t, int );
 extern inline char const* (null_if_empty)( char const* );
 
