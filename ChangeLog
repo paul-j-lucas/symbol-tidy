@@ -1,3 +1,9 @@
+2026-11-17  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * test/Makefile.am, ignore-cxx-class.toml, ignore-cxx-global.toml,
+     ignore-cxx.cpp, ignore-cxx.out, ignore-cxx.test: Added ignore-cxx-* tests.
+   * str_util.c: Added missing nonconst_str_move definition.
+
 2026-11-16  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
    * symbol.c: Made != NULL explicit.
