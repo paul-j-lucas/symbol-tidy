@@ -1235,10 +1235,10 @@ static void symbol_update_dec_loc( tidy_symbol *sym, CXCursor sym_csr,
   }
 
   sym->ext_link.def_tsid = svd->source->tsid;
-  sym->ext_link.is_def_in_tu_main_file =
+  sym->ext_link.is_def_in_main_file =
     tidy_Location_isFromFile( sym_loc, svd->source->file );
 
-  if ( !sym->ext_link.is_def_in_tu_main_file ||
+  if ( !sym->ext_link.is_def_in_main_file ||
        !cursor_is_maybe_internal( sym_csr ) ) {
     return;
   }
@@ -1375,7 +1375,7 @@ static void symbol_update_ref_origin( tidy_symbol const *from_sym,
   if ( to_sym->ext_link.is_ref_from_other_file )
     return;
 
-  if ( !from_sym->ext_link.is_def_in_tu_main_file ||
+  if ( !from_sym->ext_link.is_def_in_main_file ||
        from_sym->ext_link.def_tsid != svd->source->tsid ||
        (to_sym->ext_link.ref_tsid != 0 &&
         to_sym->ext_link.ref_tsid != svd->source->tsid) ) {
