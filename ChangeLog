@@ -1,5 +1,6 @@
 2026-11-16  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * symbol.c: Made != NULL explicit.
    * clang_util.c, clang_util.h, symbol.c, symbol.h, extern-macro.out: Now
      including macro's name.
    * symbol.c, symbol.h, test/Makefile.am, extern-macro.c, extern-macro.h,
