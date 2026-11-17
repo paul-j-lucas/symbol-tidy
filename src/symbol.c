@@ -1210,9 +1210,9 @@ static void symbol_print_path( tidy_symbol const *sym  ) {
 }
 
 /**
- * Records, for the symbol that \a sym_csr defines, whether it's a candidate
- * for having its external linkage removed and, if so, where its first
- * declaration is when that's in a header.
+ * Checks \a sym (that \a sym_csr defines) to see if it has external linkage
+ * and is a candidate for having internal linkage instead, and, if so, where
+ * its first declaration is when it's in a header.
  *
  * @param sym The tidy_symbol for \a sym_csr.
  * @param sym_csr The cursor for the definition of \a sym.
@@ -1279,21 +1279,9 @@ static void symbol_update_dec_loc( tidy_symbol *sym, CXCursor sym_csr,
  * the location of the name of the macro whose expansion defined \a sym, i.e.,
  * the macro's name in its `#define`.
  *
- * @remarks
- * @parblock
- * The macro is found by asking libclang for the macro expansion at \a sym's
- * expansion location (where the macro was invoked, as opposed to where \a
- * sym's name was written).  This doesn't depend on the order in which cursors
- * are visited, which isn't reliable: libclang doesn't visit a macro expansion
- * cursor just before the declaration it generates.
- *
- * If a macro in the same file as \a sym defined it, the path of \a sym's \ref
- * tidy_symbol::ts_macro::name_loc "macro.name_loc" is set to NULL.
- *
- * Does nothing if there's no macro expansion at \a sym's expansion location,
- * the macro's definition can't be found, or the macro isn't defined in a
- * source file (e.g., it's from a system header).
- * @endparblock
+ * @note If the macro in the same file as \a sym's definition, the \ref
+ * tidy_loc::path "path" of \a sym's \ref tidy_symbol::ts_macro::name_loc
+ * "macro.name_loc" is set to NULL.
  *
  * @param sym The tidy_symbol to update the macro defintion location of.
  * @param sym_file The file \a sym's expansion location is in.
@@ -1357,9 +1345,9 @@ static void symbol_update_macro_name_loc( tidy_symbol *sym, CXFile sym_file,
  * Updates \a to_sym's reference-origin information given that it's referenced
  * by \a from_sym in the current translation unit.
  *
- * @remarks A reference from anything not defined in the current TU's main file
- * (i.e., a header) counts as a reference from "elsewhere" since the header may
- * be included by other translation units.
+ * @remarks A reference from anything not defined in the current source's main
+ * file (e.g., a header) counts as a reference from "elsewhere" since the
+ * header may be included by other translation units.
  *
  * @param from_sym The referencing symbol.
  * @param to_sym The referenced symbol.
@@ -1375,13 +1363,31 @@ static void symbol_update_ref_origin( tidy_symbol const *from_sym,
   if ( to_sym->ext_link.is_ref_from_other_file )
     return;
 
-  if ( !from_sym->ext_link.is_def_in_main_file ||
+  if ( //
+       // The referencing symbol isn't defined in a source's main file that
+       // means it's in a header that other sources may include; or in a source
+       // file for which checking is ignored (so this flas was never set).
+       //
+       !from_sym->ext_link.is_def_in_main_file ||
+
+       //
+       // The referencing symbol was defined in a source file other than the
+       // one being visited.  This shouldn't happen: it's a defensive check.
+       //
        from_sym->ext_link.def_tsid != svd->source->tsid ||
+
+       //
+       // An earlier reference came from a source file other than the current
+       // one.
+       //
        (to_sym->ext_link.ref_tsid != 0 &&
         to_sym->ext_link.ref_tsid != svd->source->tsid) ) {
     to_sym->ext_link.is_ref_from_other_file = true;
   }
   else {
+    //
+    // The first reference (or another one from the same source's main file).
+    //
     to_sym->ext_link.ref_tsid = svd->source->tsid;
   }
 }
