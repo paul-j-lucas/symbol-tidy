@@ -132,7 +132,7 @@ static bool               print_unneeded_external;
  */
 NODISCARD
 static inline char const* symbol_name_for_print( tidy_symbol const *sym ) {
-  return sym->cxx_prototype ? sym->cxx_prototype : sym->name;
+  return sym->cxx_prototype != NULL ? sym->cxx_prototype : sym->name;
 }
 
 ////////// local functions ////////////////////////////////////////////////////
