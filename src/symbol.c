@@ -629,8 +629,9 @@ static char* dup_if_source_path( CXFile file ) {
  * already visted for an earlier translation unit of the same language.
  *
  * @remarks The first top-level cursor from a file registers it with the
- * current TU's serial and is visted, as are the rest of that file's cursors in
- * the same TU.  In later TUs, the serial differs, so they're skipped.
+ * current source's serial and is visited, as are the rest of that file's
+ * cursors in the same source.  In later sources, the serial differs, so
+ * they're skipped.
  *
  * @param file The cursor's file.
  * @param svd The symbols_visit_data to use.
@@ -1126,25 +1127,25 @@ static bool symbol_is_unneeded_extern( tidy_symbol const *sym ) {
 
   // These checks can be in any order.
   if ( !sym->ext_link.is_maybe_internal )
-    return false;                       // Not a candidate for internal.
+    return false;                       // not a candidate for internal
   if ( sym->is_dead )
-    return false;                       // Dead symbols are ignored.
+    return false;                       // dead symbols are ignored
   if ( sym->is_root )
-    return false;                       // Roots must have external linkage.
+    return false;                       // roots must have external linkage
   if ( !sym->is_used )
-    return false;                       // Unused are reported separately.
+    return false;                       // unused are reported separately
   if ( sym->ext_link.is_ref_from_other_file )
-    return false;                       // Referenced from another file.
+    return false;                       // referenced from another file
 
   // But this check must come after those.
   if ( sym->ext_link.ref_tsid == 0 )
-    return true;                        // Used, but referenced indirectly.
+    return true;                        // used, but referenced indirectly
 
   // And this check must come after the one above.
   if ( sym->ext_link.ref_tsid != sym->ext_link.def_tsid )
-    return false;                       // Referenced from another TU.
+    return false;                       // referenced from another source
 
-  return true;                          // Referenced only from defining TU.
+  return true;                          // referenced only from defining source
 }
 
 /**
@@ -1311,7 +1312,8 @@ static void symbol_update_macro_name_loc( tidy_symbol *sym, CXFile sym_file,
 
   CXCursor const macro_exp_csr =
     clang_getCursor( svd->source->tu, sym_exp_loc );
-  if ( clang_getCursorKind( macro_exp_csr ) != CXCursor_MacroExpansion )
+  enum CXCursorKind const kind = clang_getCursorKind( macro_exp_csr );
+  if ( kind != CXCursor_MacroExpansion )
     return;
 
   CXCursor const macro_def_csr = clang_getCursorReferenced( macro_exp_csr );
