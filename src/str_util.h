@@ -166,7 +166,7 @@ inline char* nonconst_str_move( char **ps ) {
 }
 // LCOV_EXCL_STOP
 
-#define str_move(S)               NONCONST_OVERLOAD( str_move, (S) )
+#define str_move(S)               NONCONST_OVERLOAD_P2P( str_move, (S) )
 /// @endcond
 
 /**

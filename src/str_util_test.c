@@ -60,6 +60,31 @@ static bool test_str_is_any( void ) {
   TEST_FUNC_END();
 }
 
+static bool test_str_move( void ) {
+  TEST_FUNC_BEGIN();
+
+  char const *s0 = NULL;
+  TEST( str_move( &s0 ) == NULL );
+
+  char const *s1a = NULL;
+  char const *s1b = str_move( &s1a );
+  TEST( s1a == NULL );
+  TEST( s1b == NULL );
+
+  char const *s2a = "x";
+  char const *s2b = str_move( &s2a );
+  TEST( s2a == NULL );
+  TEST( s2b != NULL ) && TEST( s2b[0] == 'x' );
+
+  char s3_buf[] = "y";
+  char *s3a = s3_buf;
+  char *s3b = str_move( &s3a );
+  TEST( s3a == NULL );
+  TEST( s3b == s3_buf );
+
+  TEST_FUNC_END();
+}
+
 static bool test_strn_trim( void ) {
   TEST_FUNC_BEGIN();
 
@@ -90,6 +115,7 @@ int main( int argc, char const *const argv[] ) {
   test_prog_init( argc, argv );
 
   test_str_is_any();
+  test_str_move();
   test_strn_trim();
 
   return test_exit_status;

@@ -506,11 +506,34 @@
  *  + Non-`const`, `nonconst_`\a FN is called.
  *
  * @param ... Additional arguments passed to \a FN.
+ * @return Returns whatever \a FN returns.
+ *
+ * @sa #NONCONST_OVERLOAD_P2P()
  */
 #define NONCONST_OVERLOAD(FN,PTR,...)       \
   STATIC_IF( IS_PTR_TO_CONST_EXPR( (PTR) ), \
     FN,                                     \
     NAME2(nonconst_,FN)                     \
+  )( (PTR) VA_OPT( (,), __VA_ARGS__ ) __VA_ARGS__ )
+
+/**
+ * Like #NONCONST_OVERLOAD(), but for functions taking a pointer-to-pointer
+ * (`T const**`).
+ *
+ * @param FN The name of the function to overload.
+ * @param PTR A pointer-to-pointer.  If either pointer points to:
+ *  + `const`, \a FN is called; or:
+ *  + Non-`const`, `nonconst_`\a FN is called.
+ * @param ... Additional arguments passed to \a FN.
+ * @return Returns whatever \a FN returns.
+ *
+ * @sa #NONCONST_OVERLOAD()
+ */
+#define NONCONST_OVERLOAD_P2P(FN,PTR,...)                             \
+  STATIC_IF(                                                          \
+    IS_PTR_TO_CONST_EXPR( (PTR) ) || IS_PTR_TO_CONST_EXPR( *(PTR) ),  \
+    FN,                                                               \
+    NAME2(nonconst_,FN)                                               \
   )( (PTR) VA_OPT( (,), __VA_ARGS__ ) __VA_ARGS__ )
 
 /**
