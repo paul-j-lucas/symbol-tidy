@@ -26,7 +26,9 @@ AUTOMAKE_OPTIONS = 1.12			# needed for TEST_LOG_DRIVER
 ###############################################################################
 
 TESTS=	tests/enum.test \
-	tests/labels.test
+	tests/extern-macro.test \
+	tests/labels.test \
+	tests/maybe_unused.test
 
 # Command-line option tests.
 TESTS+=	tests/cli-compiler-no-exists.test \
@@ -51,10 +53,6 @@ TESTS+=	tests/config-bad-semantics-1.test \
 TESTS+=	tests/enoent.test \
 	tests/error.test
 
-
-# C tests.
-TESTS+=	tests/extern-macro.test
-
 # C++ tests.
 TESTS+=	tests/auto_delete_pool.test \
 	tests/constructors.test \
@@ -77,8 +75,8 @@ TESTS+=	tests/auto_delete_pool.test \
 # Miscellaneous tests.
 TESTS+=	tests/c-cxx-1.test \
 	tests/c-cxx-2.test \
-	tests/fwd_dec.test \
-	tests/maybe_unused.test
+	tests/dup-source.test \
+	tests/fwd_dec.test
 
 ###############################################################################
 
