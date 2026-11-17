@@ -122,6 +122,17 @@ static bool               print_unneeded_external;
 ////////// inline functions ///////////////////////////////////////////////////
 
 /**
+ * Gets whether \a sym was defined via a macro.
+ *
+ * @param sym The tidy_symbol to check.
+ * @return Returns `true` only if \a sym was defined via a macro.
+ */
+NODISCARD
+static inline bool sym_is_def_in_macro( tidy_symbol const *sym ) {
+  return sym->macro.spelling_loc.line > 0;
+}
+
+/**
  * Gets the name of \a sym that should be used for printing.
  *
  * @remarks For C, it's just the symbol's plain name; for C++, it's the
@@ -1165,12 +1176,12 @@ static void symbol_mark_used( tidy_symbol *sym ) {
 static void symbol_print( tidy_symbol const *sym ) {
   assert( sym != NULL );
 
-  bool const is_defined_in_macro = sym->macro.spelling_loc.line > 0;
+  bool const is_def_in_macro = sym_is_def_in_macro( sym );
 
   color_start( stderr, sgr_locus );
   EPRINTF( "%5u", sym->def_loc.line );
   color_end( stderr, sgr_locus );
-  if ( is_defined_in_macro ) {
+  if ( is_def_in_macro ) {
     EPUTS( "   " );                     // same width as ",%2u"
   }
   else {
@@ -1181,7 +1192,7 @@ static void symbol_print( tidy_symbol const *sym ) {
   }
 
   EPRINTF( " | \"%s\"", symbol_name_for_print( sym ) );
-  if ( is_defined_in_macro ) {
+  if ( is_def_in_macro ) {
     EPUTS( " (defined at " );
     loc_print( &sym->macro.spelling_loc );
     if ( sym->macro.name_loc.line > 0 ) {
@@ -1425,13 +1436,10 @@ static unsigned symbols_mark_used( void ) {
   for ( tidy_symbol *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
     if ( sym->is_dead )
       continue;
-    if ( sym->def_loc.path == NULL || sym->def_loc.line == 0 ||
-         symbol_in_unused_scope( sym ) ) {
+    if ( sym->def_loc.path == NULL || symbol_in_unused_scope( sym ) )
       sym->is_dead = true;
-    }
-    else if ( !sym->is_used ) {
+    else if ( !sym->is_used )
       ++unused_count;
-    }
   } // for
 
   return unused_count;
