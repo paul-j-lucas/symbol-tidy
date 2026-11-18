@@ -402,6 +402,14 @@ done:
 static char* getScopedName_thunk( CXCursor cursor, getCursorName_fn name_fn ) {
   assert( name_fn != NULL );
 
+  enum CXCursorKind kind = clang_getCursorKind( cursor );
+  if ( kind == CXCursor_EnumConstantDecl ) {
+    CXCursor const parent = clang_getCursorSemanticParent( cursor );
+    kind = clang_getCursorKind( parent );
+    if ( kind == CXCursor_EnumDecl && !clang_EnumDecl_isScoped( parent ) )
+      return tidy_dupCursorSpelling( cursor );
+  }
+
   CXCursor const ref_csr = clang_getCursorReferenced( cursor );
   if ( !tidy_Cursor_isInvalid( ref_csr ) )
     cursor = ref_csr;

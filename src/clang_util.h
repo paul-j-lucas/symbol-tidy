@@ -151,8 +151,9 @@ NODISCARD
 CXCursor tidy_Cursor_getFirstExprChild( CXCursor cursor );
 
 /**
- * Given a cursor at a local name of an enumeration, class, class data member,
- * class member function, structure, union, or namespace, gets its fully scoped
+ * Given a cursor for a class, class data member, class member function,
+ * enumeration, enumeration constant for a scoped enumeration, structure,
+ * structure member, union, union member, or namespace, gets its fully scoped
  * "display" name that includes template parameters (if any).
  *
  * @param cursor The cursor for a symbol.
@@ -166,8 +167,9 @@ NODISCARD
 char* tidy_Cursor_getScopedDisplayName( CXCursor cursor );
 
 /**
- * Given a cursor at a local name of an enumeration, class, class data member,
- * class member function, structure, union, or namespace, gets its fully scoped
+ * Given a cursor for a class, class data member, class member function,
+ * enumeration, enumeration constant for a scoped enumeration, structure,
+ * structure member, union, union member, or namespace, gets its fully scoped
  * "spelling" name that does _not_ include template parameters (if any).
  *
  * @param cursor The cursor for a symbol.
