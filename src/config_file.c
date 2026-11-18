@@ -959,7 +959,7 @@ static void ignore_symbol_cleanup( ignore_symbol *igsym ) {
  *
  * @remarks
  * @parblock
- * Two ignore_symbol objects can only compare equal if their \ref
+ * Two ignore_symbol objects compare equal only if their \ref
  * ignore_symbol::in_any_cxx_scope "in_any_cxx_scope" values match and:
  *
  *  + If both are true, then their unqualified names must match; or:
@@ -977,6 +977,9 @@ static void ignore_symbol_cleanup( ignore_symbol *igsym ) {
  */
 static int ignore_symbol_cmp( ignore_symbol const *i_igsym,
                               ignore_symbol const *j_igsym ) {
+  assert( i_igsym != NULL );
+  assert( j_igsym != NULL );
+
   int cmp = i_igsym->in_any_cxx_scope - j_igsym->in_any_cxx_scope;
   if ( cmp != 0 )
     return cmp;
