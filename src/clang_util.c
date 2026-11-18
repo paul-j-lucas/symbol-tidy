@@ -117,6 +117,11 @@ struct getFieldInitializer_data {
 
 ////////// local functions ////////////////////////////////////////////////////
 
+NODISCARD
+static bool tidy_Cursor_isUnscopedEnumConstantDecl( CXCursor );
+
+////////// local functions ////////////////////////////////////////////////////
+
 /**
  * A helper function for tidy_Cursor_callsBaseConstructor() that looks for an
  * explicit base class constructor call.
@@ -369,13 +374,15 @@ static void getScopedName_impl( CXCursor cursor, getCursorName_fn name_fn,
   assert( name_fn != NULL );
   assert( sbuf != NULL );
 
-  CXCursor parent = cursor;
-  do {
-    parent = clang_getCursorSemanticParent( parent );
-  } while ( clang_Cursor_isInlineNamespace( parent ) );
+  if ( !tidy_Cursor_isUnscopedEnumConstantDecl( cursor ) ) {
+    CXCursor parent = cursor;
+    do {
+      parent = clang_getCursorSemanticParent( parent );
+    } while ( clang_Cursor_isInlineNamespace( parent ) );
 
-  if ( tidy_Cursor_isScopeDecl( parent ) )
-    getScopedName_impl( parent, name_fn, sbuf );
+    if ( tidy_Cursor_isScopeDecl( parent ) )
+      getScopedName_impl( parent, name_fn, sbuf );
+  }
 
   CXString const name_cxs = (*name_fn)( cursor );
   char const *const name = null_if_empty( clang_getCString( name_cxs ) );
@@ -401,14 +408,6 @@ done:
  */
 static char* getScopedName_thunk( CXCursor cursor, getCursorName_fn name_fn ) {
   assert( name_fn != NULL );
-
-  enum CXCursorKind kind = clang_getCursorKind( cursor );
-  if ( kind == CXCursor_EnumConstantDecl ) {
-    CXCursor const parent = clang_getCursorSemanticParent( cursor );
-    kind = clang_getCursorKind( parent );
-    if ( kind == CXCursor_EnumDecl && !clang_EnumDecl_isScoped( parent ) )
-      return tidy_dupCursorSpelling( cursor );
-  }
 
   CXCursor const ref_csr = clang_getCursorReferenced( cursor );
   if ( !tidy_Cursor_isInvalid( ref_csr ) )
@@ -627,6 +626,27 @@ NODISCARD
 static bool tidy_Cursor_isOrInClassTemplate( CXCursor cursor ) {
   return  isOrInClassTemplate_impl( cursor, &clang_getCursorSemanticParent ) ||
           isOrInClassTemplate_impl( cursor, &clang_getCursorLexicalParent  );
+}
+
+/**
+ * Gets whether \a cursor is an unscoped enumeration constant declaration.
+ *
+ * @param cursor The cursor to check.
+ * @return Returns `true` only if \a cursor is an unscoped enumeration constant
+ * declaration.
+ */
+NODISCARD
+static bool tidy_Cursor_isUnscopedEnumConstantDecl( CXCursor cursor ) {
+  enum CXCursorKind kind = clang_getCursorKind( cursor );
+  if ( kind != CXCursor_EnumConstantDecl )
+    return false;
+
+  CXCursor const parent = clang_getCursorSemanticParent( cursor );
+  kind = clang_getCursorKind( parent );
+  if ( kind != CXCursor_EnumDecl )
+    return false;
+
+  return !clang_EnumDecl_isScoped( parent );
 }
 
 ////////// extern functions ///////////////////////////////////////////////////
