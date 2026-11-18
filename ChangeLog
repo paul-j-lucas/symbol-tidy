@@ -1,5 +1,12 @@
 2026-11-17  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * config_file.c: Added asserts.
+   * fwd_dec.c, source.c: Code coverage exclusion comments.
+   * array_test.c: Added test_insert().
+   * str_util.c, str_util.h, str_util_test.c, util.h: Added test for str_move;
+     NONCONST_OVERLOAD_P2P().
+   * test/Makefile.am, dup-source.out, dup-source.test: Added duplicate source
+     test.
    * test/Makefile.am, ignore-cxx-class.toml, ignore-cxx-global.toml,
      ignore-cxx.cpp, ignore-cxx.out, ignore-cxx.test: Added ignore-cxx-* tests.
    * str_util.c: Added missing nonconst_str_move definition.
