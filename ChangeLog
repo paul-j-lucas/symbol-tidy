@@ -1,5 +1,7 @@
 2026-11-18  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * clang_util.c: Better implementation for no longer scoping unscoped
+     enumeration constants.
    * clang_util.c, clang_util.h, dup-source.out, enum.out: No longer scoping
      names for unscoped enumerations.
 
