@@ -541,7 +541,7 @@ unsigned symbols_print_unneeded_external( void );
 /**
  * Prints the unused symbols.
  *
- * @param unused count The number of unused symbols.
+ * @param unused_count The number of unused symbols.
  */
 void symbols_print_unused( unsigned unused_count );
 

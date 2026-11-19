@@ -160,8 +160,8 @@ static inline bool symbol_is_undefined( tidy_symbol const *sym ) {
 /**
  * Gets whether \a sym is unused and should be reported as such.
  *
- * @remarks This can be called only after \ref is_dead has been finalized for
- * \a sym by symbols_mark_used().
+ * @remarks This can be called only after \ref tidy_symbol::is_dead "is_dead"
+ * has been finalized for \a sym by symbols_mark_used().
  */
 NODISCARD
 static inline bool symbol_is_unused( tidy_symbol const *sym ) {
