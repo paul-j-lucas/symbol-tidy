@@ -29,7 +29,7 @@ TESTS=	tests/enum.test \
 	tests/extern-macro.test \
 	tests/labels.test \
 	tests/maybe_unused.test \
-	tests/undefined-prog.test
+	tests/undefined.test
 
 # Command-line option tests.
 TESTS+=	tests/cli-compiler-no-exists.test \
