@@ -108,7 +108,7 @@ static void print_summary( unsigned unused_symbols, unsigned unneeded_forwards,
  * @param env_var The name of the environment variable containing a test format
  * string (case sensitive) to parse.
  */
-void test_init( char const *env_var ) {
+static void test_init( char const *env_var ) {
   char const *const value = empty_if_null( getenv( env_var ) );
   if ( !opt_test_parse( value ) ) {
     // LCOV_EXCL_START

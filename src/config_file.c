@@ -537,10 +537,10 @@ static void ignore_symbols_parse_string( config_parse_fn_args const *config ) {
 
 /**
  * Cleans-up a bool_str.
-
+ *
  * @param bs The bool_str to clean-up.  If NULL, does nothing.
  */
-void bool_str_cleanup( bool_str *bs ) {
+static void bool_str_cleanup( bool_str *bs ) {
   if ( bs != NULL )
     FREE( bs->s );
 }

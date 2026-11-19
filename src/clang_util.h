@@ -372,20 +372,6 @@ NODISCARD
 bool tidy_Cursor_isReservedName( CXCursor cursor, enum CXLanguageKind lang );
 
 /**
- * Gets whether \a cursor is a class, class template, enumeration, namespace,
- * structure, or union declaration.
- *
- * @param cursor The cursor to check.
- * @return Returns `true` only if \a cursor is a class, class template,
- * enumeration, namespace, structure, or union.
- *
- * @sa tidy_Cursor_isClassDecl()
- * @sa tidy_Cursor_isEnclosingScope()
- */
-NODISCARD
-bool tidy_Cursor_isScopeDecl( CXCursor cursor );
-
-/**
  * Gets whether the spelling of \a cursor equals \a value.
  *
  * @param cursor The cursor to compare.
@@ -486,33 +472,6 @@ fnv1a_t tidy_FileUniqueID_hash( CXFileUniqueID const *fuid );
  */
 NODISCARD
 CXCursor tidy_getCursorByName( char const *name, CXCursor scope_csr );
-
-/**
- * Gets the cursor for the identifier given by \a token within \a scope_csr,
- * but only if \a token actually is an identifier.
- *
- * @param tu The translation unit to use.
- * @param token The token to get the cursor for.
- * @param scope_csr The cursor of the scope to search within.
- * @return Returns said cursor; or an invalid cursor if \a token is an
- * identifier, but not found; or the null cursor if \a token is not an
- * identifier.
- *
- * @sa tidy_getCursorByName()
- */
-NODISCARD
-CXCursor tidy_getCursorByNameToken( CXTranslationUnit tu, CXToken token,
-                                    CXCursor scope_csr );
-
-/**
- * Similar to `clang_getCursorDefinition()` except if the definition is
- * invalid, returns \a cursor.
- *
- * @param cursor The cursor to get the definition for.
- * @return Returns the cursor for the definition of \a cursor or \a cursor.
- */
-NODISCARD
-CXCursor tidy_getCursorDefinition( CXCursor cursor );
 
 /**
  * Similar to `clang_getCursorExtent()` except that it works better when macros
