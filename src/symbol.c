@@ -1647,7 +1647,7 @@ static void symbol_add_root_dec( CXCursor dec_csr, CXSourceLocation dec_loc,
                                  symbols_visit_data *svd ) {
   assert( svd != NULL );
 
-  if ( tidy_Cursor_isForwardDeclarable( dec_csr ) )
+  if ( !tidy_Cursor_isForwardDeclarable( dec_csr ) )
     return;
 
   if ( !clang_equalCursors( dec_csr, clang_getCanonicalCursor( dec_csr ) ) )
@@ -2415,6 +2415,35 @@ void cursor_add_ref( CXCursor to_csr, symbols_visit_data *svd ) {
     symbol_add_ref( svd->curr_sym, to_sym, svd );
 }
 
+void svd_init( symbols_visit_data *svd, tidy_source *source ) {
+  assert( svd != NULL );
+
+  bool const ignore_extern =
+    config_bool_value( &opt_ignore_externs, source->path );
+  if ( !ignore_extern )
+    print_unneeded_external = true;
+
+  bool const ignore_undefined =
+    config_bool_value( &opt_ignore_undefined, source->path );
+  if ( !ignore_undefined )
+    print_undefined = true;
+
+  *svd = (symbols_visit_data){
+    .source = source,
+    .ignore_extern = ignore_extern,
+    .ignore_forwards = config_bool_value( &opt_ignore_forwards, source->path ),
+    .ignore_undefined = ignore_undefined,
+    .cxx_constructor = {
+      .ctor_csr = clang_getNullCursor()
+    },
+    .cxx_for_range = {
+      .cls_csr = clang_getNullCursor(),
+      .begin_csr = clang_getNullCursor(),
+      .end_csr = clang_getNullCursor()
+    }
+  };
+}
+
 tidy_symbol* symbol_add( CXCursor sym_csr, symbols_visit_data const *svd ) {
   assert( svd != NULL );
 
@@ -2677,35 +2706,6 @@ unsigned symbols_print_unneeded_external( void ) {
 
   array_cleanup( &symbol_array, /*free_fn=*/NULL );
   return unneeded_count;
-}
-
-void svd_init( symbols_visit_data *svd, tidy_source *source ) {
-  assert( svd != NULL );
-
-  bool const ignore_extern =
-    config_bool_value( &opt_ignore_externs, source->path );
-  if ( !ignore_extern )
-    print_unneeded_external = true;
-
-  bool const ignore_undefined =
-    config_bool_value( &opt_ignore_undefined, source->path );
-  if ( !ignore_undefined )
-    print_undefined = true;
-
-  *svd = (symbols_visit_data){
-    .source = source,
-    .ignore_extern = ignore_extern,
-    .ignore_forwards = config_bool_value( &opt_ignore_forwards, source->path ),
-    .ignore_undefined = ignore_undefined,
-    .cxx_constructor = {
-      .ctor_csr = clang_getNullCursor()
-    },
-    .cxx_for_range = {
-      .cls_csr = clang_getNullCursor(),
-      .begin_csr = clang_getNullCursor(),
-      .end_csr = clang_getNullCursor()
-    }
-  };
 }
 
 unsigned symbols_visit( symbols_visit_data *svd ) {
