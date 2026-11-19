@@ -134,6 +134,18 @@ static inline bool symbol_is_def_in_macro( tidy_symbol const *sym ) {
 }
 
 /**
+ * Gets whether \a sym is referenced by another symbol in at least one
+ * translation unit.
+ *
+ * @param sym The tidy_symbol to check.
+ * @return Returns `true` only if \a sym is referenced.
+ */
+NODISCARD
+static inline bool symbol_is_referenced( tidy_symbol const *sym ) {
+  return sym->ext_link.is_ref_from_other_file || sym->ext_link.ref_tsid != 0;
+}
+
+/**
  * Gets whether \a sym is undefined and should be reported as such, i.e., it's
  * declared in a source path, but not defined.
  *
@@ -168,18 +180,6 @@ static inline bool symbol_is_unused( tidy_symbol const *sym ) {
 NODISCARD
 static inline char const* symbol_name_for_print( tidy_symbol const *sym ) {
   return sym->cxx_prototype != NULL ? sym->cxx_prototype : sym->name;
-}
-
-/**
- * Gets whether \a sym is referenced by another symbol in at least one
- * translation unit.
- *
- * @param sym The tidy_symbol to check.
- * @return Returns `true` only if \a sym is referenced.
- */
-NODISCARD
-static inline bool symbol_is_referenced( tidy_symbol const *sym ) {
-  return sym->ext_link.is_ref_from_other_file || sym->ext_link.ref_tsid != 0;
 }
 
 ////////// local functions ////////////////////////////////////////////////////
