@@ -1,3 +1,12 @@
+2026-11-19  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * man/man1/symbol-tidy.1, clang_util.c, clang_util.h, config_file.c,
+     config_file.h, cxx_symbol.c, options.c, options.h, source.c, source.h,
+     symbol-tidy.c, symbol-tidy.toml, symbol.c, symbol.h: Added root symbols
+     feature.
+   * clang_util.c, clang_util.h, config_file.c, symbol-tidy.c: Gave functions
+     internal linkage.
+
 2026-11-18  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
    * clang_util.c: Better implementation for no longer scoping unscoped
