@@ -129,14 +129,13 @@ static bool               print_unneeded_external;
  * @return Returns `true` only if \a sym was defined via a macro.
  */
 NODISCARD
-static inline bool sym_is_def_in_macro( tidy_symbol const *sym ) {
+static inline bool symbol_is_def_in_macro( tidy_symbol const *sym ) {
   return sym->macro.spelling_loc.line > 0;
 }
 
 /**
  * Gets whether \a sym is undefined and should be reported as such, i.e., it's
- * declared in a source path, but neither defined nor already reported as
- * unused.
+ * declared in a source path, but not defined.
  *
  * @param sym The tidy_symbol to check.
  * @return Returns `true` only if \a sym is undefined.
@@ -1347,7 +1346,7 @@ static void symbol_mark_used( tidy_symbol *sym ) {
 static void symbol_print( tidy_symbol const *sym, size_t mbr_off ) {
   assert( sym != NULL );
 
-  bool const is_def_in_macro = sym_is_def_in_macro( sym );
+  bool const is_def_in_macro = symbol_is_def_in_macro( sym );
   tidy_loc const *const tloc = PTR_TO_MBR( sym, mbr_off );
 
   color_start( stderr, sgr_locus );
