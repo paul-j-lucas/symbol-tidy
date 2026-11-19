@@ -514,6 +514,15 @@ void symbol_add_ref( tidy_symbol *from_sym, tidy_symbol *to_sym,
 void symbols_init( void );
 
 /**
+ * Marks all \ref tidy_symbol::is_used "used" symbols as used and \ref
+ * tidy_symbol::is_dead "dead" symbols as dead.
+ *
+ * @return Returns the number of unused, alive symbols.
+ */
+NODISCARD
+unsigned symbols_mark_used( void );
+
+/**
  * Determines the number of undefined symbols and prints them.
  *
  * @return Returns the number of undefined symbols.
@@ -530,11 +539,11 @@ unsigned symbols_print_undefined( void );
 unsigned symbols_print_unneeded_external( void );
 
 /**
- * Determines the number of unused symbols and prints them.
+ * Prints the unused symbols.
  *
- * @return Returns the number of unused symbols.
+ * @param unused count The number of unused symbols.
  */
-unsigned symbols_print_unused( void );
+void symbols_print_unused( unsigned unused_count );
 
 /**
  * Visits all symbols in \a source.

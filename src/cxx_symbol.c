@@ -1262,6 +1262,8 @@ void cxx_symbols_init( void ) {
 }
 
 void cxx_symbols_mark_adl_roots( void ) {
+  ASSERT_RUN_ONCE();
+
   if ( cxx_adl_name_set.size == 0 || cxx_adl_type_set.size == 0 )
     return;
 

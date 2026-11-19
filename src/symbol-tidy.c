@@ -207,8 +207,11 @@ int main( int argc, char const *argv[] ) {
     source_cleanup( source );
   } // for
 
+  unsigned const unused_symbols = symbols_mark_used();
+  if ( unused_symbols > 0 )
+    symbols_print_unused( unused_symbols );
+
   unsigned const undefined_symbols = symbols_print_undefined();
-  unsigned const unused_symbols = symbols_print_unused();
   unsigned const unneeded_externs = symbols_print_unneeded_external();
 
   tidy_summary const summary = {

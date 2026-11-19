@@ -1583,39 +1583,6 @@ static void symbols_cleanup( void ) {
 }
 
 /**
- * Marks all \ref tidy_symbol::is_used "used" symbols as used and \ref
- * tidy_symbol::is_dead "dead" symbols as dead.
- *
- * @return Returns the number of unused, alive symbols.
- */
-static unsigned symbols_mark_used( void ) {
-  cxx_symbols_mark_adl_roots();
-
-  ht_iterator_t iter;
-
-  ht_iterator_init( &iter, &tidy_symbol_set );
-  for ( tidy_symbol *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
-    if ( sym->is_root && !sym->is_defined && !symbol_is_referenced( sym ) )
-      sym->is_root = false;
-    else if ( sym->is_root )
-      symbol_mark_used( sym );
-  } // for
-
-  unsigned unused_count = 0;
-  ht_iterator_init( &iter, &tidy_symbol_set );
-  for ( tidy_symbol *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
-    if ( sym->is_dead )
-      continue;
-    if ( sym->def_loc.path == NULL || symbol_in_unused_scope( sym ) )
-      sym->is_dead = true;
-    else if ( !sym->is_used && !symbol_is_undefined( sym ) )
-      ++unused_count;
-  } // for
-
-  return unused_count;
-}
-
-/**
  * Adds a symbol for a declaration that isn't a definition (e.g., a function
  * prototype in a header), but only if the symbol is configured to be a root.
  *
@@ -2567,6 +2534,34 @@ void symbols_init( void ) {
   ATEXIT( &symbols_cleanup );
 }
 
+unsigned symbols_mark_used( void ) {
+  ASSERT_RUN_ONCE();
+  cxx_symbols_mark_adl_roots();
+
+  ht_iterator_t iter;
+
+  ht_iterator_init( &iter, &tidy_symbol_set );
+  for ( tidy_symbol *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
+    if ( sym->is_root && !sym->is_defined && !symbol_is_referenced( sym ) )
+      sym->is_root = false;
+    else if ( sym->is_root )
+      symbol_mark_used( sym );
+  } // for
+
+  unsigned unused_count = 0;
+  ht_iterator_init( &iter, &tidy_symbol_set );
+  for ( tidy_symbol *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
+    if ( sym->is_dead )
+      continue;
+    if ( sym->def_loc.path == NULL || symbol_in_unused_scope( sym ) )
+      sym->is_dead = true;
+    else if ( !sym->is_used && !symbol_is_undefined( sym ) )
+      ++unused_count;
+  } // for
+
+  return unused_count;
+}
+
 unsigned symbols_print_undefined( void ) {
   if ( !print_undefined )
     return 0;
@@ -2612,10 +2607,9 @@ unsigned symbols_print_undefined( void ) {
   return undefined_count;
 }
 
-unsigned symbols_print_unused( void ) {
-  unsigned const unused_count = symbols_mark_used();
+void symbols_print_unused( unsigned unused_count ) {
   if ( unused_count == 0 )
-    return 0;
+    return;
 
   array_t symbol_array = ARRAY_INIT( sizeof(tidy_symbol) );
   array_reserve( &symbol_array, unused_count );
@@ -2626,6 +2620,7 @@ unsigned symbols_print_unused( void ) {
     if ( !sym->is_used && !sym->is_dead && !symbol_is_undefined( sym ) )
       *(tidy_symbol*)array_push_back( &symbol_array ) = *sym;
   } // for
+  assert( symbol_array.len == unused_count );
 
   array_qsort(
     &symbol_array,
@@ -2645,7 +2640,6 @@ unsigned symbols_print_unused( void ) {
   } // for
 
   array_cleanup( &symbol_array, /*free_fn=*/NULL );
-  return unused_count;
 }
 
 unsigned symbols_print_unneeded_external( void ) {
