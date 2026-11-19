@@ -526,11 +526,11 @@ static enum CXChildVisitResult hasMaybeUnusedAttr_visitor( CXCursor cursor,
   if ( clang_getCursorKind( cursor ) != CXCursor_UnexposedAttr )
     goto skip;
 
-  CXSourceLocation const loc = clang_getCursorLocation( cursor );
+  CXSourceLocation const sloc = clang_getCursorLocation( cursor );
   CXFile    file;
   unsigned  offset;
   clang_getSpellingLocation(
-    loc, &file, /*line=*/NULL, /*col=*/NULL, &offset
+    sloc, &file, /*line=*/NULL, /*col=*/NULL, &offset
   );
   if ( unlikely( file == NULL ) )
     goto skip;                          // LCOV_EXCL_LINE
@@ -997,16 +997,16 @@ bool tidy_Cursor_inLinkageSpec( CXCursor cursor ) {
 }
 
 bool tidy_Cursor_inMacro( CXCursor cursor ) {
-  CXSourceLocation const loc = clang_getCursorLocation( cursor );
+  CXSourceLocation const sloc = clang_getCursorLocation( cursor );
 
   CXFile    spell_file, exp_file;
   unsigned  spell_line, spell_col, exp_line, exp_col;
 
   clang_getSpellingLocation(
-    loc, &spell_file, &spell_line, &spell_col, /*offset=*/NULL
+    sloc, &spell_file, &spell_line, &spell_col, /*offset=*/NULL
   );
   clang_getExpansionLocation(
-    loc, &exp_file, &exp_line, &exp_col, /*offset=*/NULL
+    sloc, &exp_file, &exp_line, &exp_col, /*offset=*/NULL
   );
 
   return !clang_File_isEqual( spell_file, exp_file ) ||
@@ -1251,8 +1251,8 @@ CXSourceRange tidy_getCursorExtent( CXCursor cursor ) {
 }
 
 CXFile tidy_getCursorLocation_File( CXCursor cursor ) {
-  CXSourceLocation const  loc = clang_getCursorLocation( cursor );
-  CXFile                  file = tidy_getSpellingLocation_File( loc );
+  CXSourceLocation const  sloc = clang_getCursorLocation( cursor );
+  CXFile                  file = tidy_getSpellingLocation_File( sloc );
 
   if ( file == NULL ) {
     //
@@ -1260,7 +1260,7 @@ CXFile tidy_getCursorLocation_File( CXCursor cursor ) {
     // the symbol was formed via preprocessor token pasting, e.g., foo_ ## bar.
     // Fall back to tidy_getFileLocation_File().
     //
-    file = tidy_getFileLocation_File( loc );
+    file = tidy_getFileLocation_File( sloc );
   }
 
   return file;
@@ -1296,10 +1296,10 @@ char* tidy_getCursorUSR( CXCursor cursor ) {
   // For some cursor kinds, libclang returns an empty string for its USR.  But
   // we _really_ want a USR, so sythesize our own using the cursor's location.
   //
-  CXSourceLocation const loc = clang_getCursorLocation( cursor );
+  CXSourceLocation const sloc = clang_getCursorLocation( cursor );
   CXFile file;
   unsigned line, col;
-  clang_getSpellingLocation( loc, &file, &line, &col, /*offset=*/NULL );
+  clang_getSpellingLocation( sloc, &file, &line, &col, /*offset=*/NULL );
   if ( unlikely( file == NULL ) )
     return NULL;                        // LCOV_EXCL_LINE
 
@@ -1407,10 +1407,10 @@ bool tidy_isEscapedNewline( CXTranslationUnit tu, CXToken const *tokens,
   return true;
 }
 
-bool tidy_Location_isFromFile( CXSourceLocation loc, CXFile file ) {
+bool tidy_Location_isFromFile( CXSourceLocation sloc, CXFile file ) {
   if ( file == NULL )
     return false;
-  CXFile const loc_file = tidy_getFileLocation_File( loc );
+  CXFile const loc_file = tidy_getFileLocation_File( sloc );
   return loc_file != NULL && clang_File_isEqual( loc_file, file );
 }
 

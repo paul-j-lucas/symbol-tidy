@@ -105,13 +105,14 @@ static enum CXChildVisitResult cursor_ranges_visitor( CXCursor cursor,
 }
 
 /**
- * Gets whether \a loc is in any range in \a ranges.
+ * Gets whether \a sloc is in any range in \a ranges.
  *
- * @param loc The location to check.
+ * @param sloc The location to check.
  * @param ranges An array of ranges to check against.
- * @return Returns `true` only if loc is in any range in \a ranges.
+ * @return Returns `true` only if sloc is in any range in \a ranges.
  */
-static bool is_loc_in_any_range( CXSourceLocation loc, array_t const *ranges ) {
+static bool is_sloc_in_any_range( CXSourceLocation sloc,
+                                  array_t const *ranges ) {
   assert( ranges != NULL );
 
   if ( ranges->len == 0 )
@@ -119,7 +120,7 @@ static bool is_loc_in_any_range( CXSourceLocation loc, array_t const *ranges ) {
 
   CXFile file;
   unsigned offset;
-  clang_getFileLocation( loc, &file, /*line=*/NULL, /*column=*/NULL, &offset );
+  clang_getFileLocation( sloc, &file, /*line=*/NULL, /*column=*/NULL, &offset );
 
   for ( size_t i = 0; i < ranges->len; ++i ) {
     CXSourceRange const *const  range = array_at_nc( ranges, i );
@@ -177,8 +178,8 @@ static void tidy_Cursor_printAbridgedTokens( CXCursor cursor ) {
     if ( token_kind == CXToken_Comment )
       continue;
 
-    CXSourceLocation const loc = clang_getTokenLocation( tu, tokens[i] );
-    if ( is_loc_in_any_range( loc, &cursor_ranges ) ) {
+    CXSourceLocation const sloc = clang_getTokenLocation( tu, tokens[i] );
+    if ( is_sloc_in_any_range( sloc, &cursor_ranges ) ) {
       eliding_tokens = true;
       continue;
     }
@@ -247,10 +248,10 @@ void verbose_print_cursor_impl( char const *label, CXCursor cursor ) {
     return;
   }
 
-  CXSourceLocation const loc = clang_getCursorLocation( cursor );
+  CXSourceLocation const sloc = clang_getCursorLocation( cursor );
   CXFile file;
   unsigned line, col;
-  clang_getSpellingLocation( loc, &file, &line, &col, /*offset=*/NULL );
+  clang_getSpellingLocation( sloc, &file, &line, &col, /*offset=*/NULL );
 
   CXString const abs_path_cxs = file != NULL ?
     tidy_File_getRealPathName( file ) : (CXString){ 0 };

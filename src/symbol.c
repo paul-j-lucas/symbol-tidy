@@ -765,11 +765,11 @@ static bool file_previously_seen( CXFile file, symbols_visit_data *svd ) {
 /**
  * Cleans-up a tidy_loc.
  *
- * @param loc The tidy_loc to clean up.  If NULL, does nothing.
+ * @param tloc The tidy_loc to clean up.  If NULL, does nothing.
  */
-static void loc_cleanup( tidy_loc *loc ) {
-  if ( loc != NULL )
-    FREE( loc->path );
+static void loc_cleanup( tidy_loc *tloc ) {
+  if ( tloc != NULL )
+    FREE( tloc->path );
 }
 
 /**
@@ -804,20 +804,20 @@ static int loc_cmp( tidy_loc const *i_loc, tidy_loc const *j_loc ) {
  * Gets a tidy_loc for the location of a declaration, but only if it's in a
  * source path.
  *
- * @param loc The source location of a declaration.
- * @return Returns a tidy_loc (spelling location) for \a loc or one having
- * a NULL \ref tidy_loc::path "path" if \a loc isn't in a file or the file
+ * @param sloc The source location of a declaration.
+ * @return Returns a tidy_loc (spelling location) for \a sloc or one having
+ * a NULL \ref tidy_loc::path "path" if \a sloc isn't in a file or the file
  * isn't a source path.
  *
  * @note The caller is responsible for calling loc_cleanup().
  */
 NODISCARD
-static tidy_loc loc_from_SourceLocation( CXSourceLocation loc ) {
+static tidy_loc loc_from_SourceLocation( CXSourceLocation sloc ) {
   CXFile    file;
   unsigned  line, col;
   tidy_loc  rv_loc = { 0 };
 
-  clang_getSpellingLocation( loc, &file, &line, &col, /*offset=*/NULL );
+  clang_getSpellingLocation( sloc, &file, &line, &col, /*offset=*/NULL );
   if ( file != NULL ) {
     rv_loc.path = dup_if_source_path( file );
     if ( rv_loc.path != NULL ) {
@@ -830,27 +830,27 @@ static tidy_loc loc_from_SourceLocation( CXSourceLocation loc ) {
 }
 
 /**
- * Prints \a loc as
+ * Prints \a tloc as
  * <tt>"</tt><i>path</i><tt>":</tt><i>line</i><tt>,</tt><i>col</i>.
  *
  * @note The path is printed only if it's non-NULL.
  *
- * @param loc The tidy_loc to print.
+ * @param tloc The tidy_loc to print.
  */
-static void loc_print( tidy_loc const *loc ) {
-  assert( loc != NULL );
+static void loc_print( tidy_loc const *tloc ) {
+  assert( tloc != NULL );
 
-  if ( loc->path != NULL ) {
+  if ( tloc->path != NULL ) {
     color_start( stderr, sgr_locus );
-    EPRINTF( "\"%s\":", loc->path );
+    EPRINTF( "\"%s\":", tloc->path );
     color_end( stderr, sgr_locus );
   }
   color_start( stderr, sgr_locus );
-  EPRINTF( "%u", loc->line );
+  EPRINTF( "%u", tloc->line );
   color_end( stderr, sgr_locus );
   EPUTC( ',' );
   color_start( stderr, sgr_locus );
-  EPRINTF( "%u", loc->col );
+  EPRINTF( "%u", tloc->col );
   color_end( stderr, sgr_locus );
 }
 
@@ -1353,10 +1353,10 @@ static void symbol_print( tidy_symbol const *sym, size_t mbr_off ) {
   assert( sym != NULL );
 
   bool const is_def_in_macro = sym_is_def_in_macro( sym );
-  tidy_loc const *const loc = PTR_TO_MBR( sym, mbr_off );
+  tidy_loc const *const tloc = PTR_TO_MBR( sym, mbr_off );
 
   color_start( stderr, sgr_locus );
-  EPRINTF( "%5u", loc->line );
+  EPRINTF( "%5u", tloc->line );
   color_end( stderr, sgr_locus );
   if ( is_def_in_macro ) {
     EPUTS( "   " );                     // same width as ",%2u"
@@ -1364,7 +1364,7 @@ static void symbol_print( tidy_symbol const *sym, size_t mbr_off ) {
   else {
     EPUTC( ',' );
     color_start( stderr, sgr_locus );
-    EPRINTF( "%2u", loc->col );
+    EPRINTF( "%2u", tloc->col );
     color_end( stderr, sgr_locus );
   }
 
@@ -1390,10 +1390,10 @@ static void symbol_print( tidy_symbol const *sym, size_t mbr_off ) {
 static void symbol_print_path( tidy_symbol const *sym, size_t mbr_off ) {
   assert( sym != NULL );
 
-  tidy_loc const *const loc = PTR_TO_MBR( sym, mbr_off );
+  tidy_loc const *const tloc = PTR_TO_MBR( sym, mbr_off );
 
   color_start( stderr, sgr_locus );
-  EPRINTF( "\"%s\"", loc->path );
+  EPRINTF( "\"%s\"", tloc->path );
   color_end( stderr, sgr_locus );
   EPUTS( ": " );
   color_start( stderr, sgr_warning );
@@ -2503,8 +2503,8 @@ done:
   //
   if ( !svd->ignore_undefined && !sym->is_defined &&
        sym->dec_loc.path == NULL ) {
-    CXSourceLocation const loc = clang_getCursorLocation( sym_csr );
-    sym->dec_loc = loc_from_SourceLocation( loc );
+    CXSourceLocation const sloc = clang_getCursorLocation( sym_csr );
+    sym->dec_loc = loc_from_SourceLocation( sloc );
   }
 
   return sym;

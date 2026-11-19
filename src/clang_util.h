@@ -354,8 +354,8 @@ bool tidy_Cursor_isImplicitMember( CXCursor cursor );
  */
 NODISCARD
 inline bool tidy_Cursor_isInSystemHeader( CXCursor cursor ) {
-  CXSourceLocation const loc = clang_getCursorLocation( cursor );
-  return clang_Location_isInSystemHeader( loc );
+  CXSourceLocation const sloc = clang_getCursorLocation( cursor );
+  return clang_Location_isInSystemHeader( sloc );
 }
 
 /**
@@ -552,16 +552,16 @@ char* tidy_getCursorUSR( CXCursor cursor );
 /**
  * Calls `clang_getFileLocation()` and returns the `CXFile`.
  *
- * @param loc The `CXSourceLocation` to use.
+ * @param sloc The `CXSourceLocation` to use.
  * @return Returns its `CXFile`.
  *
  * @sa tidy_getSpellingLocation_File()
  */
 NODISCARD
-inline CXFile tidy_getFileLocation_File( CXSourceLocation loc ) {
+inline CXFile tidy_getFileLocation_File( CXSourceLocation sloc ) {
   CXFile file;
   clang_getFileLocation(
-    loc, &file, /*line=*/NULL, /*column=*/NULL, /*offset=*/NULL
+    sloc, &file, /*line=*/NULL, /*column=*/NULL, /*offset=*/NULL
   );
   return file;
 }
@@ -580,17 +580,17 @@ CXFileUniqueID tidy_getFileUniqueID( CXFile file );
 /**
  * Calls `clang_getSpellingLocation()` and returns only the file.
  *
- * @param loc The location to use.
- * @return Returns the file of \a loc.
+ * @param sloc The location to use.
+ * @return Returns the file of \a sloc.
  *
  * @sa tidy_getFileLocation_File()
  * @sa tidy_getSpellingLocation_Line()
  */
 NODISCARD
-inline CXFile tidy_getSpellingLocation_File( CXSourceLocation loc ) {
+inline CXFile tidy_getSpellingLocation_File( CXSourceLocation sloc ) {
   CXFile file;
   clang_getSpellingLocation(
-    loc, &file, /*line=*/NULL, /*column=*/NULL, /*offset=*/NULL
+    sloc, &file, /*line=*/NULL, /*column=*/NULL, /*offset=*/NULL
   );
   return file;
 }
@@ -598,16 +598,16 @@ inline CXFile tidy_getSpellingLocation_File( CXSourceLocation loc ) {
 /**
  * Calls `clang_getSpellingLocation()` and returns only the line.
  *
- * @param loc The location to use.
- * @return Returns the line of \a loc.
+ * @param sloc The location to use.
+ * @return Returns the line of \a sloc.
  *
  * @sa tidy_getSpellingLocation_File()
  */
 NODISCARD
-inline unsigned tidy_getSpellingLocation_Line( CXSourceLocation loc ) {
+inline unsigned tidy_getSpellingLocation_Line( CXSourceLocation sloc ) {
   unsigned line;
   clang_getSpellingLocation(
-    loc, /*file=*/NULL, &line, /*column=*/NULL, /*offset=*/NULL
+    sloc, /*file=*/NULL, &line, /*column=*/NULL, /*offset=*/NULL
   );
   return line;
 }
@@ -622,10 +622,10 @@ inline unsigned tidy_getSpellingLocation_Line( CXSourceLocation loc ) {
 NODISCARD
 inline unsigned tidy_getTokenLocation_Line( CXTranslationUnit tu,
                                             CXToken token ) {
-  CXSourceLocation const loc = clang_getTokenLocation( tu, token );
+  CXSourceLocation const sloc = clang_getTokenLocation( tu, token );
   unsigned line;
   clang_getSpellingLocation(
-    loc, /*file=*/NULL, &line, /*column=*/NULL, /*offset=*/NULL
+    sloc, /*file=*/NULL, &line, /*column=*/NULL, /*offset=*/NULL
   );
   return line;
 }
@@ -666,13 +666,13 @@ bool tidy_isEscapedNewline( CXTranslationUnit tu, CXToken const *tokens,
                             unsigned token_idx );
 
 /**
- * Gets whether \a loc is in \a file.
+ * Gets whether \a sloc is in \a file.
  *
  * @remarks
  * @parblock
  * This is a generalization of `clang_Location_isFromMainFile()` to any file,
  * but it differs in how it treats macros: it uses the _file location_ of \a
- * loc (via `clang_getFileLocation()`), not the _spelling location_.
+ * sloc (via `clang_getFileLocation()`), not the _spelling location_.
  *
  * For a location inside a macro expansion, the file location is where the
  * macro was _expanded_, whereas the spelling location is where the token was
@@ -689,15 +689,15 @@ bool tidy_isEscapedNewline( CXTranslationUnit tu, CXToken const *tokens,
  * check were to place the macro's body in `foo.h`.
  * @endparblock
  *
- * @param loc The location to check.
+ * @param sloc The location to check.
  * @param file The file to check against.  May be NULL.
- * @return Returns `true` only if \a file is not NULL, \a loc has a file
+ * @return Returns `true` only if \a file is not NULL, \a sloc has a file
  * location, and that file is the same as \a file.
  *
  * @sa tidy_getFileLocation_File()
  */
 NODISCARD
-bool tidy_Location_isFromFile( CXSourceLocation loc, CXFile file );
+bool tidy_Location_isFromFile( CXSourceLocation sloc, CXFile file );
 
 /**
  * Gets a pointer to the next non-comment token in \a tokens, if any.
