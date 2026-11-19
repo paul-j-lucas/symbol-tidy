@@ -1,0 +1,2 @@
+[symbol-tidy]
+root-symbols-from = "undefined-lib.h"

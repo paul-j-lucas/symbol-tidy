@@ -4,4 +4,8 @@ test_symbol_tidy $TIDY_TEST_OPTIONS \
   $TIDY_TEST_CONFIG \
   undefined-prog.c
 
+test_symbol_tidy $TIDY_TEST_OPTIONS \
+  -Xtidy --config=undefined-lib.toml \
+  undefined-lib.c
+
 # vim:set syntax=bash et sw=2 ts=2:
