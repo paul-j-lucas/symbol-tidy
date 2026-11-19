@@ -105,7 +105,7 @@ static void summary_print( tidy_summary const *summary ) {
 
   if ( summary->undefined_symbols > 0 ) {
     EPRINTF(
-      "%s%u unused symbol%s",
+      "%s%u undefined symbol%s",
       sep, summary->undefined_symbols, plural_s( summary->undefined_symbols )
     );
     sep = "; ";
