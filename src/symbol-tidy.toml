@@ -22,6 +22,10 @@
 ignore-paths = [
   "config.h"
 ]
+root-symbols-from = [
+  "array.h",
+  "strbuf.h"
+]
 
 [cli_options.c]
 ignore-symbols = [

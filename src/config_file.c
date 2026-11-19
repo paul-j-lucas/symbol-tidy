@@ -104,6 +104,7 @@ typedef struct  config_key            config_key;
 typedef struct  config_parse_fn_args  config_parse_fn_args;
 typedef enum    config_table_kind     config_table_kind;
 typedef struct  ignore_symbol         ignore_symbol;
+typedef struct  root_symbol           root_symbol;
 
 /**
  * Signature for a function that parses the value of a configuration key.
@@ -154,6 +155,17 @@ struct ignore_symbol {
   bool        in_any_cxx_scope;         ///< Match \ref name in any C++ scope?
 };
 
+/**
+ * A root symbol set via the `root-symbols` or `root-symbols-from` keys.
+ *
+ * @remarks If \ref name is NULL (set via `root-symbols-from`), then \ref path
+ * is non-NULL and every symbol declared in that path is a root.
+ */
+struct root_symbol {
+  char const *name;                     ///< Symbol name; if NULL, any name.
+  char const *path;                     ///< Symbol path; if NULL, any path.
+};
+
 ////////// local functions ////////////////////////////////////////////////////
 
 static void   color_parse( config_parse_fn_args const* );
@@ -176,12 +188,17 @@ static void   ignore_paths_parse_string( config_parse_fn_args const* );
 static void   ignore_symbol_cleanup( ignore_symbol* );
 static void   ignore_symbols_parse( config_parse_fn_args const* );
 static void   ignore_symbols_parse_string( config_parse_fn_args const* );
+static void   ignore_undefined_parse( config_parse_fn_args const* );
 static void   ignore_unneeded_extern_parse( config_parse_fn_args const* );
 static void   ignore_unneeded_forwards_parse( config_parse_fn_args const* );
 static void   print_statistics( verbose_stat_ctx* );
 static void   print_invalid_value( config_parse_fn_args const*,
                                    toml_value const*, toml_type );
-
+static void   root_symbol_cleanup( root_symbol* );
+static void   root_symbols_from_parse( config_parse_fn_args const* );
+static void   root_symbols_from_parse_string( config_parse_fn_args const* );
+static void   root_symbols_parse( config_parse_fn_args const* );
+static void   root_symbols_parse_string( config_parse_fn_args const* );
 static void   toml_value_print( toml_value const*, FILE* );
 
 ////////// local constants ////////////////////////////////////////////////////
@@ -200,12 +217,17 @@ static config_key const CONFIG_KEYS[] = {
                                 &ignore_cxx_move_assigns_parse              },
   { "ignore-cxx-move-ctors",    TABLE_TIDY_OR_SYMBOL,
                                 &ignore_cxx_move_ctors_parse                },
+  { "ignore-undefined",         TABLE_TIDY_OR_SOURCE,
+                                &ignore_undefined_parse                     },
   { "ignore-unneeded-extern",   TABLE_TIDY_OR_SOURCE,
                                 &ignore_unneeded_extern_parse               },
   { "ignore-unneeded-forwards", TABLE_TIDY_OR_SOURCE,
                                 &ignore_unneeded_forwards_parse             },
   { "ignore-paths",             TABLE_SYMBOL_TIDY,    &ignore_paths_parse   },
   { "ignore-symbols",           TABLE_TIDY_OR_SOURCE, &ignore_symbols_parse },
+  { "root-symbols",             TABLE_TIDY_OR_SOURCE, &root_symbols_parse   },
+  { "root-symbols-from",        TABLE_SYMBOL_TIDY,
+                                &root_symbols_from_parse                    },
 };
 
 /**
@@ -225,6 +247,7 @@ static char const *const TABLE_KINDS[] = {
 static unsigned     error_count;          ///< Configuration file error count.
 static hash_table_t ignore_path_set;      ///< Set of paths to ignore.
 static hash_table_t ignore_symbol_set;    ///< Set of symbols to ignore.
+static hash_table_t root_symbol_set;      ///< Set of root symbols.
 static unsigned     warning_count;        ///< Configuration file warning count.
 
 ////////// local TOML type parsing functions //////////////////////////////////
@@ -427,6 +450,16 @@ static void ignore_cxx_move_ctors_parse( config_parse_fn_args const *config ) {
 }
 
 /**
+ * Parses the value of an `"ignore-unneeded-forwards"` key.
+ *
+ * @param config The config_parse_fn_args to use.
+ */
+static
+void ignore_undefined_parse( config_parse_fn_args const *config ) {
+  config_bool_parse( config, &opt_ignore_undefined );
+}
+
+/**
  * Parses the value of an `"ignore-unneeded-extern"` key.
  *
  * @param config The config_parse_fn_args to use.
@@ -533,6 +566,90 @@ static void ignore_symbols_parse_string( config_parse_fn_args const *config ) {
   }
 }
 
+/**
+ * Parses the value of a `"root-symbols-from"` key.
+ *
+ * @param config The config_parse_fn_args to use.
+ *
+ * @sa root_symbols_from_parse_string()
+ */
+static void root_symbols_from_parse( config_parse_fn_args const *config ) {
+  toml_string_or_string_array_parse( config, &root_symbols_from_parse_string );
+}
+
+/**
+ * Parses a single string value of an `"root-symbols-from"` key.
+ *
+ * @param config The config_parse_fn_args to use.
+ *
+ * @sa root_symbols_from_parse()
+ */
+static
+void root_symbols_from_parse_string( config_parse_fn_args const *config ) {
+  assert( config != NULL );
+  assert( config->value->type == TOML_STRING );
+
+  // A NULL name means any name in path.
+  root_symbol new_rsym = { .path = path_no_dot_slash( config->value->s ) };
+  ht_insert_rv_t const hti =
+    ht_table_insert( &root_symbol_set, &new_rsym, sizeof new_rsym );
+  if ( hti.inserted ) {
+    root_symbol *const rsym = HT_DINT( hti.entry );
+    rsym->path = strdup_or_exit( rsym->path );
+  }
+  else {
+    print_file_warning(
+      config->config_path, config->value->loc.line, config->value->loc.col,
+      "\"%s\" already rooted from\n",
+      config->value->s
+    );
+    ++warning_count;
+  }
+}
+
+/**
+ * Parses the value of an `"root-symbols"` key.
+ *
+ * @param config The config_parse_fn_args to use.
+ *
+ * @sa root_symbols_parse_string()
+ */
+static void root_symbols_parse( config_parse_fn_args const *config ) {
+  toml_string_or_string_array_parse( config, &root_symbols_parse_string );
+}
+
+/**
+ * Parses a single string value of an `"root-symbols"` key.
+ *
+ * @param config The config_parse_fn_args to use.
+ *
+ * @sa root_symbols_parse()
+ */
+static void root_symbols_parse_string( config_parse_fn_args const *config ) {
+  assert( config != NULL );
+  assert( config->value->type == TOML_STRING );
+
+  root_symbol new_rsym = { .name = config->value->s };
+  ht_insert_rv_t const hti =
+    ht_table_insert( &root_symbol_set, &new_rsym, sizeof new_rsym );
+  if ( hti.inserted ) {
+    root_symbol *const rsym = HT_DINT( hti.entry );
+    rsym->name = strdup_or_exit( rsym->name );
+    if ( config->table_kind != TABLE_SYMBOL_TIDY ) {
+      char const *const path = path_no_dot_slash( config->table->key.name );
+      rsym->path = strdup_or_exit( path );
+    }
+  }
+  else {
+    print_file_warning(
+      config->config_path, config->value->loc.line, config->value->loc.col,
+      "\"%s\" already rooted\n",
+      config->value->s
+    );
+    ++warning_count;
+  }
+}
+
 ////////// local functions ////////////////////////////////////////////////////
 
 /**
@@ -600,6 +717,9 @@ static void config_cleanup( void ) {
   ht_table_cleanup( &ignore_path_set, /*free_fn=*/NULL );
   ht_table_cleanup(
     &ignore_symbol_set, POINTER_CAST( ht_free_fn_t, &ignore_symbol_cleanup )
+  );
+  ht_table_cleanup(
+    &root_symbol_set, POINTER_CAST( ht_free_fn_t, &root_symbol_cleanup )
   );
 }
 
@@ -1052,8 +1172,76 @@ static void print_statistics( verbose_stat_ctx *vsc ) {
     ht_table_load_factor( &ignore_symbol_set )
   );
   verbose_statf( vsc, "iss-size = %u\n", ignore_symbol_set.size );
+
+  verbose_statf( vsc, "root-symbol set:\n" );
+  verbose_statf( vsc,
+    "rss-load-factor = " TIDY_STAT_LF_FMT "\n",
+    ht_table_load_factor( &root_symbol_set )
+  );
+  verbose_statf( vsc, "rss-size = %u\n", root_symbol_set.size );
 }
 // LCOV_EXCL_STOP
+
+/**
+ * Cleans-up a root_symbol.
+ *
+ * @param rsym The root_symbol to clean-up.
+ */
+static void root_symbol_cleanup( root_symbol *rsym ) {
+  if ( rsym != NULL ) {
+    FREE( rsym->name );
+    FREE( rsym->path );
+  }
+}
+
+/**
+ * Compares two \ref root_symbol objects.
+ *
+ * @remarks Two root_symbol objects compare equal only if their names match
+ * and, if both their \ref root_symbol::path "paths" are not NULL, then they
+ * must also match.
+ *
+ * @param i_rsym The first root_symbol.
+ * @param j_rsym The second root_symbol.
+ * @return Returns a number less than 0, 0, or greater than 0 if the name of \a
+ * i_rsym is less than, equal to, or greater than the name of \a j_rsym,
+ * respectively.
+ */
+static int root_symbol_cmp( root_symbol const *i_rsym,
+                            root_symbol const *j_rsym ) {
+  assert( i_rsym != NULL );
+  assert( j_rsym != NULL );
+
+  if ( i_rsym->name == NULL || j_rsym->name == NULL ) {
+    int const cmp = (i_rsym->name != NULL) - (j_rsym->name != NULL);
+    if ( cmp != 0 )
+      return cmp;
+    assert( i_rsym->path != NULL );
+    assert( j_rsym->path != NULL );
+  }
+  else {
+    int const cmp = strcmp( i_rsym->name, j_rsym->name );
+    if ( cmp != 0 )
+      return cmp;
+    if ( i_rsym->path == NULL || j_rsym->path == NULL )
+      return 0;
+  }
+
+  return strcmp( i_rsym->path, j_rsym->path );
+}
+
+/**
+ * Calculates the hash of \a rsym.
+ *
+ * @param rsym The root_symbol to hash.
+ * @return Returns said hash.
+ */
+static fnv1a_t root_symbol_hash( root_symbol const *rsym ) {
+  if ( rsym->name != NULL )
+    return fnv1a_s( rsym->name );
+  assert( rsym->path != NULL );
+  return fnv1a_s( rsym->path );
+}
 
 /**
  * Prints a TOML value.
@@ -1127,6 +1315,11 @@ void config_init( void ) {
     POINTER_CAST( ht_cmp_fn_t, &ignore_symbol_cmp ),
     POINTER_CAST( ht_hash_fn_t, &ignore_symbol_hash )
   );
+  ht_table_init(
+    &root_symbol_set, HT_DINT, 2.0, 10,
+    POINTER_CAST( ht_cmp_fn_t, &root_symbol_cmp ),
+    POINTER_CAST( ht_hash_fn_t, &root_symbol_hash )
+  );
   ATEXIT( &config_cleanup );
 
   bool found_at_least_1 = false;
@@ -1170,6 +1363,23 @@ bool config_symbol_is_ignored( char const *sym_name, char const *sym_path ) {
   }
 
   return found_igsym != NULL;
+}
+
+bool config_symbol_is_root( char const *sym_name, char const *sym_path ) {
+  // First, try looking for the name.
+  root_symbol find_rsym = {
+    .name = sym_name,
+    .path = path_no_dot_slash( sym_path )
+  };
+  ht_entry_t const *found_rsym = ht_table_find( &root_symbol_set, &find_rsym );
+
+  if ( found_rsym == NULL ) {
+    // Second, see if the symbol's path is a root-symbols-from path.
+    find_rsym.name = NULL;
+    found_rsym = ht_table_find( &root_symbol_set, &find_rsym );
+  }
+
+  return found_rsym != NULL;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

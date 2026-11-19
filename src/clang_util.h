@@ -323,6 +323,30 @@ inline bool tidy_Cursor_isExternalLinkage( CXCursor cursor ) {
 }
 
 /**
+ * Gets whether \a cursor is for a symbol that can be forward declared.
+ *
+ * @param cursor The cursor to check.
+ * @return Returns `true` only if \a cursor is for a symbol that can be forward
+ * declared.
+ */
+NODISCARD
+bool tidy_Cursor_isForwardDeclarable( CXCursor cursor );
+
+/**
+ * Gets whether \a cursor is an implicitly declared member (e.g., a default
+ * constructor, copy/move constructor, destructor, or assignment operator that
+ * the compiler generated).
+ *
+ * @remarks Libclang doesn't say directly, but an implicitly declared member's
+ * location is that of its class that an explicit member's can't be.
+ *
+ * @param cursor The cursor to check.
+ * @return Returns `true` only if \a cursor is an implicitly declared member.
+ */
+NODISCARD
+bool tidy_Cursor_isImplicitMember( CXCursor cursor );
+
+/**
  * Gets whether \a cursor is in a system header.
  *
  * @param cursor The cursor to check.

@@ -117,6 +117,7 @@ hash_table_t tidy_symbol_set;
 
 static hash_table_t       header_set;   ///< The set of all header files.
 static tidy_header_stats  header_stats; ///< Statistics for \ref header_set.
+static bool               print_undefined;
 static bool               print_unneeded_external;
 
 ////////// inline functions ///////////////////////////////////////////////////
@@ -144,6 +145,18 @@ static inline bool sym_is_def_in_macro( tidy_symbol const *sym ) {
 NODISCARD
 static inline char const* symbol_name_for_print( tidy_symbol const *sym ) {
   return sym->cxx_prototype != NULL ? sym->cxx_prototype : sym->name;
+}
+
+/**
+ * Gets whether \a sym is referenced by another symbol in at least one
+ * translation unit.
+ *
+ * @param sym The tidy_symbol to check.
+ * @return Returns `true` only if \a sym is referenced.
+ */
+NODISCARD
+static inline bool symbol_is_referenced( tidy_symbol const *sym ) {
+  return sym->ext_link.is_ref_from_other_file || sym->ext_link.ref_tsid != 0;
 }
 
 ////////// local functions ////////////////////////////////////////////////////
@@ -196,23 +209,16 @@ static bool cursor_is_maybe_internal( CXCursor sym_csr ) {
  */
 NODISCARD
 static bool cursor_is_definition( CXCursor cursor ) {
+  if ( tidy_Cursor_isForwardDeclarable( cursor ) ) {
+    //
+    // These may be forward-declared, so ask whether this cursor is the
+    // definition.
+    //
+    return tidy_isCursorDefinition( cursor );
+  }
+
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
   switch ( kind ) {
-    case CXCursor_ClassDecl:
-    case CXCursor_ClassTemplate:
-    case CXCursor_ClassTemplatePartialSpecialization:
-    case CXCursor_Constructor:
-    case CXCursor_ConversionFunction:
-    case CXCursor_CXXMethod:
-    case CXCursor_Destructor:
-    case CXCursor_FunctionDecl:
-    case CXCursor_VarDecl:
-      //
-      // These may be forward-declared, so ask whether this cursor is the
-      // definition.
-      //
-      return tidy_isCursorDefinition( cursor );
-
     case CXCursor_EnumConstantDecl:
     case CXCursor_FieldDecl:
     case CXCursor_LabelStmt:
@@ -401,6 +407,88 @@ done:
 }
 
 /**
+ * Gets whether \a csr is directly listed as a root symbol, i.e., via the config
+ * file's `root-symbols`, `root-symbols-from`, or per-file `root-symbols` keys.
+ *
+ * @param csr The (canonical) cursor to check.
+ * @param name The scoped name of \a csr.
+ * @return Returns `true` only if \a csr is listed as a root.
+ *
+ * @sa cursor_is_config_root()
+ */
+NODISCARD
+static bool cursor_is_listed_root( CXCursor csr, char const *name ) {
+  assert( name != NULL );
+
+  CXFile const file = tidy_getCursorLocation_File( csr );
+  if ( file == NULL )
+    return false;                       // LCOV_EXCL_LINE
+
+  CXString const    path_cxs = clang_getFileName( file );
+  char const *const path_cs = clang_getCString( path_cxs );
+  bool const        is_root = config_symbol_is_root( name, path_cs );
+
+  clang_disposeString( path_cxs );
+  return is_root;
+}
+
+/**
+ * Gets whether \a sym_csr is configured to be a root symbol, either:
+ *
+ *  + Directly, via cursor_is_listed_root(); or:
+ *  + Being a C++ member function of a class that's a root so the member
+ *    functions of a root class needn't be listed individually.
+ *
+ * @remarks Being configured as a root isn't sufficient to be treated as one.
+ *
+ * @param sym_csr The symbol's (canonical) cursor to check.
+ * @param sym_name The scoped name of the symbol.
+ * @return Returns `true` only if \a sym_csr is configured to be a root.
+ */
+NODISCARD
+static bool cursor_is_config_root( CXCursor sym_csr, char const *sym_name ) {
+  assert( sym_name != NULL );
+
+  if ( cursor_is_listed_root( sym_csr, sym_name ) )
+    return true;
+
+  switch ( clang_getCursorKind( sym_csr ) ) {
+    case CXCursor_Constructor:
+    case CXCursor_ConversionFunction:
+    case CXCursor_CXXMethod:
+    case CXCursor_Destructor:
+    case CXCursor_FunctionTemplate:     // member function template
+      break;
+    default:
+      return false;
+  } // switch
+
+  //
+  // The semantic parent (rather than the lexical one) is the class even for a
+  // member function defined outside of it, e.g.: `void C::f() { }`.
+  //
+  CXCursor const cls_csr =
+    clang_getCanonicalCursor( clang_getCursorSemanticParent( sym_csr ) );
+  switch ( clang_getCursorKind( cls_csr ) ) {
+    case CXCursor_ClassDecl:
+    case CXCursor_ClassTemplate:
+    case CXCursor_ClassTemplatePartialSpecialization:
+    case CXCursor_StructDecl:
+    case CXCursor_UnionDecl:
+      break;
+    default:
+      return false;
+  } // switch
+
+  char *const cls_name = tidy_Cursor_getScopedSpelling( cls_csr );
+  if ( cls_name == NULL )
+    return false;                       // LCOV_EXCL_LINE
+  bool const is_root = cursor_is_listed_root( cls_csr, cls_name );
+  free( cls_name );
+  return is_root;
+}
+
+/**
  * Dispatch to the visitor-handling function based on the kind of \a sym_csr.
  *
  * @note This function must only be called for a cursor that _is_ a definition.
@@ -412,8 +500,8 @@ done:
  * @sa cursor_is_definition()
  * @sa cursor_visit_ref()
  */
-void cursor_visit_def( CXCursor sym_csr, tidy_symbol *sym,
-                       symbols_visit_data *svd ) {
+static void cursor_visit_def( CXCursor sym_csr, tidy_symbol *sym,
+                              symbols_visit_data *svd ) {
   assert( sym != NULL );
   assert( svd != NULL );
 
@@ -682,6 +770,63 @@ static bool file_previously_seen( CXFile file, symbols_visit_data *svd ) {
 static void loc_cleanup( tidy_loc *loc ) {
   if ( loc != NULL )
     FREE( loc->path );
+}
+
+/**
+ * Compares two \ref tidy_loc objects by their path, then by line, then by
+ * column.
+ *
+ * @param i_loc The first location.
+ * @param j_loc The second location.
+ * @return Returns a number less than 0, 0, or greater than 0 if the first
+ * location is less than, equal to, or greater than the second, respectively.
+ */
+NODISCARD
+static int loc_cmp( tidy_loc const *i_loc, tidy_loc const *j_loc ) {
+  assert( i_loc != NULL );
+  assert( i_loc->path != NULL );
+  assert( j_loc != NULL );
+  assert( j_loc->path != NULL );
+
+  int const cmp = strcmp( i_loc->path, j_loc->path );
+  if ( cmp != 0 )
+    return cmp;
+  if ( i_loc->line < j_loc->line ) return -1;
+  if ( i_loc->line > j_loc->line ) return  1;
+  // LCOV_EXCL_START
+  if ( i_loc->col  < j_loc->col  ) return -1;
+  if ( i_loc->col  > j_loc->col  ) return  1;
+  return 0;
+  // LCOV_EXCL_STOP
+}
+
+/**
+ * Gets a tidy_loc for the location of a declaration, but only if it's in a
+ * source path.
+ *
+ * @param loc The source location of a declaration.
+ * @return Returns a tidy_loc (spelling location) for \a loc or one having
+ * a NULL \ref tidy_loc::path "path" if \a loc isn't in a file or the file
+ * isn't a source path.
+ *
+ * @note The caller is responsible for calling loc_cleanup().
+ */
+NODISCARD
+static tidy_loc loc_from_SourceLocation( CXSourceLocation loc ) {
+  CXFile    file;
+  unsigned  line, col;
+  tidy_loc  rv_loc = { 0 };
+
+  clang_getSpellingLocation( loc, &file, &line, &col, /*offset=*/NULL );
+  if ( file != NULL ) {
+    rv_loc.path = dup_if_source_path( file );
+    if ( rv_loc.path != NULL ) {
+      rv_loc.line = line;
+      rv_loc.col  = col;
+    }
+  }
+
+  return rv_loc;
 }
 
 /**
@@ -1013,6 +1158,7 @@ static void symbol_cleanup( tidy_symbol *sym ) {
     FREE( sym->key );
     FREE( sym->name );
     FREE( sym->cxx_prototype );
+    loc_cleanup( &sym->dec_loc );
     loc_cleanup( &sym->def_loc );
     loc_cleanup( &sym->ext_link.header_dec_loc );
 
@@ -1034,7 +1180,8 @@ static void symbol_cleanup( tidy_symbol *sym ) {
  * i_sym is less than, equal to, or greater than the name of \a j_sym,
  * respectively.
  *
- * @sa symbol_cmp_by_path()
+ * @sa symbol_cmp_by_dec_loc()
+ * @sa symbol_cmp_by_def_loc()
  */
 NODISCARD
 static int symbol_cmp( tidy_symbol const *i_sym, tidy_symbol const *j_sym ) {
@@ -1044,35 +1191,43 @@ static int symbol_cmp( tidy_symbol const *i_sym, tidy_symbol const *j_sym ) {
 }
 
 /**
- * Compares two \ref tidy_symbol objects by their source path, then by line,
- * then by column.
+ * Compares two \ref tidy_symbol objects by their declaration location.
  *
  * @param i_sym The first symbol.
  * @param j_sym The second symbol.
  * @return Returns a number less than 0, 0, or greater than 0 if the first
- * symbol's path is less than, equal to, or greater than the second symbol's
- * path, respectively.
+ * symbol's location is less than, equal to, or greater than the second
+ * symbol's location, respectively.
  *
  * @sa symbol_cmp()
+ * @sa symbol_cmp_by_def_loc()
  */
 NODISCARD
-static int symbol_cmp_by_path( tidy_symbol const *i_sym,
-                               tidy_symbol const *j_sym ) {
+static int symbol_cmp_by_dec_loc( tidy_symbol const *i_sym,
+                                  tidy_symbol const *j_sym ) {
   assert( i_sym != NULL );
-  assert( i_sym->def_loc.path != NULL );
   assert( j_sym != NULL );
-  assert( j_sym->def_loc.path != NULL );
+  return loc_cmp( &i_sym->dec_loc, &j_sym->dec_loc );
+}
 
-  int const cmp = strcmp( i_sym->def_loc.path, j_sym->def_loc.path );
-  if ( cmp != 0 )
-    return cmp;
-  if ( i_sym->def_loc.line < j_sym->def_loc.line ) return -1;
-  if ( i_sym->def_loc.line > j_sym->def_loc.line ) return  1;
-  // LCOV_EXCL_START
-  if ( i_sym->def_loc.col  < j_sym->def_loc.col  ) return -1;
-  if ( i_sym->def_loc.col  > j_sym->def_loc.col  ) return  1;
-  return 0;
-  // LCOV_EXCL_STOP
+/**
+ * Compares two \ref tidy_symbol objects by their definition location.
+ *
+ * @param i_sym The first symbol.
+ * @param j_sym The second symbol.
+ * @return Returns a number less than 0, 0, or greater than 0 if the first
+ * symbol's location is less than, equal to, or greater than the second
+ * symbol's location, respectively.
+ *
+ * @sa symbol_cmp()
+ * @sa symbol_cmp_by_dec_loc()
+ */
+NODISCARD
+static int symbol_cmp_by_def_loc( tidy_symbol const *i_sym,
+                                  tidy_symbol const *j_sym ) {
+  assert( i_sym != NULL );
+  assert( j_sym != NULL );
+  return loc_cmp( &i_sym->def_loc, &j_sym->def_loc );
 }
 
 /**
@@ -1102,6 +1257,24 @@ static bool symbol_in_unused_scope( tidy_symbol const *sym ) {
   } // for
 
   return false;
+}
+
+/**
+ * Gets whether \a sym is undefined and should be reported as such, i.e., it's
+ * declared in a source path, but neither defined nor already reported as
+ * unused.
+ *
+ * @param sym The tidy_symbol to check.
+ * @return Returns `true` only if \a sym is undefined.
+ */
+NODISCARD
+static bool symbol_is_undefined( tidy_symbol const *sym ) {
+  assert( sym != NULL );
+
+  if ( sym->is_defined || sym->dec_loc.path == NULL )
+    return false;
+
+  return sym->is_used || sym->is_dead;  // else already reported as unused
 }
 
 /**
@@ -1173,14 +1346,17 @@ static void symbol_mark_used( tidy_symbol *sym ) {
  * Prints a tidy_symbol.
  *
  * @param sym The tidy_symbol to print.
+ * @param mbr_off The offset of the tidy_loc member of \a sym whose location to
+ * print, e.g., `def_loc` or `dec_loc` (from `offsetof`).
  */
-static void symbol_print( tidy_symbol const *sym ) {
+static void symbol_print( tidy_symbol const *sym, size_t mbr_off ) {
   assert( sym != NULL );
 
   bool const is_def_in_macro = sym_is_def_in_macro( sym );
+  tidy_loc const *const loc = PTR_TO_MBR( sym, mbr_off );
 
   color_start( stderr, sgr_locus );
-  EPRINTF( "%5u", sym->def_loc.line );
+  EPRINTF( "%5u", loc->line );
   color_end( stderr, sgr_locus );
   if ( is_def_in_macro ) {
     EPUTS( "   " );                     // same width as ",%2u"
@@ -1188,7 +1364,7 @@ static void symbol_print( tidy_symbol const *sym ) {
   else {
     EPUTC( ',' );
     color_start( stderr, sgr_locus );
-    EPRINTF( "%2u", sym->def_loc.col );
+    EPRINTF( "%2u", loc->col );
     color_end( stderr, sgr_locus );
   }
 
@@ -1205,15 +1381,19 @@ static void symbol_print( tidy_symbol const *sym ) {
 }
 
 /**
- * Prints the path of \a sym.
+ * Prints a path of \a sym.
  *
  * @param sym The tidy_symbol to print the path of.
+ * @param mbr_off The offset of the tidy_loc member of \a sym whose path to
+ * print, e.g., `def_loc` or `dec_loc` (from `offsetof`).
  */
-static void symbol_print_path( tidy_symbol const *sym  ) {
+static void symbol_print_path( tidy_symbol const *sym, size_t mbr_off ) {
   assert( sym != NULL );
 
+  tidy_loc const *const loc = PTR_TO_MBR( sym, mbr_off );
+
   color_start( stderr, sgr_locus );
-  EPRINTF( "\"%s\"", sym->def_loc.path );
+  EPRINTF( "\"%s\"", loc->path );
   color_end( stderr, sgr_locus );
   EPUTS( ": " );
   color_start( stderr, sgr_warning );
@@ -1239,9 +1419,9 @@ static void symbol_update_dec_loc( tidy_symbol *sym, CXCursor sym_csr,
 
   if ( svd->ignore_extern ) {
     //
-    // Checking is disabled for this TU, so sym can't be a candidate.  A
-    // reference from this TU to a symbol defined elsewhere is still counted as
-    // a reference from another file by symbol_update_ref_origin().
+    // Checking is disabled for this source, so sym can't be a candidate.  A
+    // reference from this source to a symbol defined elsewhere is still
+    // counted as a reference from another file by symbol_update_ref_origin().
     //
     return;
   }
@@ -1267,23 +1447,11 @@ static void symbol_update_dec_loc( tidy_symbol *sym, CXCursor sym_csr,
   if ( tidy_Location_isFromFile( canon_loc, svd->source->file ) )
     return;
 
-  CXFile dec_file;
-  unsigned dec_line, dec_col;
-  clang_getSpellingLocation(
-    canon_loc, &dec_file, &dec_line, &dec_col, /*offset=*/NULL
-  );
-  if ( dec_file == NULL )
-    return;
-  char *const dec_path = dup_if_source_path( dec_file );
-  if ( dec_path == NULL )
-    return;
-
-  loc_cleanup( &sym->ext_link.header_dec_loc );
-  sym->ext_link.header_dec_loc = (tidy_loc){
-    .path = dec_path,
-    .line = dec_line,
-    .col  = dec_col
-  };
+  tidy_loc const header_dec_loc = loc_from_SourceLocation( canon_loc );
+  if ( header_dec_loc.path != NULL ) {
+    loc_cleanup( &sym->ext_link.header_dec_loc );
+    sym->ext_link.header_dec_loc = header_dec_loc;
+  }
 }
 
 /**
@@ -1356,45 +1524,49 @@ static void symbol_update_macro_name_loc( tidy_symbol *sym, CXFile sym_file,
 
 /**
  * Updates \a to_sym's reference-origin information given that it's referenced
- * by \a from_sym in the current translation unit.
+ * by \a from_sym (or from file scope if NULL) in the current translation unit.
  *
  * @remarks A reference from anything not defined in the current source's main
  * file (e.g., a header) counts as a reference from "elsewhere" since the
  * header may be included by other translation units.
  *
- * @param from_sym The referencing symbol.
+ * @param from_sym The referencing symbol.  If NULL, it means from file scope.
  * @param to_sym The referenced symbol.
  * @param svd The symbols_visit_data to use.
  */
 static void symbol_update_ref_origin( tidy_symbol const *from_sym,
                                       tidy_symbol *to_sym,
                                       symbols_visit_data const *svd ) {
-  assert( from_sym != NULL );
   assert( to_sym != NULL );
   assert( svd != NULL );
 
   if ( to_sym->ext_link.is_ref_from_other_file )
     return;
 
-  if ( //
-       // The referencing symbol isn't defined in a source's main file that
-       // means it's in a header that other sources may include; or in a source
-       // file for which checking is ignored (so this flas was never set).
-       //
-       !from_sym->ext_link.is_def_in_main_file ||
+  if (  //
+        // The referencing symbol is ...
+        //
+        (from_sym != NULL && (
+          //
+          // ... not defined in a source's main file which means it's in a
+          // header file that other source files may include; or in a source
+          // file for which checking is ignored (so this flag was never set).
+          //
+          !from_sym->ext_link.is_def_in_main_file ||
 
-       //
-       // The referencing symbol was defined in a source file other than the
-       // one being visited.  This shouldn't happen: it's a defensive check.
-       //
-       from_sym->ext_link.def_tsid != svd->source->tsid ||
+          //
+          // ... defined in a source file other than the one being visited.
+          // This shouldn't happen: it's a defensive check.
+          //
+          unlikely( from_sym->ext_link.def_tsid != svd->source->tsid )
+        )) ||
 
-       //
-       // An earlier reference came from a source file other than the current
-       // one.
-       //
-       (to_sym->ext_link.ref_tsid != 0 &&
-        to_sym->ext_link.ref_tsid != svd->source->tsid) ) {
+        //
+        // An earlier reference came from a source file other than the current
+        // one.
+        //
+        (to_sym->ext_link.ref_tsid != 0 &&
+         to_sym->ext_link.ref_tsid != svd->source->tsid) ) {
     to_sym->ext_link.is_ref_from_other_file = true;
   }
   else {
@@ -1429,7 +1601,9 @@ static unsigned symbols_mark_used( void ) {
 
   ht_iterator_init( &iter, &tidy_symbol_set );
   for ( tidy_symbol *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
-    if ( sym->is_root )
+    if ( sym->is_root && !sym->is_defined && !symbol_is_referenced( sym ) )
+      sym->is_root = false;
+    else if ( sym->is_root )
       symbol_mark_used( sym );
   } // for
 
@@ -1445,6 +1619,61 @@ static unsigned symbols_mark_used( void ) {
   } // for
 
   return unused_count;
+}
+
+/**
+ * Adds a symbol for a declaration that isn't a definition (e.g., a function
+ * prototype in a header), but only if the symbol is configured to be a root.
+ *
+ * @remarks
+ * @parblock
+ * Declarations that aren't definitions normally don't get symbols of their
+ * own.  However, a symbol configured to be a root that's declared but never
+ * defined or referenced must still be reported as unused, so it needs a symbol
+ * having a location to report; the location of the declaration is used.  If
+ * the symbol is later defined, symbol_add_def() replaces the location with
+ * that of the definition.
+ *
+ * Only the canonical (first) declaration is considered: it's both cheaper than
+ * considering every redeclaration and the same cursor used by symbol_add() to
+ * decide whether the symbol is configured to be a root.
+ * @endparblock
+ *
+ * @param dec_csr The declaration's cursor.
+ * @param dec_loc The source location of \a dec_csr.
+ * @param svd The symbols_visit_data to use.
+ */
+static void symbol_add_root_dec( CXCursor dec_csr, CXSourceLocation dec_loc,
+                                 symbols_visit_data *svd ) {
+  assert( svd != NULL );
+
+  if ( tidy_Cursor_isForwardDeclarable( dec_csr ) )
+    return;
+
+  if ( !clang_equalCursors( dec_csr, clang_getCanonicalCursor( dec_csr ) ) )
+    return;
+
+  //
+  // Check whether it's a root before calling symbol_add() so we don't add
+  // symbols for every declaration.
+  //
+  char *const sym_name = tidy_Cursor_getScopedSpelling( dec_csr );
+  if ( sym_name == NULL )
+    return;                             // LCOV_EXCL_LINE
+  bool const is_root = cursor_is_config_root( dec_csr, sym_name );
+  free( sym_name );
+  if ( !is_root )
+    return;
+
+  tidy_symbol *const sym = symbol_add( dec_csr, svd );
+  if ( sym == NULL )
+    return;                             // e.g., excluded
+
+  if ( sym->parent_sym == NULL )
+    sym->parent_sym = svd->curr_sym;
+
+  if ( sym->def_loc.path == NULL )
+    symbol_add_def( sym, dec_loc, svd );
 }
 
 /**
@@ -1576,9 +1805,10 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
     }
 
     if ( cursor_is_definition( cursor ) ) {
-      tidy_symbol *const sym = symbol_add( cursor, svd->source );
+      tidy_symbol *const sym = symbol_add( cursor, svd );
       if ( likely( sym != NULL ) ) {
         symbol_add_def( sym, sym_loc, svd );
+        sym->is_defined = true;
         if ( sym->parent_sym == NULL )
           sym->parent_sym = svd->curr_sym;
         symbol_update_dec_loc( sym, cursor, sym_loc, svd );
@@ -1587,6 +1817,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
     }
     else {
       cursor_visit_ref( cursor, svd );
+      symbol_add_root_dec( cursor, sym_loc, svd );
     }
   }
 
@@ -1758,7 +1989,7 @@ static void visit_CXXMethod( CXCursor method_csr, symbols_visit_data *svd ) {
   );
 
   for ( unsigned i = 0; i < overridden_csrs_count; ++i ) {
-    tidy_symbol *const base_sym = symbol_add( overridden_csrs[i], svd->source );
+    tidy_symbol *const base_sym = symbol_add( overridden_csrs[i], svd );
     if ( base_sym != NULL )
       symbol_add_ref( base_sym, svd->curr_sym, svd );
     //
@@ -1770,7 +2001,7 @@ static void visit_CXXMethod( CXCursor method_csr, symbols_visit_data *svd ) {
     CXCursor const canon_csr = clang_getCanonicalCursor( overridden_csrs[i] );
     if ( tidy_Cursor_isInSystemHeader( canon_csr ) ) {
       CXCursor const parent_sym = clang_getCursorSemanticParent( method_csr );
-      tidy_symbol *const cls_sym = symbol_add( parent_sym, svd->source );
+      tidy_symbol *const cls_sym = symbol_add( parent_sym, svd );
       if ( cls_sym != NULL ) {
         symbol_add_ref( cls_sym, svd->curr_sym, svd );
       }
@@ -2018,7 +2249,7 @@ static void visit_most_Ref( CXCursor cursor, symbols_visit_data *svd ) {
 
   fwd_dec_visit_ref( ref_csr, svd );
 
-  tidy_symbol *const ref_sym = symbol_add( ref_csr, svd->source );
+  tidy_symbol *const ref_sym = symbol_add( ref_csr, svd );
   if ( ref_sym != NULL ) {
     symbol_add_ref( svd->curr_sym, ref_sym, svd );
     if ( svd->source->lang == CXLanguage_CPlusPlus )
@@ -2179,16 +2410,16 @@ static void visit_VarDecl( CXCursor var_decl_csr, symbols_visit_data *svd ) {
 void cursor_add_ref( CXCursor to_csr, symbols_visit_data *svd ) {
   assert( svd != NULL );
 
-  tidy_symbol *const to_sym = symbol_add( to_csr, svd->source );
+  tidy_symbol *const to_sym = symbol_add( to_csr, svd );
   if ( to_sym != NULL )
     symbol_add_ref( svd->curr_sym, to_sym, svd );
 }
 
-tidy_symbol* symbol_add( CXCursor sym_csr, tidy_source const *source ) {
-  assert( source != NULL );
+tidy_symbol* symbol_add( CXCursor sym_csr, symbols_visit_data const *svd ) {
+  assert( svd != NULL );
 
   sym_csr = clang_getCanonicalCursor( sym_csr );
-  if ( cursor_is_excluded( sym_csr, source ) )
+  if ( cursor_is_excluded( sym_csr, svd->source ) )
     return NULL;
 
   char *key = tidy_getCursorUSR( sym_csr );
@@ -2207,8 +2438,27 @@ tidy_symbol* symbol_add( CXCursor sym_csr, tidy_source const *source ) {
     goto done;
   }
 
-  if ( source->lang == CXLanguage_CPlusPlus )
+  if ( svd->source->lang == CXLanguage_CPlusPlus ) {
     sym->cxx_prototype = tidy_Cursor_getScopedDisplayName( sym_csr );
+
+    //
+    // A pure virtual function is never defined by design, so treat its
+    // declaration as its definition.  (Deleted and defaulted functions are
+    // already definitions to libclang.)
+    //
+    if ( clang_CXXMethod_isPureVirtual( sym_csr ) ||
+         tidy_Cursor_isImplicitMember( sym_csr ) ) {
+      sym->is_defined = true;
+    }
+  }
+
+  //
+  // Only a symbol that may be declared without being defined can be undefined.
+  // Anything else (e.g., a template parameter) is never defined as such, so
+  // treat it as defined.
+  //
+  if ( !tidy_Cursor_isForwardDeclarable( sym_csr ) )
+    sym->is_defined = true;
 
   //
   // If the symbol's name is "main", we have to mark it as a root since nothing
@@ -2221,6 +2471,20 @@ tidy_symbol* symbol_add( CXCursor sym_csr, tidy_source const *source ) {
     sym->is_root = true;
   }
 
+  //
+  // A library has no main(), so additional roots can be configured: by name,
+  // as all the symbols declared in a public API header, or as the member
+  // functions of a root class.  Since sym_csr is
+  // the canonical cursor, i.e., the first declaration, a function declared in
+  // an API header and defined in a source file is matched via its declaration
+  // in the header.
+  //
+  // Unlike is_root, a configured root isn't unconditionally used: it must also
+  // be defined or referenced.
+  //
+  if ( !sym->is_root && cursor_is_config_root( sym_csr, sym->name ) )
+    sym->is_root = true;
+
   if ( tidy_Cursor_isEnclosingScope( sym_csr ) )
     sym->is_scope = true;
 
@@ -2231,6 +2495,18 @@ tidy_symbol* symbol_add( CXCursor sym_csr, tidy_source const *source ) {
   );
 
 done:
+  //
+  // Remember where the (first) declaration is for symbols that are never
+  // defined.  This is done only for a symbol that's not (yet) defined and only
+  // once by a source for which checking is enabled, no matter which source is
+  // visited first, so the result doesn't depend on the order of sources.
+  //
+  if ( !svd->ignore_undefined && !sym->is_defined &&
+       sym->dec_loc.path == NULL ) {
+    CXSourceLocation const loc = clang_getCursorLocation( sym_csr );
+    sym->dec_loc = loc_from_SourceLocation( loc );
+  }
+
   return sym;
 }
 
@@ -2239,13 +2515,16 @@ void symbol_add_ref( tidy_symbol *from_sym, tidy_symbol *to_sym,
   assert( to_sym != NULL );
   assert( svd != NULL );
 
-  if ( from_sym == NULL ) {
+  //
+  // A reference from file scope (e.g., a global initializer) makes the
+  // symbol a root.
+  //
+  if ( from_sym == NULL )
     to_sym->is_root = true;
-  }
-  else {
+  else
     ht_table_insert( &from_sym->ref_sym_set, to_sym, 0 );
-    symbol_update_ref_origin( from_sym, to_sym, svd );
-  }
+
+  symbol_update_ref_origin( from_sym, to_sym, svd );
 }
 
 void symbols_init( void ) {
@@ -2265,6 +2544,51 @@ void symbols_init( void ) {
   ATEXIT( &symbols_cleanup );
 }
 
+unsigned symbols_print_undefined( void ) {
+  if ( !print_undefined )
+    return 0;
+
+  ht_iterator_t iter;
+  unsigned undefined_count = 0;
+
+  ht_iterator_init( &iter, &tidy_symbol_set );
+  for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
+    if ( symbol_is_undefined( sym ) )
+      ++undefined_count;
+  } // for
+  if ( undefined_count == 0 )
+    return 0;
+
+  array_t symbol_array = ARRAY_INIT( sizeof(tidy_symbol) );
+  array_reserve( &symbol_array, undefined_count );
+
+  ht_iterator_init( &iter, &tidy_symbol_set );
+  for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
+    if ( symbol_is_undefined( sym ) )
+      *(tidy_symbol*)array_push_back( &symbol_array ) = *sym;
+  } // for
+
+  array_qsort(
+    &symbol_array,
+    POINTER_CAST( array_cmp_fn_t, &symbol_cmp_by_dec_loc )
+  );
+
+  char const *prev_path = "";
+  for ( size_t i = 0; i < symbol_array.len; ++i ) {
+    tidy_symbol const *const sym = array_at_nc( &symbol_array, i );
+    if ( strcmp( sym->dec_loc.path, prev_path ) != 0 ) {
+      prev_path = sym->dec_loc.path;
+      symbol_print_path( sym, offsetof( tidy_symbol, dec_loc ) );
+      EPUTS( ": undefined symbols:\n" );
+    }
+    symbol_print( sym, offsetof( tidy_symbol, dec_loc ) );
+    EPUTC( '\n' );
+  } // for
+
+  array_cleanup( &symbol_array, /*free_fn=*/NULL );
+  return undefined_count;
+}
+
 unsigned symbols_print_unused( void ) {
   unsigned const unused_count = symbols_mark_used();
   if ( unused_count == 0 )
@@ -2282,7 +2606,7 @@ unsigned symbols_print_unused( void ) {
 
   array_qsort(
     &symbol_array,
-    POINTER_CAST( array_cmp_fn_t, &symbol_cmp_by_path )
+    POINTER_CAST( array_cmp_fn_t, &symbol_cmp_by_def_loc )
   );
 
   char const *prev_path = "";
@@ -2290,10 +2614,10 @@ unsigned symbols_print_unused( void ) {
     tidy_symbol const *const sym = array_at_nc( &symbol_array, i );
     if ( strcmp( sym->def_loc.path, prev_path ) != 0 ) {
       prev_path = sym->def_loc.path;
-      symbol_print_path( sym );
+      symbol_print_path( sym, offsetof( tidy_symbol, def_loc ) );
       EPUTS( ": unused symbols:\n" );
     }
-    symbol_print( sym );
+    symbol_print( sym, offsetof( tidy_symbol, def_loc ) );
     EPUTC( '\n' );
   } // for
 
@@ -2327,7 +2651,7 @@ unsigned symbols_print_unneeded_external( void ) {
 
   array_qsort(
     &symbol_array,
-    POINTER_CAST( array_cmp_fn_t, &symbol_cmp_by_path )
+    POINTER_CAST( array_cmp_fn_t, &symbol_cmp_by_def_loc )
   );
 
   char const *prev_path = "";
@@ -2335,10 +2659,10 @@ unsigned symbols_print_unneeded_external( void ) {
     tidy_symbol const *const sym = array_at_nc( &symbol_array, i );
     if ( strcmp( sym->def_loc.path, prev_path ) != 0 ) {
       prev_path = sym->def_loc.path;
-      symbol_print_path( sym );
+      symbol_print_path( sym, offsetof( tidy_symbol, def_loc ) );
       EPUTS( ": unneeded external linkage:\n" );
     }
-    symbol_print( sym );
+    symbol_print( sym, offsetof( tidy_symbol, def_loc ) );
 
     if ( sym->ext_link.header_dec_loc.path != NULL ) {
       EPUTS( " (delete or move declaration at " );
@@ -2355,19 +2679,24 @@ unsigned symbols_print_unneeded_external( void ) {
   return unneeded_count;
 }
 
-unsigned symbols_visit( tidy_source *source ) {
-  assert( source != NULL );
+void svd_init( symbols_visit_data *svd, tidy_source *source ) {
+  assert( svd != NULL );
 
   bool const ignore_extern =
     config_bool_value( &opt_ignore_externs, source->path );
-
   if ( !ignore_extern )
     print_unneeded_external = true;
 
-  symbols_visit_data svd = {
+  bool const ignore_undefined =
+    config_bool_value( &opt_ignore_undefined, source->path );
+  if ( !ignore_undefined )
+    print_undefined = true;
+
+  *svd = (symbols_visit_data){
     .source = source,
     .ignore_extern = ignore_extern,
     .ignore_forwards = config_bool_value( &opt_ignore_forwards, source->path ),
+    .ignore_undefined = ignore_undefined,
     .cxx_constructor = {
       .ctor_csr = clang_getNullCursor()
     },
@@ -2377,9 +2706,14 @@ unsigned symbols_visit( tidy_source *source ) {
       .end_csr = clang_getNullCursor()
     }
   };
-  CXCursor const cursor = clang_getTranslationUnitCursor( source->tu );
-  clang_visitChildren( cursor, &symbols_visitor, &svd );
-  return fwd_decs_print_unneeded( source );
+}
+
+unsigned symbols_visit( symbols_visit_data *svd ) {
+  assert( svd != NULL );
+
+  CXCursor const cursor = clang_getTranslationUnitCursor( svd->source->tu );
+  clang_visitChildren( cursor, &symbols_visitor, svd );
+  return fwd_decs_print_unneeded( svd->source );
 }
 
 ///////////////////////////////////////////////////////////////////////////////

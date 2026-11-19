@@ -131,6 +131,16 @@ bool config_path_is_ignored( char const *path );
 NODISCARD
 bool config_symbol_is_ignored( char const *sym_name, char const *sym_path );
 
+/**
+ * Gets whether \a sym_name is a root symbol.
+ *
+ * @param sym_name The symbol name to check.
+ * @param sym_path The path containing \a sym_name.
+ * @return Returns `true` only if \a sym_name is a root symbol.
+ */
+NODISCARD
+bool config_symbol_is_root( char const *sym_name, char const *sym_path );
+
 ///////////////////////////////////////////////////////////////////////////////
 
 /** @} */

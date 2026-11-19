@@ -31,6 +31,7 @@
 #include "fnv1a.h"
 #include "hash_table.h"
 #include "path_util.h"
+#include "options.h"
 #include "print.h"
 #include "symbol.h"
 #include "symbol-tidy.h"
@@ -60,7 +61,7 @@ static CXIndex      tidy_index;         ///< Libclang index.
 
 ////////// local functions ////////////////////////////////////////////////////
 
-static void source_cpp_visit( tidy_source const*, CXFile );
+static void source_cpp_visit( symbols_visit_data const*, CXFile );
 
 ////////// local functions ////////////////////////////////////////////////////
 
@@ -106,8 +107,8 @@ static void include_visitor( CXFile included_file,
     goto skip;
 
   assert( data != NULL );
-  tidy_source const *const source = data;
-  source_cpp_visit( source, included_file );
+  symbols_visit_data const *const svd = data;
+  source_cpp_visit( svd, included_file );
 
 skip:
   clang_disposeString( path_cxs );
@@ -185,41 +186,42 @@ static void source_check_diagnostics( tidy_source const *source ) {
  * e.g., `#if`, `#ifdef`, etc.), so `clang_visitChildren()` can't visit them to
  * look for symbols that are referenced to mark them as used.  Consequently,
  * we're forced to iterate through all of \a source's tokens looking for `#`
- * followed by a directive name and check subsequent tokens for identifiers.
+ * followed by a conditional directive name and check subsequent tokens for
+ * identifiers.
  *
- * @param source The source file for the translation unit.
+ * @param svd The symbols_visit_data to use.
  * @param file The file whose preprocessor directives to visit.
  */
-static void source_cpp_visit( tidy_source const *source, CXFile file ) {
-  assert( source != NULL );
+static void source_cpp_visit( symbols_visit_data const *svd, CXFile file ) {
+  assert( svd != NULL );
 
   size_t file_size;
-  (void)clang_getFileContents( source->tu, file, &file_size );
+  (void)clang_getFileContents( svd->source->tu, file, &file_size );
 
   CXSourceLocation const start_loc =
-    clang_getLocation( source->tu, file, 1, 1 );
+    clang_getLocation( svd->source->tu, file, 1, 1 );
   CXSourceLocation const end_loc =
-    clang_getLocationForOffset( source->tu, file, (unsigned)file_size );
+    clang_getLocationForOffset( svd->source->tu, file, (unsigned)file_size );
   CXSourceRange const file_range = clang_getRange( start_loc, end_loc );
 
   CXToken *tokens;
   unsigned token_count;
-  clang_tokenize( source->tu, file_range, &tokens, &token_count );
+  clang_tokenize( svd->source->tu, file_range, &tokens, &token_count );
   if ( unlikely( token_count == 0 ) )
     return;                             // LCOV_EXCL_LINE
 
-  CXCursor const tu_csr = clang_getTranslationUnitCursor( source->tu );
+  CXCursor const tu_csr = clang_getTranslationUnitCursor( svd->source->tu );
 
   for ( unsigned i = 0; i < token_count; ++i ) {
     CXSourceLocation const token_loc =
-      clang_getTokenLocation( source->tu, tokens[i] );
+      clang_getTokenLocation( svd->source->tu, tokens[i] );
     if ( clang_Location_isInSystemHeader( token_loc ) )
       continue;
 
     CXTokenKind token_kind = clang_getTokenKind( tokens[i] );
     if ( token_kind != CXToken_Punctuation )
       continue;
-    if ( !tidy_Token_isSpellingEqualTo( source->tu, tokens[i], "#" ) )
+    if ( !tidy_Token_isSpellingEqualTo( svd->source->tu, tokens[i], "#" ) )
       continue;
     if ( ++i == token_count )
       break;
@@ -228,7 +230,7 @@ static void source_cpp_visit( tidy_source const *source, CXFile file ) {
     if ( token_kind != CXToken_Identifier )
       continue;
     int const directive_idx = tidy_Token_isSpellingEqualToAny(
-      source->tu, tokens[i],
+      svd->source->tu, tokens[i],
       "if", "ifdef", "ifndef", "elif", "elifdef", "elifndef"
     );
     if ( directive_idx == -1 )
@@ -238,9 +240,9 @@ static void source_cpp_visit( tidy_source const *source, CXFile file ) {
 
     while ( ++i < token_count ) {
       unsigned const token_line =
-        tidy_getTokenLocation_Line( source->tu, tokens[i] );
+        tidy_getTokenLocation_Line( svd->source->tu, tokens[i] );
       if ( token_line > last_line ) {
-        if ( !tidy_isEscapedNewline( source->tu, tokens, i ) ) {
+        if ( !tidy_isEscapedNewline( svd->source->tu, tokens, i ) ) {
           --i;
           break;
         }
@@ -252,7 +254,7 @@ static void source_cpp_visit( tidy_source const *source, CXFile file ) {
         continue;
 
       CXString const token_cxs =
-        clang_getTokenSpelling( source->tu, tokens[i] );
+        clang_getTokenSpelling( svd->source->tu, tokens[i] );
       char const *const token_cs = clang_getCString( token_cxs );
 
       if ( strcmp( token_cs, "defined" ) == 0 )
@@ -261,7 +263,7 @@ static void source_cpp_visit( tidy_source const *source, CXFile file ) {
         goto skip;
 
       CXCursor const sym_csr = tidy_getCursorByName( token_cs, tu_csr );
-      tidy_symbol *const sym = symbol_add( sym_csr, source );
+      tidy_symbol *const sym = symbol_add( sym_csr, svd );
       if ( sym != NULL )
         sym->is_root = true;
 
@@ -269,7 +271,7 @@ skip: clang_disposeString( token_cxs );
     } // while
   } // for
 
-  clang_disposeTokens( source->tu, tokens, token_count );
+  clang_disposeTokens( svd->source->tu, tokens, token_count );
 }
 
 /**
@@ -366,12 +368,12 @@ void source_cleanup( tidy_source *source ) {
   }
 };
 
-void source_parse( tidy_source *source ) {
-  assert( source != NULL );
-  source_parse_impl( source );
-  source->file = clang_getFile( source->tu, source->path );
-  source_cpp_visit( source, source->file );
-  clang_getInclusions( source->tu, &include_visitor, source );
+void source_parse( symbols_visit_data *svd ) {
+  assert( svd != NULL );
+  source_parse_impl( svd->source );
+  svd->source->file = clang_getFile( svd->source->tu, svd->source->path );
+  source_cpp_visit( svd, svd->source->file );
+  clang_getInclusions( svd->source->tu, &include_visitor, svd );
 }
 
 bool source_path_add( char const *path ) {

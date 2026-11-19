@@ -64,6 +64,7 @@ config_bool   opt_ignore_cxx_move_assigns;
 config_bool   opt_ignore_cxx_move_ctors;
 config_bool   opt_ignore_externs;
 config_bool   opt_ignore_forwards;
+config_bool   opt_ignore_undefined;
 tidy_test     opt_test;
 tidy_verbose  opt_verbose;
 
@@ -225,6 +226,7 @@ static void options_cleanup( void ) {
   config_bool_cleanup( &opt_ignore_cxx_move_ctors );
   config_bool_cleanup( &opt_ignore_externs );
   config_bool_cleanup( &opt_ignore_forwards );
+  config_bool_cleanup( &opt_ignore_undefined );
 }
 
 void options_init( void ) {
@@ -236,6 +238,7 @@ void options_init( void ) {
   config_bool_init( &opt_ignore_cxx_move_ctors );
   config_bool_init( &opt_ignore_externs );
   config_bool_init( &opt_ignore_forwards );
+  config_bool_init( &opt_ignore_undefined );
 
   ATEXIT( &options_cleanup );
 }

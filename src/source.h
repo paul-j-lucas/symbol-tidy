@@ -45,6 +45,7 @@
 ////////// typedefs ///////////////////////////////////////////////////////////
 
 typedef struct tidy_source tidy_source;
+typedef struct symbols_visit_data   symbols_visit_data;
 
 ////////// structs ////////////////////////////////////////////////////////////
 
@@ -89,9 +90,9 @@ void source_cleanup( tidy_source *source );
 /**
  * Parses \a source.
  *
- * @param source The source to parse.
+ * @param svd The symbols_visit_data to use.
  */
-void source_parse( tidy_source *source );
+void source_parse( symbols_visit_data *svd );
 
 /**
  * Adds \a path to the set of source files being tidied.

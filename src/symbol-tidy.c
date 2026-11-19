@@ -52,6 +52,23 @@ enum {
   TIDY_EX_NO_VIOLATIONS_ERROR = 2       ///< No violations, but error anyway.
 };
 
+////////// typedefs ///////////////////////////////////////////////////////////
+
+typedef struct tidy_summary tidy_summary;
+
+////////// structs ////////////////////////////////////////////////////////////
+
+/**
+ * Values for the summary line.
+ */
+struct tidy_summary {
+  unsigned undefined_symbols;     ///< Number of undefined symbols.
+  unsigned unneeded_externs;      ///< Number of unneeded extern declarations.
+  unsigned unneeded_forwards;     ///< Number of unneeded forward declarations.
+  unsigned unused_symbols;        ///< Number of unused symbols.
+  unsigned violations_count;      ///< Total number of violations.
+};
+
 ////////// extern variables ///////////////////////////////////////////////////
 
 /// @cond DOXYGEN_IGNORE
@@ -64,38 +81,46 @@ char const   *prog_name;
 ////////// local functions ////////////////////////////////////////////////////
 
 /**
- * Prints a summary line only if any if the parameters values are &gt; 0.
+ * Prints a summary line only if any values of the summary are &gt; 0.
  *
- * @param unused_symbols The number of unused symbols.
- * @param unneeded_forwards The number of unneeded declarations.
- * @param unneeded_externs The number of unneeded external declarations.
+ * @param summary The tidy_summary to check.
  */
-static void print_summary( unsigned unused_symbols, unsigned unneeded_forwards,
-                           unsigned unneeded_externs ) {
-  if ( unused_symbols == 0 && unneeded_forwards == 0 &&
-       unneeded_externs == 0 ) {
+static void summary_print( tidy_summary const *summary ) {
+  assert( summary != NULL );
+
+  if ( summary->violations_count == 0 )
     return;
-  }
 
   char const *sep ="";
 
   EPRINTF( "%s: ", prog_name );
 
-  if ( unused_symbols > 0 ) {
-    EPRINTF( "%u unused symbol%s", unused_symbols, plural_s( unused_symbols ) );
+  // These are printed in "importance" order.
+
+  if ( summary->unused_symbols > 0 ) {
+    EPRINTF( "%u unused symbol%s",
+    summary->unused_symbols, plural_s( summary->unused_symbols ) );
     sep = "; ";
   }
 
-  if ( unneeded_forwards > 0 ) {
+  if ( summary->undefined_symbols > 0 ) {
     EPRINTF(
-      "%s%u unneeded forward%s",
-      sep, unneeded_forwards, plural_s( unneeded_forwards )
+      "%s%u unused symbol%s",
+      sep, summary->undefined_symbols, plural_s( summary->undefined_symbols )
     );
     sep = "; ";
   }
 
-  if ( unneeded_externs > 0 ) {
-    EPRINTF( "%s%u unneeded external linkage", sep, unneeded_externs );
+  if ( summary->unneeded_forwards > 0 ) {
+    EPRINTF(
+      "%s%u unneeded forward%s",
+      sep, summary->unneeded_forwards, plural_s( summary->unneeded_forwards )
+    );
+    sep = "; ";
+  }
+
+  if ( summary->unneeded_externs > 0 ) {
+    EPRINTF( "%s%u unneeded external linkage", sep, summary->unneeded_externs );
     sep = "; ";
   }
 
@@ -123,13 +148,15 @@ static void test_init( char const *env_var ) {
 /**
  * Gets the status **symbol-tidy** should exit with.
  *
- * @param violations_count The number of violations.
+ * @param summary The tidy_summary to use.
  * @return Returns said exit status.
  */
 NODISCARD
-static int tidy_status( unsigned violations_count ) {
+static int tidy_status( tidy_summary const *summary ) {
+  assert( summary != NULL );
+
   if ( opt_error != TIDY_ERROR_NEVER ) {
-    if ( violations_count > 0 )
+    if ( summary->violations_count > 0 )
       return TIDY_EX_VIOLATIONS;
     if ( opt_error == TIDY_ERROR_ALWAYS )
       return TIDY_EX_NO_VIOLATIONS_ERROR;
@@ -172,16 +199,33 @@ int main( int argc, char const *argv[] ) {
     if ( IS_VERBOSE( SRC_FILE_ALWAYS ) )
       verbose_printf( "source file = \"%s\"\n", source->path );
 
-    source_parse( source );
-    unneeded_forwards += symbols_visit( source );
+    symbols_visit_data svd;
+    svd_init( &svd, source );
+
+    source_parse( &svd );
+    unneeded_forwards += symbols_visit( &svd );
     source_cleanup( source );
   } // for
 
+  // symbols_print_unused() must be called first
   unsigned const unused_symbols = symbols_print_unused();
+  unsigned const undefined_symbols = symbols_print_undefined();
   unsigned const unneeded_externs = symbols_print_unneeded_external();
+
+  tidy_summary const summary = {
+    .unused_symbols = unused_symbols,
+    .undefined_symbols = undefined_symbols,
+    .unneeded_forwards = unneeded_forwards,
+    .unneeded_externs = unneeded_externs,
+    .violations_count =
+      + undefined_symbols
+      + unneeded_externs
+      + unneeded_forwards
+      + unused_symbols
+  };
 
   array_cleanup( &sources, /*free_fn=*/NULL );
 
-  print_summary( unused_symbols, unneeded_forwards, unneeded_externs );
-  return tidy_status( unused_symbols + unneeded_forwards + unneeded_externs );
+  summary_print( &summary );
+  return tidy_status( &summary );
 }

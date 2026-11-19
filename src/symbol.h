@@ -47,6 +47,8 @@
 
 ////////// typedefs ///////////////////////////////////////////////////////////
 
+typedef struct tidy_source tidy_source;
+
 typedef struct cxx_dtor_frame       cxx_dtor_frame;
 typedef struct svd_cxx_constructor  svd_cxx_constructor;
 typedef struct svd_cxx_for_range    svd_cxx_for_range;
@@ -76,6 +78,36 @@ struct tidy_symbol {
   char const   *cxx_prototype;          ///< C++ prototype.
   tidy_symbol  *parent_sym;             ///< Parent symbol, if any.
   hash_table_t  ref_sym_set;            ///< Symbol(s) referenced from this.
+
+  /**
+   * Location of the symbol's first (canonical) declaration.
+   *
+   * @remarks
+   * @parblock
+   * This is set only while the symbol isn't \ref is_defined "defined" and only
+   * by a source for which checking for undefined symbols is enabled.  The
+   * first location recorded is kept.  Hence, a symbol that's defined when
+   * first seen never has one.
+   *
+   * Its purpose is to give symbols_print_undefined() a location to report, so
+   * it's distinct from:
+   *
+   *  + #def_loc, the location of the definition (or, for a declaration-only
+   *    configured root, a fallback location to report).
+   *
+   *  + \ref ts_ext_link::header_dec_loc "header_dec_loc", which is set only
+   *    for a defined symbol that's a candidate for internal linkage whose
+   *    first declaration is in a header.
+   *
+   * @endparblock
+   *
+   * @note If no declaration is visited, its \ref tidy_loc::path "path" will be
+   * NULL.
+   *
+   * @sa is_defined
+   * @sa symbols_print_undefined()
+   */
+  tidy_loc      dec_loc;
 
   /**
    * Location where the symbol is defined; if via a macro, where expanded.
@@ -248,6 +280,31 @@ struct tidy_symbol {
   hash_table_t  cxx_adl_usr_set;
 
   /**
+   * Is this symbol defined somewhere (or doesn't need to be)?
+   *
+   * @remarks
+   * @parblock
+   * This is set to `true` when:
+   *
+   *  + A definition of the symbol is visited (not merely its declaration).
+   *
+   *  + The symbol is never explicitly defined by design (e.g., a pure virtual
+   *    member function) or an implicitly declared member (e.g., a default
+   *    constructor) that the compiler defines.
+   *
+   *  + The symbol is of a kind that can't be forward declared (e.g., an
+   *    enumeration).
+   *
+   * This is used to decide whether:
+   *
+   *  + A configured root stays a root: it must be defined or referenced.
+   *  + The symbol is reported by symbols_print_undefined().
+   *
+   * @endparblock
+   */
+  bool          is_defined;
+
+  /**
    * Is this a "root" symbol?
    *
    * @remarks
@@ -322,10 +379,11 @@ struct tidy_symbol {
  * Additional data passed to symbols_visitor().
  */
 struct symbols_visit_data {
-  tidy_source const  *source;           ///< Source file being tidied.
+  tidy_source        *source;           ///< Source file being tidied.
   tidy_symbol        *curr_sym;         ///< Current symbol, if any.
   bool                ignore_extern;    ///< Ignore unneeded external linkage?
   bool                ignore_forwards;  ///< Ignore unneeded forward decl's?
+  bool                ignore_undefined; ///< Ignore undefined symbols?
 
   /**
    * A unique ID for every non-standard-header cursor visited by
@@ -415,15 +473,23 @@ struct symbols_visit_data {
 void cursor_add_ref( CXCursor to_csr, symbols_visit_data *svd );
 
 /**
+ * Initializes \a svd.
+ *
+ * @param svd The symbols_visit_data to initialize.
+ * @param source The tidy_source being visited.
+ */
+void svd_init( symbols_visit_data *svd, tidy_source *source );
+
+/**
  * Adds a symbol to tidy_symbol_set unless it already exists.
  *
  * @param sym_csr The cursor for the symbol to add.
- * @param source The tidy_source \a sym_csr is from.
+ * @param svd The symbols_visit_data to use.
  * @return Returns a new or existing tidy_symbol, or NULL if it is excluded or
  * could could not be added.
  */
 NODISCARD
-tidy_symbol* symbol_add( CXCursor sym_csr, tidy_source const *source );
+tidy_symbol* symbol_add( CXCursor sym_csr, symbols_visit_data const *svd );
 
 /**
  * Adds a reference from \a from_sym to \a to_sym, or mark \a to_sym as a \ref
@@ -448,6 +514,13 @@ void symbol_add_ref( tidy_symbol *from_sym, tidy_symbol *to_sym,
 void symbols_init( void );
 
 /**
+ * Determines the number of undefined symbols and prints them.
+ *
+ * @return Returns the number of undefined symbols.
+ */
+unsigned symbols_print_undefined( void );
+
+/**
  * Determines the number of symbols that have external linkage unnecessarily
  * and prints them.
  *
@@ -466,10 +539,10 @@ unsigned symbols_print_unused( void );
 /**
  * Visits all symbols in \a source.
  *
- * @param source The source file to visit.
+ * @param svd The symbols_visit_data to use.
  * @return Returns the number of unneeded forward declarations for \a source.
  */
-unsigned symbols_visit( tidy_source *source );
+unsigned symbols_visit( symbols_visit_data *svd );
 
 ////////// extern variables ///////////////////////////////////////////////////
 

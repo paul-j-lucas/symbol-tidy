@@ -1063,6 +1063,31 @@ bool tidy_Cursor_isExternalGlobalFunction( CXCursor cursor ) {
   return true;
 }
 
+bool tidy_Cursor_isForwardDeclarable( CXCursor cursor ) {
+  enum CXCursorKind const kind = clang_getCursorKind( cursor );
+  switch ( kind ) {
+    case CXCursor_ClassDecl:
+    case CXCursor_ClassTemplate:
+    case CXCursor_ClassTemplatePartialSpecialization:
+    case CXCursor_Constructor:
+    case CXCursor_ConversionFunction:
+    case CXCursor_CXXMethod:
+    case CXCursor_Destructor:
+    case CXCursor_FunctionDecl:
+    case CXCursor_VarDecl:
+      return true;
+    default:
+      return false;
+  } // switch
+}
+
+bool tidy_Cursor_isImplicitMember( CXCursor cursor ) {
+  CXCursor const parent_csr = clang_getCursorSemanticParent( cursor );
+  CXSourceLocation const cursor_loc = clang_getCursorLocation( cursor );
+  CXSourceLocation const parent_loc = clang_getCursorLocation( parent_csr );
+  return clang_equalLocations( cursor_loc, parent_loc );
+}
+
 bool tidy_Cursor_isLocalVarDecl( CXCursor cursor ) {
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
   return kind == CXCursor_VarDecl && tidy_Cursor_inFunctionScope( cursor );
