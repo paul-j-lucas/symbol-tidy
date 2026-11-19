@@ -214,20 +214,19 @@ int main( int argc, char const *argv[] ) {
   unsigned const undefined_symbols = symbols_print_undefined();
   unsigned const unneeded_externs = symbols_print_unneeded_external();
 
+  array_cleanup( &sources, /*free_fn=*/NULL );
+
   tidy_summary const summary = {
-    .unused_symbols = unused_symbols,
     .undefined_symbols = undefined_symbols,
-    .unneeded_forwards = unneeded_forwards,
     .unneeded_externs = unneeded_externs,
+    .unneeded_forwards = unneeded_forwards,
+    .unused_symbols = unused_symbols,
     .violations_count =
       + undefined_symbols
       + unneeded_externs
       + unneeded_forwards
       + unused_symbols
   };
-
-  array_cleanup( &sources, /*free_fn=*/NULL );
-
   summary_print( &summary );
   return tidy_status( &summary );
 }
