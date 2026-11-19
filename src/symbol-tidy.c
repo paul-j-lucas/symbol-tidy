@@ -207,9 +207,8 @@ int main( int argc, char const *argv[] ) {
     source_cleanup( source );
   } // for
 
-  // symbols_print_unused() must be called first
-  unsigned const unused_symbols = symbols_print_unused();
   unsigned const undefined_symbols = symbols_print_undefined();
+  unsigned const unused_symbols = symbols_print_unused();
   unsigned const unneeded_externs = symbols_print_unneeded_external();
 
   tidy_summary const summary = {
