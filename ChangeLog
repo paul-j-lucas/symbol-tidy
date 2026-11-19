@@ -1,5 +1,10 @@
 2026-11-19  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * cxx_symbol.c, symbol-tidy.c, symbol.c, symbol.h: Now explicitly calling
+     symbols_mark_used().
+   * symbol.c: A root symbol that's undefined is now reported as undedined, not
+     unused.
+   * symbol.c: ! fix; costmetic.
    * man/man1/symbol-tidy.1, clang_util.c, clang_util.h, config_file.c,
      config_file.h, cxx_symbol.c, options.c, options.h, source.c, source.h,
      symbol-tidy.c, symbol-tidy.toml, symbol.c, symbol.h: Added root symbols
