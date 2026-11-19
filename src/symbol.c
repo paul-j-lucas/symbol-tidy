@@ -134,6 +134,19 @@ static inline bool sym_is_def_in_macro( tidy_symbol const *sym ) {
 }
 
 /**
+ * Gets whether \a sym is undefined and should be reported as such, i.e., it's
+ * declared in a source path, but neither defined nor already reported as
+ * unused.
+ *
+ * @param sym The tidy_symbol to check.
+ * @return Returns `true` only if \a sym is undefined.
+ */
+NODISCARD
+static inline bool symbol_is_undefined( tidy_symbol const *sym ) {
+  return !sym->is_defined && sym->dec_loc.path != NULL;
+}
+
+/**
  * Gets the name of \a sym that should be used for printing.
  *
  * @remarks For C, it's just the symbol's plain name; for C++, it's the
@@ -1260,24 +1273,6 @@ static bool symbol_in_unused_scope( tidy_symbol const *sym ) {
 }
 
 /**
- * Gets whether \a sym is undefined and should be reported as such, i.e., it's
- * declared in a source path, but neither defined nor already reported as
- * unused.
- *
- * @param sym The tidy_symbol to check.
- * @return Returns `true` only if \a sym is undefined.
- */
-NODISCARD
-static bool symbol_is_undefined( tidy_symbol const *sym ) {
-  assert( sym != NULL );
-
-  if ( sym->is_defined || sym->dec_loc.path == NULL )
-    return false;
-
-  return sym->is_used || sym->is_dead;  // else already reported as unused
-}
-
-/**
  * Gets whether \a sym has external linkage unnecessarily.
  *
  * @remarks
@@ -1614,7 +1609,7 @@ static unsigned symbols_mark_used( void ) {
       continue;
     if ( sym->def_loc.path == NULL || symbol_in_unused_scope( sym ) )
       sym->is_dead = true;
-    else if ( !sym->is_used )
+    else if ( !sym->is_used && !symbol_is_undefined( sym ) )
       ++unused_count;
   } // for
 
@@ -2629,7 +2624,7 @@ unsigned symbols_print_unused( void ) {
   ht_iterator_t iter;
   ht_iterator_init( &iter, &tidy_symbol_set );
   for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
-    if ( !sym->is_used && !sym->is_dead )
+    if ( !sym->is_used && !sym->is_dead && !symbol_is_undefined( sym ) )
       *(tidy_symbol*)array_push_back( &symbol_array ) = *sym;
   } // for
 
