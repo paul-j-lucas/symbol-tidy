@@ -146,6 +146,17 @@ static inline bool symbol_is_undefined( tidy_symbol const *sym ) {
 }
 
 /**
+ * Gets whether \a sym is unused and should be reported as such.
+ *
+ * @remarks This can be called only after \ref is_dead has been finalized for
+ * \a sym by symbols_mark_used().
+ */
+NODISCARD
+static inline bool symbol_is_unused( tidy_symbol const *sym ) {
+  return !sym->is_used && !sym->is_dead && !symbol_is_undefined( sym );
+}
+
+/**
  * Gets the name of \a sym that should be used for printing.
  *
  * @remarks For C, it's just the symbol's plain name; for C++, it's the
@@ -2555,7 +2566,7 @@ unsigned symbols_mark_used( void ) {
       continue;
     if ( sym->def_loc.path == NULL || symbol_in_unused_scope( sym ) )
       sym->is_dead = true;
-    else if ( !sym->is_used && !symbol_is_undefined( sym ) )
+    else if ( symbol_is_unused( sym ) )
       ++unused_count;
   } // for
 
@@ -2617,7 +2628,7 @@ void symbols_print_unused( unsigned unused_count ) {
   ht_iterator_t iter;
   ht_iterator_init( &iter, &tidy_symbol_set );
   for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
-    if ( !sym->is_used && !sym->is_dead && !symbol_is_undefined( sym ) )
+    if ( symbol_is_unused( sym ) )
       *(tidy_symbol*)array_push_back( &symbol_array ) = *sym;
   } // for
   assert( symbol_array.len == unused_count );
