@@ -1,8 +1,5 @@
 # symbol-tidy
 
-THIS SOFTWARE IS PRE-ALPHA AND DOESN'T WORK YET.
-STAY TUNED.
-
 ## Introduction
 
 Most C and C++ compilers can warn only when
