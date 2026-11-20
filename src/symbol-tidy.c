@@ -196,8 +196,10 @@ int main( int argc, char const *argv[] ) {
     if ( !source_path_add( source->path ) )
       continue;
 
-    if ( IS_VERBOSE( SRC_FILE_PATH ) )
+    if ( IS_VERBOSE( SRC_FILE_PATH ) ) {
       verbose_printf( "source file = \"%s\"\n", source->path );
+      fflush( stdout );
+    }
 
     symbols_visit_data svd;
     svd_init( &svd, source );

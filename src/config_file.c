@@ -888,6 +888,7 @@ static FILE* config_open( char const *config_path, config_opts opts ) {
     if ( verbose_section_begin( &printed_configuration_header ) )
       verbose_printf( "configuration files:\n" );
     verbose_printf( "  \"%s\": %s\n", config_path, ok ? "OK" : STRERROR() );
+    fflush( stdout );
     // LCOV_EXCL_STOP
   }
 

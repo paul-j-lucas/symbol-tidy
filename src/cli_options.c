@@ -1364,6 +1364,8 @@ void cli_options_init( int argc, char const *argv[], array_t *rv_sources ) {
   }
   if ( rv_sources->len == 0 )
     fatal_error( EX_USAGE, "no source files given\n" );
+
+  fflush( stdout );
 }
 
 bool option_is_set( int short_opt ) {

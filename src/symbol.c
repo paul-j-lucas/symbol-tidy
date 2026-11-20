@@ -1700,8 +1700,12 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
   else {
     ++svd->visit_id;
 
-    if ( IS_VERBOSE( CURSORS ) )
-      verbose_print_cursor( cursor );   // LCOV_EXCL_LINE
+    if ( IS_VERBOSE( CURSORS ) ) {
+      // LCOV_EXCL_START
+      verbose_print_cursor( cursor );
+      fflush( stdout );
+      // LCOV_EXCL_STOP
+    }
 
     bool const is_expression = clang_isExpression( kind );
 
