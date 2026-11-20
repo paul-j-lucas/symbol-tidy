@@ -53,7 +53,7 @@ AM_CFLAGS +=		--coverage -g -O0
 AM_LDFLAGS +=		--coverage
 endif
 
-TIDY_FLAGS =		-Xtidy --verbose=f -Xtidy --error=never
+TIDY_FLAGS =		-Xtidy --error=never
 TIDY_CFLAGS =		$(CFLAGS) $(AM_CFLAGS) $(CPPFLAGS) $(AM_CPPFLAGS)
 
 symbol_tidy_SOURCES =	array.c array.h \
