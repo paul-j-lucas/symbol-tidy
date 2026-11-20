@@ -65,9 +65,22 @@
 ////////// typedefs ///////////////////////////////////////////////////////////
 
 typedef struct tidy_header        tidy_header;
-typedef struct tidy_header_stats  tidy_header_stats;
+typedef struct symbol_stats  symbol_stats;
 
 ////////// structs ////////////////////////////////////////////////////////////
+
+/**
+ * Additional statistics for symbols across all translation units.
+ */
+struct symbol_stats {
+  /**
+   * Statistics for headers.
+   */
+  struct ss_header {
+    unsigned  revisit_count;            ///< Headers visited more than once.
+    unsigned  skipped_count;            ///< Headers skipped.
+  } header;
+};
 
 /**
  * A header included in a translation unit.
@@ -76,15 +89,6 @@ struct tidy_header {
   CXFileUniqueID      fuid;             ///< The file's unique ID.
   enum CXLanguageKind lang;             ///< From tidy_source.
   unsigned            tsid;             ///< From tidy_source.
-};
-
-/**
- * Additional statistics for the set of headers that were included across all
- * translation units.
- */
-struct tidy_header_stats {
-  unsigned  revisit_count;              ///< Headers visited more than once.
-  unsigned  skipped_count;              ///< Headers skipped.
 };
 
 ////////// local functions ////////////////////////////////////////////////////
@@ -115,10 +119,10 @@ hash_table_t tidy_symbol_set;
 
 ////////// local variables ////////////////////////////////////////////////////
 
-static hash_table_t       header_set;   ///< The set of all header files.
-static tidy_header_stats  header_stats; ///< Statistics for \ref header_set.
-static bool               print_undefined;
-static bool               print_unneeded_external;
+static hash_table_t header_set;         ///< The set of all header files.
+static bool         print_undefined;    ///< Print undefined for any source?
+static bool         print_unneeded_external;  ///< Print unneeded externals?
+static symbol_stats stats;              ///< Additional statistics.
 
 ////////// inline functions ///////////////////////////////////////////////////
 
@@ -775,9 +779,9 @@ static bool file_previously_seen( CXFile file, symbols_visit_data *svd ) {
     tidy_header const *const found_header = HT_DINT( hti.entry );
     seen = found_header->tsid != svd->source->tsid;
     if ( seen )
-      ++header_stats.skipped_count;
+      ++stats.header.skipped_count;
     else
-      ++header_stats.revisit_count;
+      ++stats.header.revisit_count;
   }
 
   svd->fps.last_file = file;
@@ -1094,8 +1098,8 @@ static void print_statistics( verbose_stat_ctx *vsc ) {
     ht_table_load_factor( &header_set )
   );
   verbose_statf( vsc, "hs-size = %u\n", header_set.size );
-  verbose_statf( vsc, "hs-revisit-count = %u\n", header_stats.revisit_count );
-  verbose_statf( vsc, "hs-skipped-count = %'u\n", header_stats.skipped_count );
+  verbose_statf( vsc, "hs-revisit-count = %u\n", stats.header.revisit_count );
+  verbose_statf( vsc, "hs-skipped-count = %'u\n", stats.header.skipped_count );
 
   verbose_statf( vsc, "symbol set:\n" );
   verbose_statf( vsc,
