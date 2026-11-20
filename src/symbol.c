@@ -64,8 +64,8 @@
 
 ////////// typedefs ///////////////////////////////////////////////////////////
 
-typedef struct tidy_header        tidy_header;
-typedef struct symbol_stats  symbol_stats;
+typedef struct tidy_header  tidy_header;
+typedef struct symbol_stats symbol_stats;
 
 ////////// structs ////////////////////////////////////////////////////////////
 
