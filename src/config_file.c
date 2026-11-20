@@ -1307,16 +1307,7 @@ static void root_symbols_dump( void ) {
 
   array_qsort(
     &root_symbol_array,
-    //
-    // This relies on C11 §6.7.2.1¶15:
-    //
-    //    Within a structure object, the ... members ... have addresses that
-    //    increase in the order in which they are declared. A pointer to a
-    //    structure object ... points to its initial member ... and vice versa.
-    //    There may be unnamed padding within a structure object, but not at
-    //    its beginning.
-    //
-    POINTER_CAST( array_cmp_fn_t, &str_ptr_cmp )
+    POINTER_CAST( array_cmp_fn_t, &root_symbol_cmp )
   );
 
   verbose_section_begin( /*printed_header=*/NULL );
@@ -1324,7 +1315,10 @@ static void root_symbols_dump( void ) {
   for ( size_t i = 0; i < root_symbol_array.len; ++i ) {
     root_symbol const *const rsym = array_at_nc( &root_symbol_array, i );
     verbose_printf( "  \"" );
-    fputs_escaped( rsym->name, stdout );
+    if ( rsym->name != NULL )
+      fputs_escaped( rsym->name, stdout );
+    else
+      putchar( '*' );
     putchar( '"' );
     if ( rsym->path != NULL )
       printf( " @ \"%s\"", rsym->path );
@@ -1430,6 +1424,7 @@ void config_init( void ) {
   if ( IS_VERBOSE( CONFIG_SYMBOLS ) ) {
     ignore_symbols_dump();
     root_symbols_dump();
+    fflush( stdout );
   }
 }
 

@@ -10,6 +10,7 @@ test_symbol_tidy $TIDY_TEST_OPTIONS \
 
 test_symbol_tidy $TIDY_TEST_OPTIONS \
   -Xtidy --config=undefined-lib.toml \
+  -Xtidy --verbose=S \
   undefined-lib.c
 
 # vim:set syntax=bash et sw=2 ts=2:
