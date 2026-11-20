@@ -221,6 +221,19 @@ inline char* nonconst_strnrchr( char *s, size_t s_len, int c ) {
 NODISCARD
 char* strn_trim( char *s, size_t n );
 
+/**
+ * Like **strcmp**(3) except compares to _pointers_ to `char` pointers by the
+ * string.
+ *
+ * @param i_ps The first pointer to string.
+ * @param j_ps The second pointer to string.
+ * @return Returns a number less than 0, 0, or greater than 0 if the first
+ * string is less than, equal to, or greater than the second string,
+ * respectively.
+ */
+NODISCARD
+int str_ptr_cmp( char const *const *i_ps, char const *const *j_ps );
+
 ///////////////////////////////////////////////////////////////////////////////
 
 /** @} */

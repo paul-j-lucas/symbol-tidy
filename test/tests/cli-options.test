@@ -32,11 +32,6 @@ test_symbol_tidy $TIDY_TEST_OPTIONS \
 
 test_symbol_tidy $TIDY_TEST_OPTIONS \
   $TIDY_TEST_CONFIG \
-  -Xtidy --verbose=f \
-  minimal.c
-
-test_symbol_tidy $TIDY_TEST_OPTIONS \
-  $TIDY_TEST_CONFIG \
   -Xtidy --verbose=F \
   minimal.c
 

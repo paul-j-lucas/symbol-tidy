@@ -86,13 +86,13 @@ $ symbol-tidy -Xtidy --verbose=
 symbol-tidy: error: "--verbose" requires an argument
 
 $ symbol-tidy -Xtidy --verbose=X
-symbol-tidy: error: "X": invalid value for --verbose/-V; must be [acCdfFsSz]+
+symbol-tidy: error: "X": invalid value for --verbose/-V; must be [acCdFsSz]+
 
 $ symbol-tidy -Xtidy -V
 symbol-tidy: error: "-V" requires an argument
 
 $ symbol-tidy -Xtidy -VX
-symbol-tidy: error: "X": invalid value for --verbose/-V; must be [acCdfFsSz]+
+symbol-tidy: error: "X": invalid value for --verbose/-V; must be [acCdFsSz]+
 
 $ symbol-tidy --help X
 usage: symbol-tidy [-Xtidy tidy-option]... [compiler-option]... source-file...

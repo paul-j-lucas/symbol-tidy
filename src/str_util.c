@@ -109,6 +109,10 @@ char* strn_trim( char *s, size_t n ) {
   return s;
 }
 
+int str_ptr_cmp( char const *const *i_ps, char const *const *j_ps ) {
+  return strcmp( *i_ps, *j_ps );
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 /** @} */
