@@ -35,7 +35,6 @@
 #include <clang-c/Index.h>
 
 // standard
-#include <stdarg.h>
 #include <stdbool.h>
 
 /// @endcond

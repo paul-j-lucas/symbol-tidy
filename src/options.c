@@ -29,7 +29,6 @@
 #include "options.h"
 #include "color.h"
 #include "config_file.h"
-#include "type_traits.h"
 #include "util.h"
 
 /// @cond DOXYGEN_IGNORE

@@ -27,6 +27,7 @@
 // local
 #include "pjl_config.h"
 #include "config_file.h"
+#include "array.h"
 #include "bit_util.h"
 #include "cli_options.h"
 #include "cxx_util.h"

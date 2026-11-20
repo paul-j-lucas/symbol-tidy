@@ -31,7 +31,6 @@
 #include "fnv1a.h"
 #include "hash_table.h"
 #include "path_util.h"
-#include "options.h"
 #include "print.h"
 #include "symbol.h"
 #include "symbol-tidy.h"

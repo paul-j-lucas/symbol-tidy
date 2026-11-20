@@ -39,6 +39,8 @@
 #include "verbose.h"
 
 // standard
+#include <assert.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <sysexits.h>
 

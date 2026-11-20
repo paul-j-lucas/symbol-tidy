@@ -29,7 +29,6 @@
 
 // local
 #include "pjl_config.h"
-#include "source.h"
 #include "symbol.h"
 
 /// @cond DOXYGEN_IGNORE
