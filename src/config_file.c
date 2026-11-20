@@ -664,30 +664,6 @@ static void bool_str_cleanup( bool_str *bs ) {
 }
 
 /**
- * Compares two "bool string" objects.
- *
- * @param i_bs The first bool string.
- * @param j_bs The second bool string.
- * @return Returns a number less than 0, 0, or greater than 0 if \a i_bs is
- * less than, equal to, or greater than \a j_bs, respectively.
- */
-static int bool_str_cmp( bool_str const *i_bs, bool_str const *j_bs ) {
-  assert( i_bs != NULL );
-  assert( j_bs != NULL );
-  return strcmp( i_bs->s, j_bs->s );
-}
-
-/**
- * Calculates the hash of a "bool string" object.
- *
- * @param bs The bool string to calculate the hash for.
- * @return Returns said hash.
- */
-static fnv1a_t bool_str_hash( bool_str const *bs ) {
-  return fnv1a_str( bs->s );
-}
-
-/**
  * Sets the Boolean value for \a cb, either globally or only for \a s.
  *
  * @param cb The config_bool to set or insert \a s into.
@@ -1121,16 +1097,6 @@ static int ignore_symbol_cmp( ignore_symbol const *i_igsym,
 }
 
 /**
- * Calculates the hash of \a igsym.
- *
- * @param igsym The ignore_symbol to hash.
- * @return Returns said hash.
- */
-static fnv1a_t ignore_symbol_hash( ignore_symbol const *igsym ) {
-  return fnv1a_str( igsym->name );
-}
-
-/**
  * Dumps all ignored symbols.
  */
 static void ignore_symbols_dump( void ) {
@@ -1371,8 +1337,17 @@ void config_bool_init( config_bool *cb ) {
   assert( cb != NULL );
   ht_table_init(
     &cb->bool_str_set, HT_DINT, 2.0, 10,
-    POINTER_CAST( ht_cmp_fn_t, &bool_str_cmp ),
-    POINTER_CAST( ht_hash_fn_t, &bool_str_hash )
+    //
+    // This relies on C11 §6.7.2.1¶15:
+    //
+    //    Within a structure object, the ... members ... have addresses that
+    //    increase in the order in which they are declared. A pointer to a
+    //    structure object ... points to its initial member ... and vice versa.
+    //    There may be unnamed padding within a structure object, but not at
+    //    its beginning.
+    //
+    POINTER_CAST( ht_cmp_fn_t, &str_ptr_cmp ),
+    POINTER_CAST( ht_hash_fn_t, &fnv1a_str_ptr )
   );
 }
 
@@ -1402,7 +1377,16 @@ void config_init( void ) {
   ht_table_init(
     &ignore_symbol_set, HT_DINT, 2.0, 10,
     POINTER_CAST( ht_cmp_fn_t, &ignore_symbol_cmp ),
-    POINTER_CAST( ht_hash_fn_t, &ignore_symbol_hash )
+    //
+    // This relies on C11 §6.7.2.1¶15:
+    //
+    //    Within a structure object, the ... members ... have addresses that
+    //    increase in the order in which they are declared. A pointer to a
+    //    structure object ... points to its initial member ... and vice versa.
+    //    There may be unnamed padding within a structure object, but not at
+    //    its beginning.
+    //
+    POINTER_CAST( ht_hash_fn_t, &fnv1a_str_ptr )
   );
   ht_table_init(
     &root_symbol_set, HT_DINT, 2.0, 10,
