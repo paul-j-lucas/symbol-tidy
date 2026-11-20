@@ -684,7 +684,7 @@ static int bool_str_cmp( bool_str const *i_bs, bool_str const *j_bs ) {
  * @return Returns said hash.
  */
 static fnv1a_t bool_str_hash( bool_str const *bs ) {
-  return fnv1a_s( bs->s );
+  return fnv1a_str( bs->s );
 }
 
 /**
@@ -1127,7 +1127,7 @@ static int ignore_symbol_cmp( ignore_symbol const *i_igsym,
  * @return Returns said hash.
  */
 static fnv1a_t ignore_symbol_hash( ignore_symbol const *igsym ) {
-  return fnv1a_s( igsym->name );
+  return fnv1a_str( igsym->name );
 }
 
 /**
@@ -1289,9 +1289,9 @@ static int root_symbol_cmp( root_symbol const *i_rsym,
  */
 static fnv1a_t root_symbol_hash( root_symbol const *rsym ) {
   if ( rsym->name != NULL )
-    return fnv1a_s( rsym->name );
+    return fnv1a_str( rsym->name );
   assert( rsym->path != NULL );
-  return fnv1a_s( rsym->path );
+  return fnv1a_str( rsym->path );
 }
 
 /**
@@ -1397,7 +1397,7 @@ void config_init( void ) {
   ht_table_init(
     &ignore_path_set, HT_DINT, 2.0, 10,
     POINTER_CAST( ht_cmp_fn_t, &strcmp ),
-    POINTER_CAST( ht_hash_fn_t, &fnv1a_s )
+    POINTER_CAST( ht_hash_fn_t, &fnv1a_str )
   );
   ht_table_init(
     &ignore_symbol_set, HT_DINT, 2.0, 10,

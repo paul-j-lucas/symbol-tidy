@@ -392,7 +392,7 @@ void sources_init( void ) {
   ht_table_init(
     &source_file_set, HT_DINT, 2.0, 256,
     POINTER_CAST( ht_cmp_fn_t, &strcmp ),
-    POINTER_CAST( ht_hash_fn_t, &fnv1a_s )
+    POINTER_CAST( ht_hash_fn_t, &fnv1a_str )
   );
 
   tidy_index = clang_createIndex(

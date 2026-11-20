@@ -2117,7 +2117,7 @@ static void visit_MacroDefinition( CXCursor macro_csr,
   ht_table_init(
     &param_set, HT_DINT, 2.0, 10,
     POINTER_CAST( ht_cmp_fn_t, &strcmp ),
-    POINTER_CAST( ht_hash_fn_t, &fnv1a_s )
+    POINTER_CAST( ht_hash_fn_t, &fnv1a_str )
   );
 
   unsigned i = clang_Cursor_isMacroFunctionLike( macro_csr ) ?

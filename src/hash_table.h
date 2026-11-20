@@ -87,7 +87,7 @@
 ///
 ///       ht_hash_val_t word_count_hash( void const *p ) {
 ///         struct word_count const *const wc = p;
-///         return fnv1a_s( wc->word );
+///         return fnv1a_str( wc->word );
 ///       }
 ///
 ///       void word_count_cleanup( void const *p ) {
@@ -117,7 +117,7 @@
 ///
 /// **Notes**:
 ///
-/// + The example assumes the existence of a string hash function `fnv1a_s`.
+/// + The example assumes the existence of a string hash function `fnv1a_str`.
 ///
 /// + \ref ht_cmp_fn_t "Comparison functions" return 0 when two entries are
 ///   equal (just like `strcmp` does with strings).

@@ -799,7 +799,7 @@ static void str_set_insert( hash_table_t *set, char const *s ) {
     ht_table_init(
       set, HT_DINT, 2.0, 256,
       POINTER_CAST( ht_cmp_fn_t, &strcmp ),
-      POINTER_CAST( ht_hash_fn_t, &fnv1a_s )
+      POINTER_CAST( ht_hash_fn_t, &fnv1a_str )
     );
   }
   ht_table_insert( set, CONST_CAST( char*, s ), strlen( s ) + 1/*'\0'*/ );

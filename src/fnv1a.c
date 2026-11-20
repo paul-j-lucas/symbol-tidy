@@ -54,7 +54,7 @@ fnv1a_t fnv1a64_mem( fnv1a_t hash, void const *data, size_t n ) {
   return hash;
 }
 
-fnv1a_t fnv1a_s( char const *s ) {
+fnv1a_t fnv1a_str( char const *s ) {
   assert( s != NULL );
 
   fnv1a_t hash = FNV1A_INIT;
@@ -64,7 +64,7 @@ fnv1a_t fnv1a_s( char const *s ) {
 }
 
 fnv1a_t fnv1a_str_ptr( char const *const *ps ) {
-  return fnv1a_s( *ps );
+  return fnv1a_str( *ps );
 }
 
 ///////////////////////////////////////////////////////////////////////////////
