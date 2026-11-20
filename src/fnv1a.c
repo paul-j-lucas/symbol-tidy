@@ -63,6 +63,10 @@ fnv1a_t fnv1a_s( char const *s ) {
   return hash;
 }
 
+fnv1a_t fnv1a_str_ptr( char const *const *ps ) {
+  return fnv1a_s( *ps );
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 /** @} */

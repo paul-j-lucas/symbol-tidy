@@ -97,6 +97,7 @@ typedef uint64_t fnv1a_t;
  * @return Returns said hash.
  *
  * @sa fnv1a64_s()
+ * @sa fnv1a_str_ptr()
  * @sa [The FNV Non-Cryptographic Hash Algorithm](https://datatracker.ietf.org/doc/html/draft-eastlake-fnv-17.html)
  */
 NODISCARD
@@ -105,14 +106,29 @@ fnv1a_t fnv1a64_mem( fnv1a_t hash, void const *data, size_t n );
 /**
  * Fowler-Noll-Vo hash function for a string.
  *
- * @param s The null-terminated string to calculate the hash of.
+ * @param s The pointer to the null-terminated string to calculate the hash of.
  * @return Returns said hash.
  *
  * @sa fnv1a64_mem()
+ * @sa fnv1a_str_ptr()
  * @sa [The FNV Non-Cryptographic Hash Algorithm](https://datatracker.ietf.org/doc/html/draft-eastlake-fnv-17.html)
  */
 NODISCARD
 fnv1a_t fnv1a_s( char const *s );
+
+/**
+ * Fowler-Noll-Vo hash function for a _pointer_ to string.
+ *
+ * @param ps The _pointer_ to the pointer to the null-terminated string to
+ * calculate the hash of.
+ * @return Returns said hash.
+ *
+ * @sa fnv1a64_mem()
+ * @sa fnv1a_s()
+ * @sa [The FNV Non-Cryptographic Hash Algorithm](https://datatracker.ietf.org/doc/html/draft-eastlake-fnv-17.html)
+ */
+NODISCARD
+fnv1a_t fnv1a_str_ptr( char const *const *ps );
 
 ///////////////////////////////////////////////////////////////////////////////
 

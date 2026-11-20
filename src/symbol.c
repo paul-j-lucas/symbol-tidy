@@ -1259,25 +1259,6 @@ static void symbol_cleanup( tidy_symbol *sym ) {
 }
 
 /**
- * Compares two \ref tidy_symbol objects.
- *
- * @param i_sym The first symbol.
- * @param j_sym The second symbol.
- * @return Returns a number less than 0, 0, or greater than 0 if the name of \a
- * i_sym is less than, equal to, or greater than the name of \a j_sym,
- * respectively.
- *
- * @sa symbol_cmp_by_dec_loc()
- * @sa symbol_cmp_by_def_loc()
- */
-NODISCARD
-static int symbol_cmp( tidy_symbol const *i_sym, tidy_symbol const *j_sym ) {
-  assert( i_sym != NULL );
-  assert( j_sym != NULL );
-  return strcmp( i_sym->key, j_sym->key );
-}
-
-/**
  * Compares two \ref tidy_symbol objects by their declaration location.
  *
  * @param i_sym The first symbol.
@@ -1286,7 +1267,6 @@ static int symbol_cmp( tidy_symbol const *i_sym, tidy_symbol const *j_sym ) {
  * symbol's location is less than, equal to, or greater than the second
  * symbol's location, respectively.
  *
- * @sa symbol_cmp()
  * @sa symbol_cmp_by_def_loc()
  */
 NODISCARD
@@ -1306,7 +1286,6 @@ static int symbol_cmp_by_dec_loc( tidy_symbol const *i_sym,
  * symbol's location is less than, equal to, or greater than the second
  * symbol's location, respectively.
  *
- * @sa symbol_cmp()
  * @sa symbol_cmp_by_dec_loc()
  */
 NODISCARD
@@ -1315,17 +1294,6 @@ static int symbol_cmp_by_def_loc( tidy_symbol const *i_sym,
   assert( i_sym != NULL );
   assert( j_sym != NULL );
   return loc_cmp( &i_sym->def_loc, &j_sym->def_loc );
-}
-
-/**
- * Calculates the hash of \a sym.
- *
- * @param sym The tidy_symbol to calculate the hash for.
- * @return Returns said hash.
- */
-NODISCARD
-static ht_hash_val_t symbol_hash( tidy_symbol const *sym ) {
-  return fnv1a_s( sym->key );
 }
 
 /**
@@ -2461,8 +2429,17 @@ tidy_symbol* symbol_add( CXCursor sym_csr, symbols_visit_data const *svd ) {
 
   ht_table_init(
     &sym->ref_sym_set, HT_DPTR, 2.0, 128,
-    POINTER_CAST( ht_cmp_fn_t, &symbol_cmp ),
-    POINTER_CAST( ht_hash_fn_t, &fnv1a_s )
+    //
+    // This relies on C11 §6.7.2.1¶15:
+    //
+    //    Within a structure object, the ... members ... have addresses that
+    //    increase in the order in which they are declared. A pointer to a
+    //    structure object ... points to its initial member ... and vice versa.
+    //    There may be unnamed padding within a structure object, but not at
+    //    its beginning.
+    //
+    POINTER_CAST( ht_cmp_fn_t, &str_ptr_cmp ),
+    POINTER_CAST( ht_hash_fn_t, &fnv1a_str_ptr )
   );
 
 done:
@@ -2507,8 +2484,17 @@ void symbols_init( void ) {
   );
   ht_table_init(
     &tidy_symbol_set, HT_DINT, 2.0, 4096,
-    POINTER_CAST( ht_cmp_fn_t, &symbol_cmp ),
-    POINTER_CAST( ht_hash_fn_t, &symbol_hash )
+    //
+    // This relies on C11 §6.7.2.1¶15:
+    //
+    //    Within a structure object, the ... members ... have addresses that
+    //    increase in the order in which they are declared. A pointer to a
+    //    structure object ... points to its initial member ... and vice versa.
+    //    There may be unnamed padding within a structure object, but not at
+    //    its beginning.
+    //
+    POINTER_CAST( ht_cmp_fn_t, &str_ptr_cmp ),
+    POINTER_CAST( ht_hash_fn_t, &fnv1a_str_ptr )
   );
   cxx_symbols_init();
   fwd_decs_init();
