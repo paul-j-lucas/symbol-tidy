@@ -257,7 +257,6 @@ static bool cursor_is_definition( CXCursor cursor ) {
     case CXCursor_TypedefDecl:
       return true;
 
-    case CXCursor_EnumDecl:
     case CXCursor_Namespace:
       return !clang_Cursor_isAnonymous( cursor );
 
