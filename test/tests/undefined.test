@@ -5,6 +5,10 @@ test_symbol_tidy $TIDY_TEST_OPTIONS \
   undefined-prog.c
 
 test_symbol_tidy $TIDY_TEST_OPTIONS \
+  $TIDY_TEST_CONFIG \
+  undefined-lib.c
+
+test_symbol_tidy $TIDY_TEST_OPTIONS \
   -Xtidy --config=undefined-lib.toml \
   undefined-lib.c
 
