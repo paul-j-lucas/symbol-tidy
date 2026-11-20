@@ -1081,6 +1081,10 @@ bool tidy_Cursor_isForwardDeclarable( CXCursor cursor ) {
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
   switch ( kind ) {
     case CXCursor_ClassDecl:
+    case CXCursor_StructDecl:
+    case CXCursor_UnionDecl:
+      return !clang_Cursor_isAnonymous( cursor );
+
     case CXCursor_ClassTemplate:
     case CXCursor_ClassTemplatePartialSpecialization:
     case CXCursor_Constructor:

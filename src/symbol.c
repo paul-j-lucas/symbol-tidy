@@ -259,8 +259,6 @@ static bool cursor_is_definition( CXCursor cursor ) {
 
     case CXCursor_EnumDecl:
     case CXCursor_Namespace:
-    case CXCursor_StructDecl:
-    case CXCursor_UnionDecl:
       return !clang_Cursor_isAnonymous( cursor );
 
     case CXCursor_ParmDecl:
