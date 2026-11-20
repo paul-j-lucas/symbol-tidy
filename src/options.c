@@ -200,11 +200,8 @@ bool opt_verbose_parse( char const *verbose_format ) {
       case 'd':
         verbose |= TIDY_VERBOSE_DIRECTORY;
         break;
-      case 'f':
-        verbose |= TIDY_VERBOSE_SRC_FILE_VIOLATIONS;
-        break;
       case 'F':
-        verbose |= TIDY_VERBOSE_SRC_FILE_ALWAYS;
+        verbose |= TIDY_VERBOSE_SRC_FILE_PATH;
         break;
       case 's':
         verbose |= TIDY_VERBOSE_SYMBOLS;
@@ -225,10 +222,6 @@ bool opt_verbose_parse( char const *verbose_format ) {
   } // for
 
   opt_verbose = verbose;
-
-  if ( IS_VERBOSE( SRC_FILE_ALWAYS ) )
-    verbose &= ~TO_UNSIGNED_EXPR( TIDY_VERBOSE_SRC_FILE_VIOLATIONS );
-
   return true;
 }
 

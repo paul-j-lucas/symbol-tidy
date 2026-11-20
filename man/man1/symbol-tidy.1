@@ -148,7 +148,7 @@ In your
 .BR Makefile ,
 have:
 .cS
-TIDY_FLAGS  = -Xtidy --verbose=f -Xtidy --error=never
+TIDY_FLAGS  = -Xtidy --error=never
 TIDY_CFLAGS = $(CFLAGS) $(AM_CFLAGS) $(CPPFLAGS) $(AM_CPPFLAGS)
 
 stidy:
@@ -191,8 +191,6 @@ options
 that affect compilation.
 .PP
 The
-.B \-\-verbose=f
-prints each source file's name;
 .B \-\-error=never
 causes
 .B symbol-tidy
@@ -452,11 +450,6 @@ Directory changing to from the
 or
 .B \-d
 option.
-.TP
-.B f
-Name of
-.I source-file
-only if in violation.
 .TP
 .B F
 Name of

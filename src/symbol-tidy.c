@@ -186,7 +186,7 @@ int main( int argc, char const *argv[] ) {
   sources_init();
   symbols_init();
 
-  if ( IS_VERBOSE( SRC_FILE_ALWAYS ) )
+  if ( IS_VERBOSE( SRC_FILE_PATH ) )
     verbose_section_begin( /*printed_header=*/NULL );
 
   unsigned unneeded_forwards = 0;
@@ -196,7 +196,7 @@ int main( int argc, char const *argv[] ) {
     if ( !source_path_add( source->path ) )
       continue;
 
-    if ( IS_VERBOSE( SRC_FILE_ALWAYS ) )
+    if ( IS_VERBOSE( SRC_FILE_PATH ) )
       verbose_printf( "source file = \"%s\"\n", source->path );
 
     symbols_visit_data svd;
