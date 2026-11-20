@@ -93,6 +93,9 @@ struct tidy_header {
 
 ////////// local functions ////////////////////////////////////////////////////
 
+NODISCARD
+static bool cursor_is_explicit_config_root( CXCursor, char const* );
+
 static void symbol_update_macro_name_loc( tidy_symbol*, CXFile,
                                           symbols_visit_data const* );
 
@@ -434,35 +437,9 @@ done:
 }
 
 /**
- * Gets whether \a csr is directly listed as a root symbol, i.e., via the config
- * file's `root-symbols`, `root-symbols-from`, or per-file `root-symbols` keys.
- *
- * @param csr The (canonical) cursor to check.
- * @param sym_name The scoped name of \a csr.
- * @return Returns `true` only if \a csr is listed as a root.
- *
- * @sa cursor_is_config_root()
- */
-NODISCARD
-static bool cursor_is_listed_root( CXCursor csr, char const *sym_name ) {
-  assert( sym_name != NULL );
-
-  CXFile const file = tidy_getCursorLocation_File( csr );
-  if ( file == NULL )
-    return false;                       // LCOV_EXCL_LINE
-
-  CXString const    path_cxs = clang_getFileName( file );
-  char const *const path_cs = clang_getCString( path_cxs );
-  bool const        is_root = config_symbol_is_root( sym_name, path_cs );
-
-  clang_disposeString( path_cxs );
-  return is_root;
-}
-
-/**
  * Gets whether \a sym_csr is configured to be a root symbol, either:
  *
- *  + Directly, via cursor_is_listed_root(); or:
+ *  + Directly, via cursor_is_explicit_config_root(); or:
  *  + Being a C++ member function of a class that's a root so the member
  *    functions of a root class needn't be listed individually.
  *
@@ -476,7 +453,7 @@ NODISCARD
 static bool cursor_is_config_root( CXCursor sym_csr, char const *sym_name ) {
   assert( sym_name != NULL );
 
-  if ( cursor_is_listed_root( sym_csr, sym_name ) )
+  if ( cursor_is_explicit_config_root( sym_csr, sym_name ) )
     return true;
   if ( !tidy_Cursor_isClassFunction( sym_csr ) )
     return false;
@@ -489,8 +466,35 @@ static bool cursor_is_config_root( CXCursor sym_csr, char const *sym_name ) {
   char *const cls_name = tidy_Cursor_getScopedSpelling( cls_csr );
   if ( cls_name == NULL )
     return false;                       // LCOV_EXCL_LINE
-  bool const is_root = cursor_is_listed_root( cls_csr, cls_name );
+  bool const is_root = cursor_is_explicit_config_root( cls_csr, cls_name );
   free( cls_name );
+  return is_root;
+}
+
+/**
+ * Gets whether \a sym_csr is explicitly listed as a root symbol via the config
+ * file's `root-symbols` or `root-symbols-from` keys.
+ *
+ * @param sym_csr The (canonical) cursor to check.
+ * @param sym_name The scoped name of \a sym_csr.
+ * @return Returns `true` only if \a sym_csr is explicitly listed as a root.
+ *
+ * @sa cursor_is_config_root()
+ */
+NODISCARD
+static bool cursor_is_explicit_config_root( CXCursor sym_csr,
+                                            char const *sym_name ) {
+  assert( sym_name != NULL );
+
+  CXFile const file = tidy_getCursorLocation_File( sym_csr );
+  if ( file == NULL )
+    return false;                       // LCOV_EXCL_LINE
+
+  CXString const    path_cxs = clang_getFileName( file );
+  char const *const path_cs = clang_getCString( path_cxs );
+  bool const        is_root = config_symbol_is_root( sym_name, path_cs );
+
+  clang_disposeString( path_cxs );
   return is_root;
 }
 
@@ -821,18 +825,18 @@ NODISCARD
 static tidy_loc loc_from_SourceLocation( CXSourceLocation sloc ) {
   CXFile    file;
   unsigned  line, col;
-  tidy_loc  rv_loc = { 0 };
+  tidy_loc  rv_tloc = { 0 };
 
   clang_getSpellingLocation( sloc, &file, &line, &col, /*offset=*/NULL );
   if ( file != NULL ) {
-    rv_loc.path = dup_if_source_path( file );
-    if ( rv_loc.path != NULL ) {
-      rv_loc.line = line;
-      rv_loc.col  = col;
+    rv_tloc.path = dup_if_source_path( file );
+    if ( rv_tloc.path != NULL ) {
+      rv_tloc.line = line;
+      rv_tloc.col  = col;
     }
   }
 
-  return rv_loc;
+  return rv_tloc;
 }
 
 /**
@@ -1105,8 +1109,8 @@ static void symbol_add_def( tidy_symbol *sym, CXSourceLocation sym_loc,
                             symbols_visit_data const *svd ) {
   assert( sym != NULL );
 
-  CXFile ref_file, def_file;
-  unsigned def_line, def_col;
+  CXFile    ref_file, def_file;
+  unsigned  def_line, def_col;
 
   clang_getExpansionLocation(
     sym_loc, &ref_file, &sym->def_loc.line, &sym->def_loc.col, /*offset=*/NULL
@@ -1137,7 +1141,7 @@ static void symbol_add_def( tidy_symbol *sym, CXSourceLocation sym_loc,
       goto skip;                        // LCOV_EXCL_LINE
   }
 
-  FREE( sym->def_loc.path );            // just in case
+  loc_cleanup( &sym->def_loc );
   sym->def_loc.path = str_move( &ref_path );
 
   if ( is_defined_in_macro ) {
@@ -1152,6 +1156,59 @@ static void symbol_add_def( tidy_symbol *sym, CXSourceLocation sym_loc,
 
 skip:
   free( ref_path );
+}
+
+/**
+ * Checks \a sym (that \a sym_csr defines) to see if it has external linkage
+ * and is a candidate for having internal linkage instead, and, if so, where
+ * its first declaration is when it's in a header.
+ *
+ * @param sym The tidy_symbol for \a sym_csr.
+ * @param sym_csr The cursor for the definition of \a sym.
+ * @param sym_loc The source location of \a sym_csr.
+ * @param svd The symbols_visit_data to use.
+ */
+static void symbol_check_int_link( tidy_symbol *sym, CXCursor sym_csr,
+                                   CXSourceLocation sym_loc,
+                                   symbols_visit_data const *svd ) {
+  assert( sym != NULL );
+  assert( svd != NULL );
+
+  if ( svd->ignore_extern ) {
+    //
+    // Checking is disabled for this source, so sym can't be a candidate.  A
+    // reference from this source to a symbol defined elsewhere is still
+    // counted as a reference from another file by symbol_update_ref_origin().
+    //
+    return;
+  }
+
+  sym->ext_link.def_tsid = svd->source->tsid;
+  sym->ext_link.is_def_in_main_file =
+    tidy_Location_isFromFile( sym_loc, svd->source->file );
+
+  if ( !sym->ext_link.is_def_in_main_file ||
+       !cursor_is_maybe_int_link( sym_csr ) ) {
+    return;
+  }
+  sym->ext_link.is_maybe_internal = true;
+
+  //
+  // The canonical cursor is the first declaration.  If it's in a header, then
+  // that declaration has to be deleted or moved if the symbol is made static.
+  //
+  CXCursor const canon_csr = clang_getCanonicalCursor( sym_csr );
+  if ( clang_equalCursors( canon_csr, sym_csr ) )
+    return;
+  CXSourceLocation const canon_loc = clang_getCursorLocation( canon_csr );
+  if ( tidy_Location_isFromFile( canon_loc, svd->source->file ) )
+    return;
+
+  tidy_loc const header_dec_loc = loc_from_SourceLocation( canon_loc );
+  if ( header_dec_loc.path != NULL ) {
+    loc_cleanup( &sym->ext_link.header_dec_loc );
+    sym->ext_link.header_dec_loc = header_dec_loc;
+  }
 }
 
 /**
@@ -1387,59 +1444,6 @@ static void symbol_print_path( tidy_symbol const *sym, size_t mbr_off ) {
   color_start( stderr, sgr_warning );
   EPUTS( "warning" );
   color_end( stderr, sgr_warning );
-}
-
-/**
- * Checks \a sym (that \a sym_csr defines) to see if it has external linkage
- * and is a candidate for having internal linkage instead, and, if so, where
- * its first declaration is when it's in a header.
- *
- * @param sym The tidy_symbol for \a sym_csr.
- * @param sym_csr The cursor for the definition of \a sym.
- * @param sym_loc The source location of \a sym_csr.
- * @param svd The symbols_visit_data to use.
- */
-static void symbol_update_dec_loc( tidy_symbol *sym, CXCursor sym_csr,
-                                   CXSourceLocation sym_loc,
-                                   symbols_visit_data const *svd ) {
-  assert( sym != NULL );
-  assert( svd != NULL );
-
-  if ( svd->ignore_extern ) {
-    //
-    // Checking is disabled for this source, so sym can't be a candidate.  A
-    // reference from this source to a symbol defined elsewhere is still
-    // counted as a reference from another file by symbol_update_ref_origin().
-    //
-    return;
-  }
-
-  sym->ext_link.def_tsid = svd->source->tsid;
-  sym->ext_link.is_def_in_main_file =
-    tidy_Location_isFromFile( sym_loc, svd->source->file );
-
-  if ( !sym->ext_link.is_def_in_main_file ||
-       !cursor_is_maybe_int_link( sym_csr ) ) {
-    return;
-  }
-  sym->ext_link.is_maybe_internal = true;
-
-  //
-  // The canonical cursor is the first declaration.  If it's in a header, then
-  // that declaration has to be deleted or moved if the symbol is made static.
-  //
-  CXCursor const canon_csr = clang_getCanonicalCursor( sym_csr );
-  if ( clang_equalCursors( canon_csr, sym_csr ) )
-    return;
-  CXSourceLocation const canon_loc = clang_getCursorLocation( canon_csr );
-  if ( tidy_Location_isFromFile( canon_loc, svd->source->file ) )
-    return;
-
-  tidy_loc const header_dec_loc = loc_from_SourceLocation( canon_loc );
-  if ( header_dec_loc.path != NULL ) {
-    loc_cleanup( &sym->ext_link.header_dec_loc );
-    sym->ext_link.header_dec_loc = header_dec_loc;
-  }
 }
 
 /**
@@ -1749,7 +1753,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
         sym->is_defined = true;
         if ( sym->parent_sym == NULL )
           sym->parent_sym = svd->curr_sym;
-        symbol_update_dec_loc( sym, cursor, sym_loc, svd );
+        symbol_check_int_link( sym, cursor, sym_loc, svd );
         cursor_visit_def( cursor, sym, svd );
       }
     }
