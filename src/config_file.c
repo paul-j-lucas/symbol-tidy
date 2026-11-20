@@ -1165,8 +1165,7 @@ static void ignore_symbols_dump( void ) {
   verbose_printf( "ignore symbols:\n" );
   for ( size_t i = 0; i < ignore_symbol_array.len; ++i ) {
     ignore_symbol const *const igsym = array_at_nc( &ignore_symbol_array, i );
-    char const *const any_prefix = igsym->in_any_cxx_scope ? "*::" : "";
-    verbose_printf( "  \"%s", any_prefix );
+    verbose_printf( "  \"%s", igsym->in_any_cxx_scope ? "*::" : "" );
     fputs_escaped( igsym->name, stdout );
     putchar( '"' );
     if ( igsym->path != NULL )
