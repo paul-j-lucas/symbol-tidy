@@ -2095,7 +2095,8 @@ static void visit_FieldDecl( CXCursor field_csr, symbols_visit_data *svd ) {
 static void visit_FunctionDecl( CXCursor fn_csr, symbols_visit_data *svd ) {
   assert( svd != NULL );
 
-  fwd_dec_visit_def( fn_csr, svd );
+  if ( !svd->ignore_forwards )
+    fwd_dec_visit_def( fn_csr, svd );
 
   if ( svd->source->lang != CXLanguage_CPlusPlus || svd->curr_sym == NULL )
     return;
@@ -2188,7 +2189,8 @@ static void visit_most_Ref( CXCursor cursor, symbols_visit_data *svd ) {
     return;
   }
 
-  fwd_dec_visit_ref( ref_csr, svd );
+  if ( !svd->ignore_forwards )
+    fwd_dec_visit_ref( ref_csr, svd );
 
   tidy_symbol *const ref_sym = symbol_add( ref_csr, svd );
   if ( ref_sym != NULL ) {
@@ -2233,7 +2235,8 @@ static void visit_OverloadedDeclRef( CXCursor overloaded_csr,
     if ( tidy_Cursor_isInvalid( dec_csr ) )
       continue;                         // LCOV_EXCL_LINE
     dec_csr = clang_getCanonicalCursor( dec_csr );
-    fwd_dec_visit_ref( dec_csr, svd );
+    if ( !svd->ignore_forwards )
+      fwd_dec_visit_ref( dec_csr, svd );
     cursor_add_ref( dec_csr, svd );
   } // for
 }
@@ -2676,12 +2679,10 @@ unsigned symbols_print_unneeded_external( void ) {
   return unneeded_count;
 }
 
-unsigned symbols_visit( symbols_visit_data *svd ) {
+void symbols_visit( symbols_visit_data *svd ) {
   assert( svd != NULL );
-
   CXCursor const cursor = clang_getTranslationUnitCursor( svd->source->tu );
   clang_visitChildren( cursor, &symbols_visitor, svd );
-  return fwd_decs_print_unneeded( svd->source );
 }
 
 ///////////////////////////////////////////////////////////////////////////////

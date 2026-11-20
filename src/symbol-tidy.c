@@ -30,6 +30,7 @@
 #include "cli_options.h"
 #include "color.h"
 #include "config_file.h"
+#include "fwd_dec.h"
 #include "options.h"
 #include "path_util.h"
 #include "source.h"
@@ -207,7 +208,9 @@ int main( int argc, char const *argv[] ) {
     svd_init( &svd, source );
 
     source_parse( &svd );
-    unneeded_forwards += symbols_visit( &svd );
+    symbols_visit( &svd );
+    if ( !svd.ignore_forwards )
+      unneeded_forwards += fwd_decs_print_unneeded( svd.source );
     source_cleanup( source );
   } // for
 

@@ -549,9 +549,8 @@ void symbols_print_unused( unsigned unused_count );
  * Visits all symbols in \a source.
  *
  * @param svd The symbols_visit_data to use.
- * @return Returns the number of unneeded forward declarations for \a source.
  */
-unsigned symbols_visit( symbols_visit_data *svd );
+void symbols_visit( symbols_visit_data *svd );
 
 ////////// extern variables ///////////////////////////////////////////////////
 
