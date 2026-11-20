@@ -124,12 +124,6 @@ static hash_table_t   fwd_dec_set;
 
 static fwd_statistics fwd_stats;        ///< Forward declaration statistics.
 
-/**
- * We should print statistics only if at least one source file did not ignore
- * unnecessary forward declarations.
- */
-static bool           should_print_statistics;
-
 ////////// local functions ////////////////////////////////////////////////////
 
 /**
@@ -280,7 +274,7 @@ static bool fwd_dec_is_necessary( fwd_dec const *fwd ) {
  * Cleans-up all forward declarations.
  */
 static void fwd_decs_cleanup( void ) {
-  if ( should_print_statistics )
+  if ( fwd_stats.max_size > 0 )
     verbose_print_statistics( &print_statistics );
   fwd_statistics_cleanup( &fwd_stats );
   ht_table_cleanup( &fwd_dec_set, /*free_fn=*/NULL );
@@ -372,8 +366,6 @@ static void print_statistics( verbose_stat_ctx *vsc ) {
 ////////// extern functions ///////////////////////////////////////////////////
 
 void fwd_dec_maybe_unneeded( CXCursor fn_csr, symbols_visit_data const *svd ) {
-  should_print_statistics = true;
-
   CXSourceLocation const fn_loc = clang_getCursorLocation( fn_csr );
   if ( !clang_Location_isFromMainFile( fn_loc ) )
     return;
@@ -411,7 +403,6 @@ void fwd_dec_maybe_unneeded( CXCursor fn_csr, symbols_visit_data const *svd ) {
 }
 
 void fwd_dec_visit_ref( CXCursor ref_csr, symbols_visit_data const *svd ) {
-  should_print_statistics = true;
   if ( fwd_dec_set.size == 0 )
     return;                             // fast path: no candidates
 
@@ -425,7 +416,6 @@ void fwd_dec_visit_ref( CXCursor ref_csr, symbols_visit_data const *svd ) {
 }
 
 void fwd_dec_visit_def( CXCursor fn_csr, symbols_visit_data const *svd ) {
-  should_print_statistics = true;
   if ( fwd_dec_set.size == 0 )
     return;                             // fast path: no candidates
 

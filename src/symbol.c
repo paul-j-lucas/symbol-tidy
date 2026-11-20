@@ -1600,7 +1600,8 @@ static void symbol_update_ref_origin( tidy_symbol const *from_sym,
  * Cleans-up all symbols.
  */
 static void symbols_cleanup( void ) {
-  verbose_print_statistics( &print_statistics );
+  if ( header_set.size > 0 || tidy_symbol_set.size > 0 )
+    verbose_print_statistics( &print_statistics );
   ht_table_cleanup( &header_set, /*free_fn=*/NULL );
   ht_table_cleanup(
     &tidy_symbol_set, POINTER_CAST( ht_free_fn_t, &symbol_cleanup )

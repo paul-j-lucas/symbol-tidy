@@ -481,7 +481,8 @@ skip:
  * Cleans-up all C++ symbols.
  */
 static void cxx_symbols_cleanup( void ) {
-  verbose_print_statistics( &print_statistics );
+  if ( cxx_adl_name_set.size > 0 || cxx_adl_type_set.size > 0 )
+    verbose_print_statistics( &print_statistics );
   ht_table_cleanup( &cxx_adl_name_set, /*free_fn=*/NULL );
   ht_table_cleanup( &cxx_adl_type_set, /*free_fn=*/NULL );
 }
