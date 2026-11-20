@@ -197,7 +197,7 @@ static inline char const* symbol_name_for_print( tidy_symbol const *sym ) {
  * @return Returns `true` only if \a sym_csr could be `static`.
  */
 NODISCARD
-static bool cursor_is_maybe_internal( CXCursor sym_csr ) {
+static bool cursor_is_maybe_int_link( CXCursor sym_csr ) {
   enum CXCursorKind const kind = clang_getCursorKind( sym_csr );
   switch ( kind ) {
     case CXCursor_FunctionDecl:
@@ -438,14 +438,14 @@ done:
  * file's `root-symbols`, `root-symbols-from`, or per-file `root-symbols` keys.
  *
  * @param csr The (canonical) cursor to check.
- * @param name The scoped name of \a csr.
+ * @param sym_name The scoped name of \a csr.
  * @return Returns `true` only if \a csr is listed as a root.
  *
  * @sa cursor_is_config_root()
  */
 NODISCARD
-static bool cursor_is_listed_root( CXCursor csr, char const *name ) {
-  assert( name != NULL );
+static bool cursor_is_listed_root( CXCursor csr, char const *sym_name ) {
+  assert( sym_name != NULL );
 
   CXFile const file = tidy_getCursorLocation_File( csr );
   if ( file == NULL )
@@ -453,7 +453,7 @@ static bool cursor_is_listed_root( CXCursor csr, char const *name ) {
 
   CXString const    path_cxs = clang_getFileName( file );
   char const *const path_cs = clang_getCString( path_cxs );
-  bool const        is_root = config_symbol_is_root( name, path_cs );
+  bool const        is_root = config_symbol_is_root( sym_name, path_cs );
 
   clang_disposeString( path_cxs );
   return is_root;
@@ -479,7 +479,8 @@ static bool cursor_is_config_root( CXCursor sym_csr, char const *sym_name ) {
   if ( cursor_is_listed_root( sym_csr, sym_name ) )
     return true;
 
-  switch ( clang_getCursorKind( sym_csr ) ) {
+  enum CXCursorKind kind = clang_getCursorKind( sym_csr );
+  switch ( kind ) {
     case CXCursor_Constructor:
     case CXCursor_ConversionFunction:
     case CXCursor_CXXMethod:
@@ -490,13 +491,10 @@ static bool cursor_is_config_root( CXCursor sym_csr, char const *sym_name ) {
       return false;
   } // switch
 
-  //
-  // The semantic parent (rather than the lexical one) is the class even for a
-  // member function defined outside of it, e.g.: `void C::f() { }`.
-  //
-  CXCursor const cls_csr =
-    clang_getCanonicalCursor( clang_getCursorSemanticParent( sym_csr ) );
-  switch ( clang_getCursorKind( cls_csr ) ) {
+  CXCursor const parent_csr = clang_getCursorSemanticParent( sym_csr );
+  CXCursor const cls_csr = clang_getCanonicalCursor( parent_csr );
+  kind = clang_getCursorKind( cls_csr );
+  switch ( kind ) {
     case CXCursor_ClassDecl:
     case CXCursor_ClassTemplate:
     case CXCursor_ClassTemplatePartialSpecialization:
@@ -1287,7 +1285,7 @@ static bool symbol_in_unused_scope( tidy_symbol const *sym ) {
 }
 
 /**
- * Gets whether \a sym has external linkage unnecessarily.
+ * Gets whether \a sym has unneeded external linkage.
  *
  * @remarks
  * @parblock
@@ -1299,12 +1297,12 @@ static bool symbol_in_unused_scope( tidy_symbol const *sym ) {
  * @endparblock
  *
  * @param sym The symbol to check.
- * @return Returns `true` only if \a sym has external linkage unnecessarily.
+ * @return Returns `true` only if \a sym has unnecessarily external linkage.
  *
  * @note This must be called only after symbols_mark_used().
  */
 NODISCARD
-static bool symbol_is_unneeded_extern( tidy_symbol const *sym ) {
+static bool symbol_is_unneeded_ext_link( tidy_symbol const *sym ) {
   assert( sym != NULL );
 
   // These checks can be in any order.
@@ -1440,7 +1438,7 @@ static void symbol_update_dec_loc( tidy_symbol *sym, CXCursor sym_csr,
     tidy_Location_isFromFile( sym_loc, svd->source->file );
 
   if ( !sym->ext_link.is_def_in_main_file ||
-       !cursor_is_maybe_internal( sym_csr ) ) {
+       !cursor_is_maybe_int_link( sym_csr ) ) {
     return;
   }
   sym->ext_link.is_maybe_internal = true;
@@ -2649,7 +2647,7 @@ unsigned symbols_print_unneeded_external( void ) {
 
   ht_iterator_init( &iter, &tidy_symbol_set );
   for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
-    if ( symbol_is_unneeded_extern( sym ) )
+    if ( symbol_is_unneeded_ext_link( sym ) )
       ++unneeded_count;
   } // for
   if ( unneeded_count == 0 )
@@ -2660,7 +2658,7 @@ unsigned symbols_print_unneeded_external( void ) {
 
   ht_iterator_init( &iter, &tidy_symbol_set );
   for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
-    if ( symbol_is_unneeded_extern( sym ) )
+    if ( symbol_is_unneeded_ext_link( sym ) )
       *(tidy_symbol*)array_push_back( &symbol_array ) = *sym;
   } // for
 
