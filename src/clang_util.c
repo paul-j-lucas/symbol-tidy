@@ -1018,10 +1018,24 @@ bool tidy_Cursor_isClassDecl( CXCursor cursor ) {
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
   switch ( kind ) {
     case CXCursor_ClassDecl:
-    case CXCursor_StructDecl:
     case CXCursor_ClassTemplate:
     case CXCursor_ClassTemplatePartialSpecialization:
+    case CXCursor_StructDecl:
     case CXCursor_UnionDecl:
+      return true;
+    default:
+      return false;
+  } // switch
+}
+
+bool tidy_Cursor_isClassFunction( CXCursor cursor ) {
+  enum CXCursorKind kind = clang_getCursorKind( cursor );
+  switch ( kind ) {
+    case CXCursor_Constructor:
+    case CXCursor_ConversionFunction:
+    case CXCursor_CXXMethod:
+    case CXCursor_Destructor:
+    case CXCursor_FunctionTemplate:     // member function template
       return true;
     default:
       return false;

@@ -478,32 +478,13 @@ static bool cursor_is_config_root( CXCursor sym_csr, char const *sym_name ) {
 
   if ( cursor_is_listed_root( sym_csr, sym_name ) )
     return true;
-
-  enum CXCursorKind kind = clang_getCursorKind( sym_csr );
-  switch ( kind ) {
-    case CXCursor_Constructor:
-    case CXCursor_ConversionFunction:
-    case CXCursor_CXXMethod:
-    case CXCursor_Destructor:
-    case CXCursor_FunctionTemplate:     // member function template
-      break;
-    default:
-      return false;
-  } // switch
+  if ( !tidy_Cursor_isClassFunction( sym_csr ) )
+    return false;
 
   CXCursor const parent_csr = clang_getCursorSemanticParent( sym_csr );
   CXCursor const cls_csr = clang_getCanonicalCursor( parent_csr );
-  kind = clang_getCursorKind( cls_csr );
-  switch ( kind ) {
-    case CXCursor_ClassDecl:
-    case CXCursor_ClassTemplate:
-    case CXCursor_ClassTemplatePartialSpecialization:
-    case CXCursor_StructDecl:
-    case CXCursor_UnionDecl:
-      break;
-    default:
-      return false;
-  } // switch
+  if ( !tidy_Cursor_isClassDecl( cls_csr ) )
+    return false;
 
   char *const cls_name = tidy_Cursor_getScopedSpelling( cls_csr );
   if ( cls_name == NULL )

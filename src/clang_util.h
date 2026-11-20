@@ -279,11 +279,25 @@ bool tidy_Cursor_inMacro( CXCursor cursor );
  * @return Returns `true` only if \a cursor is a class, class template,
  * structure, or union declaration.
  *
+ * @sa tidy_Cursor_isClassFunction()
  * @sa tidy_Cursor_isEnclosingScope()
  * @sa tidy_Cursor_isScopeDecl()
  */
 NODISCARD
 bool tidy_Cursor_isClassDecl( CXCursor cursor );
+
+/**
+ * Gets whether \a cursor is a constructor, conversion function, destructor,
+ * member function, or template member function.
+ *
+ * @param cursor The cursor to check.
+ * @return Returns `true` only if \a cursor is a constructor, conversion
+ * function, destructor, member function, or template member function.
+ *
+ * @sa tidy_Cursor_isClassDecl()
+ */
+NODISCARD
+bool tidy_Cursor_isClassFunction( CXCursor cursor );
 
 /**
  * Gets whether \a cursor is something that provides an enclosing scope for
