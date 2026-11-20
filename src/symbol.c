@@ -64,8 +64,8 @@
 
 ////////// typedefs ///////////////////////////////////////////////////////////
 
-typedef struct tidy_header  tidy_header;
 typedef struct symbol_stats symbol_stats;
+typedef struct tidy_header  tidy_header;
 
 ////////// structs ////////////////////////////////////////////////////////////
 
@@ -448,6 +448,8 @@ done:
  * @param sym_csr The symbol's (canonical) cursor to check.
  * @param sym_name The scoped name of the symbol.
  * @return Returns `true` only if \a sym_csr is configured to be a root.
+ *
+ * @sa cursor_is_explicit_config_root()
  */
 NODISCARD
 static bool cursor_is_config_root( CXCursor sym_csr, char const *sym_name ) {
@@ -770,6 +772,40 @@ static bool file_previously_seen( CXFile file, symbols_visit_data *svd ) {
   svd->fps.last_file = file;
   svd->fps.last_seen = seen;
   return seen;
+}
+
+/**
+ * Compares two tidy_header objects.
+ *
+ * @note The \ref tidy_header::tsid "tsid" field is intentionally not compared.
+ *
+ * @param i_hdr The first tidy_header.
+ * @param j_hdr The second tidy_header.
+ * @return Returns a number less than 0, 0, or greater than 0 if \a i_hdr is
+ * less than, equal to, or greater than \a j_hdr, respectively.
+ */
+NODISCARD
+static int header_cmp( tidy_header const *i_hdr, tidy_header const *j_hdr ) {
+  int const cmp = tidy_FileUniqueID_cmp( &i_hdr->fuid, &j_hdr->fuid );
+  if ( cmp != 0 )
+    return cmp;
+  return (i_hdr->lang > j_hdr->lang) - (i_hdr->lang < j_hdr->lang);
+}
+
+/**
+ * Calculates the hash of \a hdr.
+ *
+ * @note The \ref tidy_header::tsid "tsid" field is intentionally not part of
+ * the hash.
+ *
+ * @param hdr The tidy_header to calculate the hash for.
+ * @return Returns said hash.
+ */
+NODISCARD
+static ht_hash_val_t header_hash( tidy_header const *hdr ) {
+  fnv1a_t hash = tidy_FileUniqueID_hash( &hdr->fuid );
+  hash = FNV1A_PRIME * (hash ^ STATIC_CAST( fnv1a_t, hdr->lang ));
+  return STATIC_CAST( ht_hash_val_t, hash );
 }
 
 /**
@@ -1173,15 +1209,6 @@ static void symbol_check_int_link( tidy_symbol *sym, CXCursor sym_csr,
                                    symbols_visit_data const *svd ) {
   assert( sym != NULL );
   assert( svd != NULL );
-
-  if ( svd->ignore_extern ) {
-    //
-    // Checking is disabled for this source, so sym can't be a candidate.  A
-    // reference from this source to a symbol defined elsewhere is still
-    // counted as a reference from another file by symbol_update_ref_origin().
-    //
-    return;
-  }
 
   sym->ext_link.def_tsid = svd->source->tsid;
   sym->ext_link.is_def_in_main_file =
@@ -1596,8 +1623,13 @@ static void symbol_add_dec( CXCursor dec_csr, CXSourceLocation dec_loc,
                             symbols_visit_data *svd ) {
   assert( svd != NULL );
 
-  if ( !tidy_Cursor_isForwardDeclarable( dec_csr ) )
+  if ( !tidy_Cursor_isForwardDeclarable( dec_csr ) ) {
+    //
+    // A symbol that isn't forward-declarable means its declaration is also its
+    // definition.
+    //
     return;
+  }
 
   CXCursor const canon_dec_csr = clang_getCanonicalCursor( dec_csr );
   if ( !clang_equalCursors( dec_csr, canon_dec_csr ) )
@@ -1753,7 +1785,8 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
         sym->is_defined = true;
         if ( sym->parent_sym == NULL )
           sym->parent_sym = svd->curr_sym;
-        symbol_check_int_link( sym, cursor, sym_loc, svd );
+        if ( !svd->ignore_extern )
+          symbol_check_int_link( sym, cursor, sym_loc, svd );
         cursor_visit_def( cursor, sym, svd );
       }
     }
@@ -1768,41 +1801,6 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
 
 skip:
   return CXChildVisit_Continue;
-}
-
-/**
- * Compares two tidy_header objects.
- *
- * @note The \ref tidy_header::tsid "tsid" field is intentionally not compared.
- *
- * @param i_hdr The first tidy_header.
- * @param j_hdr The second tidy_header.
- * @return Returns a number less than 0, 0, or greater than 0 if \a i_hdr is
- * less than, equal to, or greater than \a j_hdr, respectively.
- */
-NODISCARD
-static int tidy_header_cmp( tidy_header const *i_hdr,
-                            tidy_header const *j_hdr ) {
-  int const cmp = tidy_FileUniqueID_cmp( &i_hdr->fuid, &j_hdr->fuid );
-  if ( cmp != 0 )
-    return cmp;
-  return (i_hdr->lang > j_hdr->lang) - (i_hdr->lang < j_hdr->lang);
-}
-
-/**
- * Calculates the hash of \a hdr.
- *
- * @note The \ref tidy_header::tsid "tsid" field is intentionally not part of
- * the hash.
- *
- * @param hdr The tidy_header to calculate the hash for.
- * @return Returns said hash.
- */
-NODISCARD
-static ht_hash_val_t tidy_header_hash( tidy_header const *hdr ) {
-  fnv1a_t hash = tidy_FileUniqueID_hash( &hdr->fuid );
-  hash = FNV1A_PRIME * (hash ^ STATIC_CAST( fnv1a_t, hdr->lang ));
-  return STATIC_CAST( ht_hash_val_t, hash );
 }
 
 /**
@@ -2066,21 +2064,22 @@ static void visit_FieldDecl( CXCursor field_csr, symbols_visit_data *svd ) {
 
   clang_disposeTokens( tu, tokens, token_count );
 
-  if ( svd->source->lang == CXLanguage_CPlusPlus ) {
-    unsigned const prev_num_refs = svd->curr_sym->ref_sym_set.size;
+  if ( svd->source->lang != CXLanguage_CPlusPlus )
+    return;
 
-    cxx_field_def_ctor_add_ref( field_csr, svd );
-    cxx_dtors_add_refs( field_csr, svd );
+  unsigned const prev_num_refs = svd->curr_sym->ref_sym_set.size;
 
-    //
-    // If a reference was added to a constructor or destructor of the field's
-    // type, either might have side effects, so the field must be considered
-    // used if its class is.
-    //
-    tidy_symbol *const cls_sym = svd->curr_sym->parent_sym;
-    if ( cls_sym != NULL && svd->curr_sym->ref_sym_set.size > prev_num_refs )
-      symbol_add_ref( cls_sym, svd->curr_sym, svd );
-  }
+  cxx_field_def_ctor_add_ref( field_csr, svd );
+  cxx_dtors_add_refs( field_csr, svd );
+
+  //
+  // If a reference was added to a constructor or destructor of the field's
+  // type, either might have side effects, so the field must be considered used
+  // if its class is.
+  //
+  tidy_symbol *const cls_sym = svd->curr_sym->parent_sym;
+  if ( cls_sym != NULL && svd->curr_sym->ref_sym_set.size > prev_num_refs )
+    symbol_add_ref( cls_sym, svd->curr_sym, svd );
 }
 
 /**
@@ -2502,8 +2501,8 @@ void symbols_init( void ) {
   ASSERT_RUN_ONCE();
   ht_table_init(
     &header_set, HT_DINT, 2.0, 256,
-    POINTER_CAST( ht_cmp_fn_t, &tidy_header_cmp ),
-    POINTER_CAST( ht_hash_fn_t, &tidy_header_hash )
+    POINTER_CAST( ht_cmp_fn_t, &header_cmp ),
+    POINTER_CAST( ht_hash_fn_t, &header_hash )
   );
   ht_table_init(
     &tidy_symbol_set, HT_DINT, 2.0, 4096,
