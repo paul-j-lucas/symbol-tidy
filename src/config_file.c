@@ -1126,6 +1126,53 @@ static fnv1a_t ignore_symbol_hash( ignore_symbol const *igsym ) {
 }
 
 /**
+ * Dumps all ignored symbols.
+ */
+static void ignore_symbols_dump( void ) {
+  if ( ignore_symbol_set.size == 0 )
+    return;
+
+  array_t ignore_symbol_array = ARRAY_INIT( sizeof(ignore_symbol) );
+  array_reserve( &ignore_symbol_array, ignore_symbol_set.size );
+
+  ht_iterator_t iter;
+  ht_iterator_init( &iter, &ignore_symbol_set );
+  for ( ignore_symbol const *igsym;
+        (igsym = ht_iterator_next( &iter )) != NULL; ) {
+    *(ignore_symbol*)array_push_back( &ignore_symbol_array ) = *igsym;
+  } // for
+
+  array_qsort(
+    &ignore_symbol_array,
+    //
+    // This relies on C11 §6.7.2.1¶15:
+    //
+    //    Within a structure object, the ... members ... have addresses that
+    //    increase in the order in which they are declared. A pointer to a
+    //    structure object ... points to its initial member ... and vice versa.
+    //    There may be unnamed padding within a structure object, but not at
+    //    its beginning.
+    //
+    POINTER_CAST( array_cmp_fn_t, &str_ptr_cmp )
+  );
+
+  verbose_section_begin( /*printed_header=*/NULL );
+  verbose_printf( "ignore symbols:\n" );
+  for ( size_t i = 0; i < ignore_symbol_array.len; ++i ) {
+    ignore_symbol const *const igsym = array_at_nc( &ignore_symbol_array, i );
+    char const *const any_prefix = igsym->in_any_cxx_scope ? "*::" : "";
+    verbose_printf( "  \"%s", any_prefix );
+    fputs_escaped( igsym->name, stdout );
+    putchar( '"' );
+    if ( igsym->path != NULL )
+      printf( " @ \"%s\"", igsym->path );
+    putchar( '\n' );
+  } // for
+
+  array_cleanup( &ignore_symbol_array, /*free_fn=*/NULL );
+}
+
+/**
  * Prints an error message saying that \a value is invalid.
  *
  * @param config The config_parse_fn_args to use.
@@ -1244,6 +1291,50 @@ static fnv1a_t root_symbol_hash( root_symbol const *rsym ) {
 }
 
 /**
+ * Dumps all root symbols.
+ */
+static void root_symbols_dump( void ) {
+  if ( root_symbol_set.size == 0 )
+    return;
+
+  array_t root_symbol_array = ARRAY_INIT( sizeof(root_symbol) );
+  array_reserve( &root_symbol_array, root_symbol_set.size );
+
+  ht_iterator_t iter;
+  ht_iterator_init( &iter, &root_symbol_set );
+  for ( root_symbol const *rsym; (rsym = ht_iterator_next( &iter )) != NULL; )
+    *(root_symbol*)array_push_back( &root_symbol_array ) = *rsym;
+
+  array_qsort(
+    &root_symbol_array,
+    //
+    // This relies on C11 §6.7.2.1¶15:
+    //
+    //    Within a structure object, the ... members ... have addresses that
+    //    increase in the order in which they are declared. A pointer to a
+    //    structure object ... points to its initial member ... and vice versa.
+    //    There may be unnamed padding within a structure object, but not at
+    //    its beginning.
+    //
+    POINTER_CAST( array_cmp_fn_t, &str_ptr_cmp )
+  );
+
+  verbose_section_begin( /*printed_header=*/NULL );
+  verbose_printf( "root symbols:\n" );
+  for ( size_t i = 0; i < root_symbol_array.len; ++i ) {
+    root_symbol const *const rsym = array_at_nc( &root_symbol_array, i );
+    verbose_printf( "  \"" );
+    fputs_escaped( rsym->name, stdout );
+    putchar( '"' );
+    if ( rsym->path != NULL )
+      printf( " @ \"%s\"", rsym->path );
+    putchar( '\n' );
+  } // for
+
+  array_cleanup( &root_symbol_array, /*free_fn=*/NULL );
+}
+
+/**
  * Prints a TOML value.
  *
  * @param value The toml_value to print.
@@ -1335,6 +1426,11 @@ void config_init( void ) {
     warning_count = 0;
   } while ( opt_config_layers || !found_at_least_1 );
   strbuf_cleanup( &path_buf );
+
+  if ( IS_VERBOSE( CONFIG_SYMBOLS ) ) {
+    ignore_symbols_dump();
+    root_symbols_dump();
+  }
 }
 
 bool config_path_is_ignored( char const *path ) {
