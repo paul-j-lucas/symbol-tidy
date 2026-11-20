@@ -124,6 +124,12 @@ static hash_table_t   fwd_dec_set;
 
 static fwd_statistics fwd_stats;        ///< Forward declaration statistics.
 
+/**
+ * We should print statistics only if at least one source file did not ignore
+ * unnecessary forward declarations.
+ */
+static bool           should_print_statistics;
+
 ////////// local functions ////////////////////////////////////////////////////
 
 /**
@@ -274,7 +280,8 @@ static bool fwd_dec_is_necessary( fwd_dec const *fwd ) {
  * Cleans-up all forward declarations.
  */
 static void fwd_decs_cleanup( void ) {
-  verbose_print_statistics( &print_statistics );
+  if ( should_print_statistics )
+    verbose_print_statistics( &print_statistics );
   fwd_statistics_cleanup( &fwd_stats );
   ht_table_cleanup( &fwd_dec_set, /*free_fn=*/NULL );
 }
@@ -365,7 +372,7 @@ static void print_statistics( verbose_stat_ctx *vsc ) {
 ////////// extern functions ///////////////////////////////////////////////////
 
 void fwd_dec_maybe_unneeded( CXCursor fn_csr, symbols_visit_data const *svd ) {
-  assert( svd != NULL );
+  should_print_statistics = true;
 
   CXSourceLocation const fn_loc = clang_getCursorLocation( fn_csr );
   if ( !clang_Location_isFromMainFile( fn_loc ) )
@@ -381,6 +388,8 @@ void fwd_dec_maybe_unneeded( CXCursor fn_csr, symbols_visit_data const *svd ) {
 
   if ( is_redundant && !clang_Location_isFromMainFile( canon_loc ) )
     return;
+
+  assert( svd != NULL );
 
   fwd_dec new_fwd = {
     .canon_csr = canon_csr,
@@ -402,27 +411,32 @@ void fwd_dec_maybe_unneeded( CXCursor fn_csr, symbols_visit_data const *svd ) {
 }
 
 void fwd_dec_visit_ref( CXCursor ref_csr, symbols_visit_data const *svd ) {
-  assert( svd != NULL );
+  should_print_statistics = true;
   if ( fwd_dec_set.size == 0 )
     return;                             // fast path: no candidates
 
   ref_csr = clang_getCanonicalCursor( ref_csr );
   fwd_dec *const fwd = fwd_dec_find( ref_csr );
-  if ( fwd != NULL && fwd->first_ref_visit_id == 0 )
-    fwd->first_ref_visit_id = svd->visit_id;
+  if ( fwd == NULL || fwd->first_ref_visit_id > 0 )
+    return;
+
+  assert( svd != NULL );
+  fwd->first_ref_visit_id = svd->visit_id;
 }
 
 void fwd_dec_visit_def( CXCursor fn_csr, symbols_visit_data const *svd ) {
+  should_print_statistics = true;
   if ( fwd_dec_set.size == 0 )
     return;                             // fast path: no candidates
 
   CXCursor const canon_fn_csr = clang_getCanonicalCursor( fn_csr );
   fwd_dec *const fwd = fwd_dec_find( canon_fn_csr );
-  if ( fwd != NULL && fwd->def_visit_id == 0 ) {
-    assert( svd != NULL );
-    fwd->def_visit_id = svd->visit_id;
-    fwd->def_csr = fn_csr;
-  }
+  if ( fwd == NULL || fwd->def_visit_id > 0 )
+    return;
+
+  assert( svd != NULL );
+  fwd->def_visit_id = svd->visit_id;
+  fwd->def_csr = fn_csr;
 }
 
 void fwd_decs_init( void ) {
