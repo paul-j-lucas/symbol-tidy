@@ -1595,46 +1595,25 @@ static void symbols_cleanup( void ) {
 
 /**
  * Adds a symbol for a declaration that isn't a definition (e.g., a function
- * prototype in a header), but only if the symbol is configured to be a root.
+ * prototype in a header).
  *
- * @remarks
- * @parblock
- * Declarations that aren't definitions normally don't get symbols of their
- * own.  However, a symbol configured to be a root that's declared but never
- * defined or referenced must still be reported as unused, so it needs a symbol
- * having a location to report; the location of the declaration is used.  If
- * the symbol is later defined, symbol_add_def() replaces the location with
- * that of the definition.
- *
- * Only the canonical (first) declaration is considered: it's both cheaper than
- * considering every redeclaration and the same cursor used by symbol_add() to
- * decide whether the symbol is configured to be a root.
- * @endparblock
+ * @note Only the canonical (first) declaration is considered.
  *
  * @param dec_csr The declaration's cursor.
  * @param dec_loc The source location of \a dec_csr.
  * @param svd The symbols_visit_data to use.
+ *
+ * @sa symbols_print_undefined()
  */
-static void symbol_add_root_dec( CXCursor dec_csr, CXSourceLocation dec_loc,
-                                 symbols_visit_data *svd ) {
+static void symbol_add_dec( CXCursor dec_csr, CXSourceLocation dec_loc,
+                            symbols_visit_data *svd ) {
   assert( svd != NULL );
 
   if ( !tidy_Cursor_isForwardDeclarable( dec_csr ) )
     return;
 
-  if ( !clang_equalCursors( dec_csr, clang_getCanonicalCursor( dec_csr ) ) )
-    return;
-
-  //
-  // Check whether it's a root before calling symbol_add() so we don't add
-  // symbols for every declaration.
-  //
-  char *const sym_name = tidy_Cursor_getScopedSpelling( dec_csr );
-  if ( sym_name == NULL )
-    return;                             // LCOV_EXCL_LINE
-  bool const is_root = cursor_is_config_root( dec_csr, sym_name );
-  free( sym_name );
-  if ( !is_root )
+  CXCursor const canon_dec_csr = clang_getCanonicalCursor( dec_csr );
+  if ( !clang_equalCursors( dec_csr, canon_dec_csr ) )
     return;
 
   tidy_symbol *const sym = symbol_add( dec_csr, svd );
@@ -1644,7 +1623,7 @@ static void symbol_add_root_dec( CXCursor dec_csr, CXSourceLocation dec_loc,
   if ( sym->parent_sym == NULL )
     sym->parent_sym = svd->curr_sym;
 
-  if ( sym->def_loc.path == NULL )
+  if ( sym->is_root && sym->def_loc.path == NULL )
     symbol_add_def( sym, dec_loc, svd );
 }
 
@@ -1789,7 +1768,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
     }
     else {
       cursor_visit_ref( cursor, svd );
-      symbol_add_root_dec( cursor, sym_loc, svd );
+      symbol_add_dec( cursor, sym_loc, svd );
     }
   }
 
