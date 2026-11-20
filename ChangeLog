@@ -1,5 +1,13 @@
 2026-11-19  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * symbol.c: Fixed undefined symbols.
+   * undefined.out, undefined.test: Another "undefined" test.
+   * options.c, options.h: Made option_str_set_all_or_none be static.
+   * undefined-lib.c, undefined-lib.h, undefined-lib.toml, undefined-prog.out,
+     undefined-prog.test: Another "undefined" test.
+   * test/Makefile.am, undefined-prog.c, undefined-prog.out,
+     undefined-prog.test: Added "undefined" test.
+   * symbol.c: Added symbol_is_unused.
    * cxx_symbol.c, symbol-tidy.c, symbol.c, symbol.h: Now explicitly calling
      symbols_mark_used().
    * symbol.c: A root symbol that's undefined is now reported as undedined, not
