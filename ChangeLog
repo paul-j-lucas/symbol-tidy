@@ -1,5 +1,10 @@
 2026-11-19  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * config_file.c: Added verbose of config symbols.
+   * str_util.c, str_util.h, cli-options-error.out, cli-options.out,
+     cli-options.test: Updated tests after removal of verbose=f.
+   * man/man1/symbol-tidy.1, options.c, options.h, symbol-tidy.c: Eliminated
+     verbose=f --- doesn't apply in symbol-tidy.
    * symbol.c: Fixed undefined symbols.
    * undefined.out, undefined.test: Another "undefined" test.
    * options.c, options.h: Made option_str_set_all_or_none be static.
