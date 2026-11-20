@@ -1,3 +1,27 @@
+2026-11-20  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * config_file.c: Elimininated a few *_cmp and *_hash functions.
+   * fnv1a.c, fnv1a.h, symbol.c: Added fnv1a_str_ptr().
+   * clang_util.c, symbol.c: Moved EnumDecl to tidy_Cursor_isForwardDeclarable.
+   * clang_util.c, symbol.c: tidy_Cursor_isForwardDeclarable now also include
+     structs and unions.
+   * config_file.c, cxx_symbol.c, fwd_dec.c, symbol.c: Now printing statistics
+     only when needed.
+   * config_file.c: Added should_print_statistics.
+   * fwd_dec.c: Addede should_print_statistics.
+   * symbol-tidy.c, symbol.c, symbol.h: Now guarding fwd_* calls with: if (
+     !svd->ignore_forwards ).
+   * config_file.c, fwd_dec.h, options.c, source.c, symbol-tidy.c, verbose.h:
+     #include fixes.
+   * src/Makefile.am: Put --verbose=f back for include-tidy.
+   * type_traits.h: Removed TO_UNSIGNED_EXPR --- unused.
+   * src/Makefile.am: Removed --verbose=f.
+   * clang_util.c, clang_util.h, symbol.c: Added tidy_Cursor_isClassFunction().
+   * cli_options.c, config_file.c, symbol-tidy.c, symbol.c: Added fflush for
+     verbose output.
+   * config_file.c, undefined.out, undefined.test: Fixed root_symbols_dump
+     printing.
+
 2026-11-19  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
    * config_file.c: Added verbose of config symbols.
