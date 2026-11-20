@@ -1094,6 +1094,7 @@ bool tidy_Cursor_isForwardDeclarable( CXCursor cursor ) {
     case CXCursor_FunctionDecl:
     case CXCursor_VarDecl:
       return true;
+
     default:
       return false;
   } // switch
