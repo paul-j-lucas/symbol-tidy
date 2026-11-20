@@ -251,6 +251,11 @@ static hash_table_t ignore_symbol_set;    ///< Set of symbols to ignore.
 static hash_table_t root_symbol_set;      ///< Set of root symbols.
 static unsigned     warning_count;        ///< Configuration file warning count.
 
+/**
+ * We should print statistics only if at least one configuration file was read.
+ */
+static bool         should_print_statistics;
+
 ////////// local TOML type parsing functions //////////////////////////////////
 
 /**
@@ -714,7 +719,8 @@ static void config_str_set( config_bool *cb, bool value, char const *s ) {
  * Cleans-up all configuration data.
  */
 static void config_cleanup( void ) {
-  verbose_print_statistics( &print_statistics );
+  if ( should_print_statistics )
+    verbose_print_statistics( &print_statistics );
   ht_table_cleanup( &ignore_path_set, /*free_fn=*/NULL );
   ht_table_cleanup(
     &ignore_symbol_set, POINTER_CAST( ht_free_fn_t, &ignore_symbol_cleanup )
@@ -1007,6 +1013,7 @@ static void config_parse( char const *config_path, FILE *config_file ) {
         .value = &kv->value
       };
       (*found_key->parse_fn)( &config );
+      should_print_statistics = true;
     } // for
   } // while
 
