@@ -1170,7 +1170,7 @@ void cxx_member_add_ref( CXCursor member_csr, symbols_visit_data *svd ) {
 }
 
 void cxx_member_def_ctor_add_ref( CXCursor member_csr, tidy_symbol *member_sym,
-                                  symbols_visit_data const *svd ) {
+                                  symbols_visit_data *svd ) {
   assert( member_sym != NULL );
   assert( svd->source->lang == CXLanguage_CPlusPlus );
 

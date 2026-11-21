@@ -206,7 +206,7 @@ void cxx_member_add_ref( CXCursor member_csr, symbols_visit_data *svd );
  * @param svd The symbols_visit_data to use.
  */
 void cxx_member_def_ctor_add_ref( CXCursor member_csr, tidy_symbol *member_sym,
-                                  symbols_visit_data const *svd );
+                                  symbols_visit_data *svd );
 
 /**
  * Adds references to the member operators of \a cls_csr named either \a name

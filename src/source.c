@@ -60,7 +60,7 @@ static CXIndex      tidy_index;         ///< Libclang index.
 
 ////////// local functions ////////////////////////////////////////////////////
 
-static void source_cpp_visit( symbols_visit_data const*, CXFile );
+static void source_cpp_visit( symbols_visit_data*, CXFile );
 
 ////////// local functions ////////////////////////////////////////////////////
 
@@ -106,7 +106,7 @@ static void include_visitor( CXFile included_file,
     goto skip;
 
   assert( data != NULL );
-  symbols_visit_data const *const svd = data;
+  symbols_visit_data *const svd = data;
   source_cpp_visit( svd, included_file );
 
 skip:
@@ -191,7 +191,7 @@ static void source_check_diagnostics( tidy_source const *source ) {
  * @param svd The symbols_visit_data to use.
  * @param file The file whose preprocessor directives to visit.
  */
-static void source_cpp_visit( symbols_visit_data const *svd, CXFile file ) {
+static void source_cpp_visit( symbols_visit_data *svd, CXFile file ) {
   assert( svd != NULL );
 
   size_t file_size;

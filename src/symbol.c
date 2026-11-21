@@ -2354,7 +2354,7 @@ void svd_init( symbols_visit_data *svd, tidy_source *source ) {
   };
 }
 
-tidy_symbol* symbol_add( CXCursor sym_csr, symbols_visit_data const *svd ) {
+tidy_symbol* symbol_add( CXCursor sym_csr, symbols_visit_data *svd ) {
   assert( svd != NULL );
 
   sym_csr = clang_getCanonicalCursor( sym_csr );
@@ -2441,6 +2441,12 @@ tidy_symbol* symbol_add( CXCursor sym_csr, symbols_visit_data const *svd ) {
     POINTER_CAST( ht_cmp_fn_t, &str_ptr_cmp ),
     POINTER_CAST( ht_hash_fn_t, &fnv1a_str_ptr )
   );
+
+  if ( IS_VERBOSE( SYMBOLS ) ) {
+    if ( verbose_new_section( &svd->printed_symbols_header  ) )
+      verbose_printf( "symbols:\n" );
+    verbose_printf( "  \"%s\"\n", symbol_name_for_print( sym ) );
+  }
 
 done:
   //

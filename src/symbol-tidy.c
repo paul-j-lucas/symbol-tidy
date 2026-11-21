@@ -189,9 +189,6 @@ int main( int argc, char const *argv[] ) {
   sources_init();
   symbols_init();
 
-  if ( IS_VERBOSE( SRC_FILE_PATH ) )
-    verbose_section_begin( /*printed_header=*/NULL );
-
   unsigned unneeded_forwards = 0;
 
   for ( size_t i = 0; i < sources.len; ++i ) {
@@ -200,6 +197,7 @@ int main( int argc, char const *argv[] ) {
       continue;
 
     if ( IS_VERBOSE( SRC_FILE_PATH ) ) {
+      verbose_new_line();
       verbose_printf( "source file = \"%s\"\n", source->path );
       fflush( stdout );
     }

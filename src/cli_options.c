@@ -1326,7 +1326,7 @@ void cli_options_init( int argc, char const *argv[], array_t *rv_sources ) {
     // opt_compiler_path (if given).
     //
     if ( IS_VERBOSE( DIRECTORY ) ) {
-      verbose_section_begin( /*printed_header=*/NULL );
+      verbose_new_line();
       verbose_printf( "directory = \"%s\"\n", opt_directory );
     }
     if ( chdir( opt_directory ) != 0 )

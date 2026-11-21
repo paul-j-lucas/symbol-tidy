@@ -386,6 +386,11 @@ struct symbols_visit_data {
   bool                ignore_undefined; ///< Ignore undefined symbols?
 
   /**
+   * Printed "symbols:" header?
+   */
+  bool                printed_symbols_header;
+
+  /**
    * A unique ID for every non-standard-header cursor visited by
    * symbols_visitor() restarting at 1 for every translation unit.
    *
@@ -489,7 +494,7 @@ void svd_init( symbols_visit_data *svd, tidy_source *source );
  * could could not be added.
  */
 NODISCARD
-tidy_symbol* symbol_add( CXCursor sym_csr, symbols_visit_data const *svd );
+tidy_symbol* symbol_add( CXCursor sym_csr, symbols_visit_data *svd );
 
 /**
  * Adds a reference from \a from_sym to \a to_sym, or mark \a to_sym as a \ref

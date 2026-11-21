@@ -865,7 +865,7 @@ static FILE* config_open( char const *config_path, config_opts opts ) {
 
   if ( IS_VERBOSE( CONFIG_FILES ) ) {
     // LCOV_EXCL_START: configuration paths are absolute
-    if ( verbose_section_begin( &printed_configuration_header ) )
+    if ( verbose_new_section( &printed_configuration_header ) )
       verbose_printf( "configuration files:\n" );
     verbose_printf( "  \"%s\": %s\n", config_path, ok ? "OK" : STRERROR() );
     fflush( stdout );
@@ -1127,7 +1127,7 @@ static void ignore_symbols_dump( void ) {
     POINTER_CAST( array_cmp_fn_t, &str_ptr_cmp )
   );
 
-  verbose_section_begin( /*printed_header=*/NULL );
+  verbose_new_section( /*printed_header=*/NULL );
   verbose_printf( "ignore symbols:\n" );
   for ( size_t i = 0; i < ignore_symbol_array.len; ++i ) {
     ignore_symbol const *const igsym = array_at_nc( &ignore_symbol_array, i );
@@ -1280,7 +1280,7 @@ static void root_symbols_dump( void ) {
     POINTER_CAST( array_cmp_fn_t, &root_symbol_cmp )
   );
 
-  verbose_section_begin( /*printed_header=*/NULL );
+  verbose_new_section( /*printed_header=*/NULL );
   verbose_printf( "root symbols:\n" );
   for ( size_t i = 0; i < root_symbol_array.len; ++i ) {
     root_symbol const *const rsym = array_at_nc( &root_symbol_array, i );
