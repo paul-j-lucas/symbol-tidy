@@ -1333,6 +1333,21 @@ void config_bool_cleanup( config_bool *cb ) {
   }
 }
 
+bool config_bool_get( config_bool *cb, char const *s ) {
+  assert( cb != NULL );
+
+  if ( s != NULL ) {
+    bool_str find_bs = { .s = s };
+    ht_entry_t const *const entry =
+      ht_table_find( &cb->bool_str_set, &find_bs );
+    if ( entry != NULL ) {
+      bool_str const *const found_bs = HT_DINT( entry );
+      return found_bs->value;
+    }
+  }
+  return cb->global_value;
+}
+
 void config_bool_init( config_bool *cb ) {
   assert( cb != NULL );
   ht_table_init(
@@ -1349,21 +1364,6 @@ void config_bool_init( config_bool *cb ) {
     POINTER_CAST( ht_cmp_fn_t, &str_ptr_cmp ),
     POINTER_CAST( ht_hash_fn_t, &fnv1a_str_ptr )
   );
-}
-
-bool config_bool_value( config_bool *cb, char const *s ) {
-  assert( cb != NULL );
-
-  if ( s != NULL ) {
-    bool_str find_bs = { .s = s };
-    ht_entry_t const *const entry =
-      ht_table_find( &cb->bool_str_set, &find_bs );
-    if ( entry != NULL ) {
-      bool_str const *const found_bs = HT_DINT( entry );
-      return found_bs->value;
-    }
-  }
-  return cb->global_value;
 }
 
 void config_init( void ) {

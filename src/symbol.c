@@ -390,11 +390,11 @@ static bool cursor_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
     case CXCursor_Constructor:
       cls_name = tidy_Cursor_getScopedSpelling( parent_csr );
       if ( clang_CXXConstructor_isCopyConstructor( sym_csr ) &&
-           config_bool_value( &opt_ignore_cxx_copy_ctors, cls_name ) ) {
+           config_bool_get( &opt_ignore_cxx_copy_ctors, cls_name ) ) {
         is_excluded = true;
       }
       if ( clang_CXXConstructor_isMoveConstructor( sym_csr ) &&
-           config_bool_value( &opt_ignore_cxx_move_ctors, cls_name ) ) {
+           config_bool_get( &opt_ignore_cxx_move_ctors, cls_name ) ) {
         is_excluded = true;
       }
       break;
@@ -406,11 +406,11 @@ static bool cursor_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
       }
       cls_name = tidy_Cursor_getScopedSpelling( parent_csr );
       if ( clang_CXXMethod_isCopyAssignmentOperator( sym_csr ) ) {
-        if ( config_bool_value( &opt_ignore_cxx_copy_assigns, cls_name ) )
+        if ( config_bool_get( &opt_ignore_cxx_copy_assigns, cls_name ) )
           is_excluded = true;
       }
       else if ( clang_CXXMethod_isMoveAssignmentOperator( sym_csr ) ) {
-        if ( config_bool_value( &opt_ignore_cxx_move_assigns, cls_name ) )
+        if ( config_bool_get( &opt_ignore_cxx_move_assigns, cls_name ) )
           is_excluded = true;
       }
       break;
@@ -2328,21 +2328,11 @@ void cursor_add_ref( CXCursor to_csr, symbols_visit_data *svd ) {
 void svd_init( symbols_visit_data *svd, tidy_source *source ) {
   assert( svd != NULL );
 
-  bool const ignore_extern =
-    config_bool_value( &opt_ignore_externs, source->path );
-  if ( !ignore_extern )
-    print_unneeded_external = true;
-
-  bool const ignore_undefined =
-    config_bool_value( &opt_ignore_undefined, source->path );
-  if ( !ignore_undefined )
-    print_undefined = true;
-
   *svd = (symbols_visit_data){
     .source = source,
-    .ignore_extern = ignore_extern,
-    .ignore_forwards = config_bool_value( &opt_ignore_forwards, source->path ),
-    .ignore_undefined = ignore_undefined,
+    .ignore_extern = config_bool_get( &opt_ignore_externs, source->path ),
+    .ignore_forwards = config_bool_get( &opt_ignore_forwards, source->path ),
+    .ignore_undefined = config_bool_get( &opt_ignore_undefined, source->path ),
     .cxx_constructor = {
       .ctor_csr = clang_getNullCursor()
     },
@@ -2352,6 +2342,11 @@ void svd_init( symbols_visit_data *svd, tidy_source *source ) {
       .end_csr = clang_getNullCursor()
     }
   };
+
+  if ( !svd->ignore_extern )
+    print_unneeded_external = true;
+  if ( !svd->ignore_undefined )
+    print_undefined = true;
 }
 
 tidy_symbol* symbol_add( CXCursor sym_csr, symbols_visit_data *svd ) {

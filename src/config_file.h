@@ -86,15 +86,6 @@ struct config_bool {
 void config_bool_cleanup( config_bool *cb );
 
 /**
- * Initializes a config_bool.
- *
- * @param cb The config_bool to initialize.
- *
- * @sa config_bool_cleanup()
- */
-void config_bool_init( config_bool *cb );
-
-/**
  * Gets the value of a config_bool.
  *
  * @param cb The config_bool to get the value of.
@@ -103,7 +94,16 @@ void config_bool_init( config_bool *cb );
  * if not.
  */
 NODISCARD
-bool config_bool_value( config_bool *cb, char const *path );
+bool config_bool_get( config_bool *cb, char const *path );
+
+/**
+ * Initializes a config_bool.
+ *
+ * @param cb The config_bool to initialize.
+ *
+ * @sa config_bool_cleanup()
+ */
+void config_bool_init( config_bool *cb );
 
 /**
  * Reads an **symbol-tidy** configuration file, if any.
