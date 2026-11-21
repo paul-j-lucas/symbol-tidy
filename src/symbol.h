@@ -47,8 +47,6 @@
 
 ////////// typedefs ///////////////////////////////////////////////////////////
 
-typedef struct tidy_source tidy_source;
-
 typedef struct cxx_dtor_frame       cxx_dtor_frame;
 typedef struct svd_cxx_constructor  svd_cxx_constructor;
 typedef struct svd_cxx_for_range    svd_cxx_for_range;
@@ -56,6 +54,7 @@ typedef struct svd_cxx_member       svd_cxx_member;
 typedef struct svd_cxx_operator     svd_cxx_operator;
 typedef struct symbols_visit_data   symbols_visit_data;
 typedef struct tidy_loc             tidy_loc;
+typedef struct tidy_source          tidy_source;
 typedef struct tidy_symbol          tidy_symbol;
 
 ////////// structs ////////////////////////////////////////////////////////////
