@@ -55,6 +55,7 @@ endif
 
 TIDY_FLAGS =		-Xtidy --error=never
 ITIDY_FLAGS =		$(TIDY_FLAGS) -Xtidy --verbose=f
+STIDY_FLAGS =		$(TIDY_FLAGS)
 TIDY_CFLAGS =		$(CFLAGS) $(AM_CFLAGS) $(CPPFLAGS) $(AM_CPPFLAGS)
 
 symbol_tidy_SOURCES =	array.c array.h \
@@ -126,7 +127,7 @@ itidy:
 	done
 
 stidy: symbol-tidy
-	@symbol-tidy $(TIDY_FLAGS) $(TIDY_CFLAGS) *.c
+	@symbol-tidy $(STIDY_FLAGS) $(TIDY_CFLAGS) *.c
 
 clean-coverage-local:
 	rm -f *.gcda
