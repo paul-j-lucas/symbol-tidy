@@ -575,7 +575,7 @@
  * @return Returns A pointer to the member.
  */
 #define PTR_TO_MBR(OBJ_PTR,MBR_OFFSET) \
-  TO_VOID_PTR_EXPR( TO_CHAR_PTR_EXPR( OBJ_PTR ) + (MBR_OFFSET) )
+  TO_VOID_PTR_EXPR( TO_CHAR_PTR_EXPR( (OBJ_PTR) ) + (MBR_OFFSET) )
 
 /**
  * Calls **fputs**(3) with `stdout`.
