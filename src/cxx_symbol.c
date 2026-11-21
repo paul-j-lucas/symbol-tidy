@@ -155,7 +155,7 @@ enum CXChildVisitResult cxx_base_dtor_add_ref_visitor( CXCursor cursor,
   }
   base_cls_csr = clang_getCanonicalCursor( base_cls_csr );
   if ( tidy_Cursor_isInvalid( base_cls_csr ) )
-    goto skip;
+    goto skip;                          // LCOV_EXCL_LINE
 
   assert( data != NULL );
   symbols_visit_data *const svd = data;
@@ -300,7 +300,7 @@ static bool cxx_member_add_refs_by_name( CXCursor cls_csr, char const *name,
   assert( svd != NULL );
 
   if ( tidy_Cursor_isInvalid( cls_csr ) || name[0] == '\0' )
-    return false;
+    return false;                       // LCOV_EXCL_LINE
 
   svd_cxx_member const prev_svd_cxx_member = svd->cxx_member;
   svd->cxx_member = (svd_cxx_member){ .name = name };
@@ -462,7 +462,7 @@ static enum CXChildVisitResult cxx_operator_base_visitor( CXCursor cursor,
 
   CXCursor const base_csr = tidy_Cursor_getBaseSpecifierClass( cursor );
   if ( tidy_Cursor_isInvalid( base_csr ) )
-    goto skip;
+    goto skip;                          // LCOV_EXCL_LINE
 
   //
   // Copy the names first since the recursive call replaces (then restores)
@@ -531,7 +531,7 @@ NODISCARD
 static bool cxx_tmpl_ctors_param( CXCursor spec_csr, unsigned param_idx ) {
   CXCursor const tmpl_csr = clang_getSpecializedCursorTemplate( spec_csr );
   if ( tidy_Cursor_isInvalid( tmpl_csr ) )
-    return true;
+    return true;                        // LCOV_EXCL_LINE
   if ( tidy_Cursor_isInSystemHeader( tmpl_csr ) )
     return true;
   enum CXCursorKind kind = clang_getCursorKind( tmpl_csr );
@@ -540,8 +540,8 @@ static bool cxx_tmpl_ctors_param( CXCursor spec_csr, unsigned param_idx ) {
 
   cxx_tmpl_param_visitor_data tpvd = { .find_idx = param_idx };
   tidy_visitClassChildren( tmpl_csr, &cxx_tmpl_param_visitor, &tpvd );
-  if ( !tpvd.found_tmpl_type_param )
-    return true;                        // pack, out of range, etc.: can't tell
+  if ( !tpvd.found_tmpl_type_param )    // pack, out of range, etc.: can't tell
+    return true;                        // LCOV_EXCL_LINE
 
   bool              is_param_constructed = true;
   CXString const    name_cxs = clang_getCursorSpelling( tpvd.found_csr );
@@ -927,7 +927,7 @@ enum CXChildVisitResult cxx_DeleteExpr_visitor( CXCursor cursor,
 
   CXType type = clang_getCursorType( cursor );
   if ( type.kind == CXType_Invalid )
-    goto skip;
+    goto skip;                          // LCOV_EXCL_LINE
   type = clang_getCanonicalType( type );
   type = clang_getNonReferenceType( type );
   if ( type.kind != CXType_Pointer )
@@ -1086,7 +1086,7 @@ enum CXChildVisitResult cxx_find_begin_end_visitor( CXCursor cursor,
 
       CXCursor param_cls_csr = clang_getTypeDeclaration( canon_type );
       if ( tidy_Cursor_isInvalid( param_cls_csr ) )
-        goto skip;
+        goto skip;                      // LCOV_EXCL_LINE
       param_cls_csr = clang_getCanonicalCursor( param_cls_csr );
       if ( !clang_equalCursors( param_cls_csr, svd->cxx_for_range.cls_csr ) )
         goto skip;
@@ -1120,7 +1120,7 @@ skip:
 void cxx_member_add_ref( CXCursor member_csr, symbols_visit_data *svd ) {
   CXCursor const base_csr = tidy_Cursor_getFirstExprChild( member_csr );
   if ( clang_Cursor_isNull( base_csr ) )
-    return;
+    return;                             // LCOV_EXCL_LINE
 
   CXType type = clang_getCanonicalType( clang_getCursorType( base_csr ) );
          type = clang_getNonReferenceType( type );
@@ -1194,7 +1194,7 @@ void cxx_member_def_ctor_add_ref( CXCursor member_csr, tidy_symbol *member_sym,
   if ( ctor_info.has_other_ctors )
     return;
   if ( clang_Cursor_isNull( ctor_info.def_ctor_csr ) )
-    return;
+    return;                             // LCOV_EXCL_LINE
 
   tidy_symbol *const def_ctor_sym = symbol_add( ctor_info.def_ctor_csr, svd );
   if ( def_ctor_sym != NULL )
@@ -1235,7 +1235,7 @@ void cxx_var_template_args_def_ctor_add_ref( CXType type,
     CXType arg_type =
       clang_Type_getTemplateArgumentAsType( type, STATIC_CAST( unsigned, i ) );
     if ( arg_type.kind == CXType_Invalid )
-      continue;
+      continue;                         // LCOV_EXCL_LINE
 
     arg_type = clang_getCanonicalType( arg_type );
     CXCursor const arg_cls_csr = clang_getTypeDeclaration( arg_type );
