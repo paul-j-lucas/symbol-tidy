@@ -223,7 +223,7 @@
 #define TO_CHAR_PTR_EXPR(EXPR)          \
   _Generic( TO_VOID_PTR_EXPR( (EXPR) ), \
     void*       : (char      *)(EXPR),  \
-    const void* : (char const*)(EXPR)   \
+    void const* : (char const*)(EXPR)   \
   )
 
 /**
