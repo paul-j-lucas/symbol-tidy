@@ -427,6 +427,16 @@
     - IS_SIGNED_TYPE(TYPE))
 
 /**
+ * Gets a pointer to a member of a `struct` \a OBJ_PTR at \a MBR_OFFSET.
+ *
+ * @param OBJ_PTR A pointer to a `struct` object.
+ * @param MBR_OFFSET The offset to a member (returned from `offsetof`).
+ * @return Returns A pointer to the member.
+ */
+#define MEMBER_AT(OBJ_PTR,MBR_OFFSET) \
+  TO_VOID_PTR_EXPR( TO_CHAR_PTR_EXPR( (OBJ_PTR) ) + (MBR_OFFSET) )
+
+/**
  * Concatenate \a A and \a B together to form a single token.
  *
  * @remarks This macro is needed instead of simply using `##` when either
@@ -566,16 +576,6 @@
  * @sa #STATIC_CAST()
  */
 #define POINTER_CAST(T,EXPR)      ((T)(uintptr_t)(EXPR))
-
-/**
- * Gets a pointer to a member of a `struct` \a OBJ_PTR.
- *
- * @param OBJ_PTR A pointer to a `struct` object.
- * @param MBR_OFFSET The offset to a member (returned from `offsetof`).
- * @return Returns A pointer to the member.
- */
-#define PTR_TO_MBR(OBJ_PTR,MBR_OFFSET) \
-  TO_VOID_PTR_EXPR( TO_CHAR_PTR_EXPR( (OBJ_PTR) ) + (MBR_OFFSET) )
 
 /**
  * Calls **fputs**(3) with `stdout`.

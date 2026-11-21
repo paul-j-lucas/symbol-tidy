@@ -1077,7 +1077,7 @@ static void print_max_lf_stats( verbose_stat_ctx *vsc, size_t mbr_off,
   for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
     if ( sym->is_dead )
       continue;
-    hash_table_t const *const set = PTR_TO_MBR( sym, mbr_off );
+    hash_table_t const *const set = MEMBER_AT( sym, mbr_off );
     if ( set->size > 0 ) {
       double const lf = ht_table_load_factor( set );
       if ( lf > max_lf ) {
@@ -1390,7 +1390,7 @@ static void symbol_print( tidy_symbol const *sym, size_t mbr_off ) {
   assert( sym != NULL );
 
   bool const is_def_in_macro = symbol_is_def_in_macro( sym );
-  tidy_loc const *const tloc = PTR_TO_MBR( sym, mbr_off );
+  tidy_loc const *const tloc = MEMBER_AT( sym, mbr_off );
 
   color_start( stderr, sgr_locus );
   EPRINTF( "%5u", tloc->line );
@@ -1427,7 +1427,7 @@ static void symbol_print( tidy_symbol const *sym, size_t mbr_off ) {
 static void symbol_print_path( tidy_symbol const *sym, size_t mbr_off ) {
   assert( sym != NULL );
 
-  tidy_loc const *const tloc = PTR_TO_MBR( sym, mbr_off );
+  tidy_loc const *const tloc = MEMBER_AT( sym, mbr_off );
 
   color_start( stderr, sgr_locus );
   EPRINTF( "\"%s\"", tloc->path );
