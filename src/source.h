@@ -44,8 +44,8 @@
 
 ////////// typedefs ///////////////////////////////////////////////////////////
 
-typedef struct tidy_source tidy_source;
-typedef struct symbols_visit_data   symbols_visit_data;
+typedef struct symbols_visit_data symbols_visit_data;
+typedef struct tidy_source        tidy_source;
 
 ////////// structs ////////////////////////////////////////////////////////////
 
