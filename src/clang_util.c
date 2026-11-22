@@ -378,15 +378,16 @@ static void getScopedName_impl( CXCursor cursor, getCursorName_fn name_fn,
   assert( name_fn != NULL );
   assert( sbuf != NULL );
 
-  if ( !tidy_Cursor_isUnscopedEnumConstantDecl( cursor ) ) {
-    CXCursor parent = cursor;
-    do {
-      parent = clang_getCursorSemanticParent( parent );
-    } while ( clang_Cursor_isInlineNamespace( parent ) );
+  CXCursor parent = clang_getCursorSemanticParent( cursor );
 
-    if ( tidy_Cursor_isScopeDecl( parent ) )
-      getScopedName_impl( parent, name_fn, sbuf );
-  }
+  if ( tidy_Cursor_isUnscopedEnumConstantDecl( cursor ) )
+    parent = clang_getCursorSemanticParent( parent );
+
+  while ( clang_Cursor_isInlineNamespace( parent ) )
+    parent = clang_getCursorSemanticParent( parent );
+
+  if ( tidy_Cursor_isScopeDecl( parent ) )
+    getScopedName_impl( parent, name_fn, sbuf );
 
   CXString const name_cxs = (*name_fn)( cursor );
   char const *const name = null_if_empty( clang_getCString( name_cxs ) );
