@@ -9,23 +9,26 @@ or label
 is unused
 within a single source file.
 
-**symbol-tidy** (Tidy) is a command-line tool
+**symbol-tidy** (**Tidy**) is a command-line tool
 that allows you to tidy-up symbols
 in a set of either C or C++ source files
 comprising a program.
 Specifically,
 **Tidy** can warn you about:
 
-+ Symbols, specifically functions (`static` or not), labels, macros,
-  parameters, types, and variable, that are not used at least once
-  in any source file comprising a program.
++ Unused symbols, specifically unused functions, labels, macros, parameters,
+  types, and variables.
 
 + Functions or variables with unnecessary external linkage
   that could instead be declared `static`.
 
 + Unnecessary function forward declarations.
 
-That means **Tidy** will print a warning for those that aren't.
++ Undefined symbols.
+
+C or C++ Compilers can only warn you about unused symbols
+in a single source file;
+**Tidy** can warn you about the above across all source files.
 
 **symbol-tidy** has a companion
 [**include-tidy**](https://github.com/paul-j-lucas/include-tidy/)

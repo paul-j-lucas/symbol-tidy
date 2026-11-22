@@ -1,5 +1,23 @@
+2026-11-22  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * type_traits.h, util.h: s/TO_CHAR_PTR_EXPR/TO_TYPE_PTR_EXPR/ -- only.
+   * type_traits.h, util.h: Revert "Eliminated VOID_TO_CHAR_PTR;
+     s/TO_CHAR_PTR_EXPR/TO_TYPE_PTR_EXPR/"
+   * type_traits.h, util.h: Eliminated VOID_TO_CHAR_PTR;
+     s/TO_CHAR_PTR_EXPR/TO_TYPE_PTR_EXPR/
+
+2026-11-21  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * type_traits.h, util.h: Added ().
+   * Doxygen.sed: Hiding same-named enum typedefs.
+   * cli_options.c, config_file.c, cxx_symbol.c, cxx_symbol.h, source.c,
+     symbol-tidy.c, symbol.c, symbol.h, verbose.c, verbose.h: Better verbose
+     section handling.
+
 2026-11-20  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * cxx_symbol.c: Added code coverage exclusion lines.
+   * src/Makefile.am: Added STIDY_FLAGS.
    * config_file.c: Elimininated a few *_cmp and *_hash functions.
    * fnv1a.c, fnv1a.h, symbol.c: Added fnv1a_str_ptr().
    * clang_util.c, symbol.c: Moved EnumDecl to tidy_Cursor_isForwardDeclarable.
