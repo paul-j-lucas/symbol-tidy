@@ -434,7 +434,7 @@
  * @return Returns A pointer to the member.
  */
 #define MEMBER_AT(OBJ_PTR,MBR_OFFSET) \
-  TO_VOID_PTR_EXPR( TO_CHAR_PTR_EXPR( (OBJ_PTR) ) + (MBR_OFFSET) )
+  TO_VOID_PTR_EXPR( TO_TYPE_PTR_EXPR( char, (OBJ_PTR) ) + (MBR_OFFSET) )
 
 /**
  * Concatenate \a A and \a B together to form a single token.
@@ -596,8 +596,8 @@
  * @sa realloc_or_exit()
  * @sa #MALLOC()
  */
-#define REALLOC(PTR,N) ((PTR) = realloc_or_exit(                      \
-    (PTR), sizeof *VOID_TO_CHAR_PTR(PTR) * STATIC_CAST( size_t, (N) ) \
+#define REALLOC(PTR,N) ((PTR) = realloc_or_exit( (PTR),                 \
+    sizeof *TO_TYPE_PTR_EXPR(char, (PTR)) * STATIC_CAST( size_t, (N) )  \
   ))
 
 /**
@@ -764,20 +764,6 @@
 # define VA_OPT_EMPTY_1(TOKENS,...) /* nothing */
   /// @endcond
 #endif /* HAVE___VA_OPT__ */
-
-/**
- * Casts a `void` pointer to a `char` pointer.
- *
- * @param PTR The pointer.
- * @return If \a PTR is a `void*` or `void const*`, returns it cast to either
- * `char*` or `char const*`, respectively; otherwise returns \a PTR as-is.
- */
-#define VOID_TO_CHAR_PTR(PTR)         \
-  _Generic( (PTR),                    \
-    void*       : (char      *)(PTR), \
-    void const* : (char const*)(PTR), \
-    default     :              (PTR)  \
-  )
 
 ////////// extern constants ///////////////////////////////////////////////////
 
