@@ -645,6 +645,18 @@ inline unsigned tidy_getTokenLocation_Line( CXTranslationUnit tu,
 }
 
 /**
+ * Similar to `clang_getSpecializedCursorTemplate()` except returns \a cursor
+ * if it's not an instantiation of a template instead of returning an invalid
+ * cursor.
+ *
+ * @param cursor The cursor to get the template cursor for.
+ * @return Returns the specialized cursor template of \a cursor if it's an
+ * instantiation of a template or \a cursor if not.
+ */
+NODISCARD
+CXCursor tidy_getSpecializedCursorTemplate( CXCursor cursor );
+
+/**
  * Calls `clang_isCursorDefinition()` but, in C, also considers tentative
  * definitions as definitions.
  *
@@ -816,7 +828,7 @@ NODISCARD
 CXType tidy_Type_getUnderlyingType( CXType type );
 
 /**
- * Similar to `clang_visitChildren()`, but visit the children of the class
+ * Similar to `clang_visitChildren()`, but visits the children of the class
  * definition cursor of \a cursor.
  *
  * @param cls_csr The class cursor whose definition children to visit.

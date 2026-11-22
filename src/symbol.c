@@ -2352,6 +2352,7 @@ void svd_init( symbols_visit_data *svd, tidy_source *source ) {
 tidy_symbol* symbol_add( CXCursor sym_csr, symbols_visit_data *svd ) {
   assert( svd != NULL );
 
+  sym_csr = tidy_getSpecializedCursorTemplate( sym_csr );
   sym_csr = clang_getCanonicalCursor( sym_csr );
   if ( cursor_is_excluded( sym_csr, svd->source ) )
     return NULL;

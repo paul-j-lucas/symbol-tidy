@@ -1358,6 +1358,21 @@ CXFileUniqueID tidy_getFileUniqueID( CXFile file ) {
   return fuid;
 }
 
+CXCursor tidy_getSpecializedCursorTemplate( CXCursor cursor ) {
+  CXCursor const tmpl_csr = clang_getSpecializedCursorTemplate( cursor );
+  if ( tidy_Cursor_isInvalid( tmpl_csr ) )
+    return cursor;
+
+  //
+  // An implicit instantiation has the same location as its pattern; an
+  // explicit specialization (template<> ...) is written elsewhere and is a
+  // symbol in its own right, so leave it alone.
+  //
+  CXSourceLocation const loc  = clang_getCursorLocation( cursor );
+  CXSourceLocation const tmpl_loc = clang_getCursorLocation( tmpl_csr );
+  return clang_equalLocations( loc, tmpl_loc ) ? tmpl_csr : cursor;
+}
+
 bool tidy_isCursorDefinition( CXCursor cursor ) {
   if ( clang_isCursorDefinition( cursor ) )
     return true;
