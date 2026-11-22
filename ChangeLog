@@ -1,5 +1,6 @@
 2026-11-22  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * configure.ac: Updated version to 1.0.
    * type_traits.h, util.h: s/TO_CHAR_PTR_EXPR/TO_TYPE_PTR_EXPR/ -- only.
    * type_traits.h, util.h: Revert "Eliminated VOID_TO_CHAR_PTR;
      s/TO_CHAR_PTR_EXPR/TO_TYPE_PTR_EXPR/"
