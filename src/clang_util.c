@@ -596,8 +596,8 @@ static bool isOrInClassTemplate_impl( CXCursor cursor,
       case CXCursor_ClassDecl:
       case CXCursor_StructDecl:
       case CXCursor_UnionDecl:;
-        CXCursor const sct_csr = clang_getSpecializedCursorTemplate( cursor );
-        if ( !tidy_Cursor_isInvalid( sct_csr ) )
+        CXCursor const tmpl_csr = clang_getSpecializedCursorTemplate( cursor );
+        if ( !tidy_Cursor_isInvalid( tmpl_csr ) )
           return true;
         break;
 
