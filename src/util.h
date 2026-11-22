@@ -434,7 +434,7 @@
  * @return Returns A pointer to the member.
  */
 #define MEMBER_AT(OBJ_PTR,MBR_OFFSET) \
-  TO_VOID_PTR_EXPR( TO_CHAR_PTR_EXPR( (OBJ_PTR) ) + (MBR_OFFSET) )
+  TO_VOID_PTR_EXPR( TO_TYPE_PTR_EXPR( char, (OBJ_PTR) ) + (MBR_OFFSET) )
 
 /**
  * Concatenate \a A and \a B together to form a single token.
