@@ -61,6 +61,7 @@ TESTS+=	tests/auto_delete_pool.test \
 	tests/encoded_char.test \
 	tests/exception-unused.test \
 	tests/exception-used.test \
+	tests/func-template.test \
 	tests/functor.test \
 	tests/ignore-cxx.test \
 	tests/new-delete.test \
