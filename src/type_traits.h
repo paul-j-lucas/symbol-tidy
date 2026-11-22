@@ -210,21 +210,20 @@
   )
 
 /**
- * Converts \a EXPR (a pointer expression) to a pointer to \a TYPE preserving
+ * Converts \a EXPR (a pointer expression) to a pointer to `char` preserving
  * `const`-ness.
  *
- * @param TYPE The type to convert the pointer to.
  * @param EXPR A pointer expression.
  * @return Returns:
- *  + `(TYPE*)(EXPR)` only if \a EXPR is a pointer to non-`const`; or:
- *  + `(TYPE const*)(EXPR)` only if \a EXPR is a pointer to `const`.
+ *  + `(char*)(EXPR)` only if \a EXPR is a pointer to non-`const`; or:
+ *  + `(char const*)(EXPR)` only if \a EXPR is a pointer to `const`.
  *
  * @sa #TO_VOID_PTR_EXPR()
  */
-#define TO_TYPE_PTR_EXPR(TYPE,EXPR)     \
+#define TO_CHAR_PTR_EXPR(EXPR)          \
   _Generic( TO_VOID_PTR_EXPR( (EXPR) ), \
-    void*       : (TYPE      *)(EXPR),  \
-    void const* : (TYPE const*)(EXPR)   \
+    void*       : (char      *)(EXPR),  \
+    void const* : (char const*)(EXPR)   \
   )
 
 /**
@@ -236,7 +235,7 @@
  *  + `(void*)(EXPR)` only if \a EXPR is a pointer to non-`const`; or:
  *  + `(void const*)(EXPR)` only if \a EXPR is a pointer to `const`.
  *
- * @sa #TO_TYPE_PTR_EXPR()
+ * @sa #TO_CHAR_PTR_EXPR()
  */
 #define TO_VOID_PTR_EXPR(EXPR)    (1 ? (EXPR) : (void*)(EXPR))
 
