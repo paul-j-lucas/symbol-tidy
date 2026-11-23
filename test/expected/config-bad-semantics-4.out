@@ -1,0 +1,4 @@
+$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --config=bad-semantics-4.toml minimal.cpp
+"bad-semantics-4.toml":1: error: "foo@bar": invalid C/C++ name: '@': unexpected character
+symbol-tidy: 1 error generated
+
