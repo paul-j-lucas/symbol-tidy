@@ -130,10 +130,10 @@ void* ht_iterator_next( ht_iterator_t *it ) {
 }
 
 void ht_table_cleanup( hash_table_t *table, ht_free_fn_t free_fn ) {
-  if ( table == NULL || table->buckets == NULL )
-    return;
-  ht_table_clear( table, free_fn );
-  free( table->buckets );
+  if ( table != NULL && table->buckets != NULL ) {
+    ht_table_clear( table, free_fn );
+    free( table->buckets );
+  }
   *table = (hash_table_t){ 0 };
 }
 
@@ -162,6 +162,7 @@ void ht_table_clear( hash_table_t *table, ht_free_fn_t free_fn ) {
 
 void ht_table_delete( hash_table_t *table, ht_entry_t *entry ) {
   assert( table != NULL );
+  assert( table->size > 0 );
   assert( entry != NULL );
 
   entry->prev->next = entry->next;
