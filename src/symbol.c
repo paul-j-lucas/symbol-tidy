@@ -1399,6 +1399,9 @@ static void symbol_print( tidy_symbol const *sym, size_t mbr_off ) {
  * @param file The file to print to.
  */
 static void symbol_print_name_quoted( tidy_symbol const *sym, FILE *file ) {
+  assert( sym != NULL );
+  assert( file != NULL );
+
   fputc( '"', file );
   if ( sym->cxx_prototype != NULL )
     fputs_escaped( sym->cxx_prototype, file );
