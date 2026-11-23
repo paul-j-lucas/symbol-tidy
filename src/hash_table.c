@@ -216,6 +216,7 @@ void ht_table_init( hash_table_t *table, ht_dloc_t dloc, double max_lf,
 ht_insert_rv_t ht_table_insert( hash_table_t *table, void *data,
                                 size_t data_size ) {
   assert( table != NULL );
+  assert( table->buckets != NULL );
   assert( data != NULL );
   assert( table->dloc == HT_DPTR || data_size > 0 );
 
