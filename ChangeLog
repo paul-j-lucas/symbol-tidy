@@ -1,5 +1,45 @@
+2026-11-23  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * ignore-paths.toml, config-ignore-paths.out: Duplicate ignore-paths test.
+   * test/Makefile.am, bad-semantics-4.toml, config-bad-semantics-4.out,
+     config-bad-semantics-4.test: Invalid symbol name test.
+   * ignore-symbols.toml, config-ignore-symbols.out: Updated test.
+   * root-symbols.toml, config-root-symbols.out: Updated test.
+   * test/Makefile.am, root-symbols.c, root-symbols.h, root-symbols.toml,
+     config-root-symbols.out, config-root-symbols.test: Added root-symbols
+     test.
+   * test/Makefile.am, ignore-paths.c, ignore-paths.h, ignore-paths.toml,
+     config-ignore-paths.out, config-ignore-paths.test: Added ignore-paths
+     test.
+   * clang_util.c, source.c, str_util.c, str_util.h: Added null_or_empty().
+   * run_test.sh: s/INCLUDE_TIDY_TEST/SYMBOL_TIDY_TEST/
+   * test/Makefile.am, bad-semantics-3.toml, config-bad-semantics-3.out,
+     config-bad-semantics-3.test: Added another config. file bad semantics
+     test.
+   * xdg_config_home.out, xdg_config_home.test: More XDG tests.
+   * test/Makefile.am, xdg_config_home/symbol-tidy/config.toml,
+     xdg_config_home.out, xdg_config_home.test: Added XDG_CONFIG_HOME test.
+   * config_file.c, test/Makefile.am, home/.config/symbol-tidy/config.toml,
+     home/README.txt, home.out, home.test: Added home.test;
+     s/ignore-unneeded-extern/ignore-unneeded-externs/
+   * hash_table.c: Added assert().
+   * config_file.c: Now initializing global_value.
+   * symbol.c, c-cxx-1.out, c-cxx-1.test: Now including source path in
+     symbols-dump.
+   * symbol.c: Added asserts.
+   * symbol.c: s/symbol_name_for_print/symbol_print_name_quoted/
+   * symbol.c: Moved cursor_is_config_root() into "else".
+   * symbol.c: Now calling tidy_Cursor_getScopedSpelling() only once per
+     symbol_add().
+
 2026-11-22  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * symbol.c: Added cursor_is_ignored().
+   * test/Makefile.am, func-template.cpp, func-template.out,
+     func-template.test: Added function template test.
+   * clang_util.c, clang_util.h, symbol.c: Fixed function template
+     specializations.
+   * clang_util.c: Fixed unscoped enumeration scoped names.
    * configure.ac: Updated version to 1.0.
    * type_traits.h, util.h: s/TO_CHAR_PTR_EXPR/TO_TYPE_PTR_EXPR/ -- only.
    * type_traits.h, util.h: Revert "Eliminated VOID_TO_CHAR_PTR;
