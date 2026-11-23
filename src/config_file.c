@@ -451,7 +451,7 @@ static void ignore_cxx_move_ctors_parse( config_parse_fn_args const *config ) {
 }
 
 /**
- * Parses the value of an `"ignore-unneeded-forwards"` key.
+ * Parses the value of an `"ignore-undefined"` key.
  *
  * @param config The config_parse_fn_args to use.
  */
