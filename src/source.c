@@ -56,7 +56,7 @@
 
 ////////// local variables ////////////////////////////////////////////////////
 
-static hash_table_t source_file_set;    ///< Source files being tidied.
+static hash_table_t source_path_set;    ///< Source files being tidied.
 static CXIndex      tidy_index;         ///< Libclang index.
 
 ////////// local functions ////////////////////////////////////////////////////
@@ -345,7 +345,7 @@ static void source_parse_impl( tidy_source *source ) {
  * Cleans-up sources.
  */
 static void sources_cleanup( void ) {
-  ht_table_cleanup( &source_file_set, /*free_fn=*/NULL );
+  ht_table_cleanup( &source_path_set, /*free_fn=*/NULL );
   if ( tidy_index != NULL )
     clang_disposeIndex( tidy_index );
 }
@@ -356,7 +356,7 @@ bool is_source_path( char const *path ) {
   if ( null_or_empty( path ) )
     return false;                       // LCOV_EXCL_LINE
   path = path_no_dot_slash( path );
-  ht_entry_t const *const found_ht = ht_table_find( &source_file_set, path );
+  ht_entry_t const *const found_ht = ht_table_find( &source_path_set, path );
   return found_ht != NULL;
 }
 
@@ -382,7 +382,7 @@ bool source_path_add( char const *path ) {
     return false;
   path = path_no_dot_slash( path );
   ht_insert_rv_t const hti = ht_table_insert(
-    &source_file_set, CONST_CAST( char*, path ), strlen( path ) + 1/*'\0'*/
+    &source_path_set, CONST_CAST( char*, path ), strlen( path ) + 1/*'\0'*/
   );
   return hti.inserted;
 }
@@ -391,7 +391,7 @@ void sources_init( void ) {
   ASSERT_RUN_ONCE();
 
   ht_table_init(
-    &source_file_set, HT_DINT, 2.0, 256,
+    &source_path_set, HT_DINT, 2.0, 256,
     POINTER_CAST( ht_cmp_fn_t, &strcmp ),
     POINTER_CAST( ht_hash_fn_t, &fnv1a_str )
   );
