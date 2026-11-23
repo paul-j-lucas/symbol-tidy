@@ -194,41 +194,68 @@ static inline char const* symbol_name_for_print( tidy_symbol const *sym ) {
 ////////// local functions ////////////////////////////////////////////////////
 
 /**
- * Gets whether \a sym_csr is a definition of the kind of symbol that could be
- * given internal linkage: a non-member, non-template function or variable that
- * currently has external linkage.
+ * Gets whether \a cursor is nested, at any depth, within a class (or
+ * enumeration) that is ignored via the `ignore-symbols` key.
  *
- * @param sym_csr The definition's cursor to check.
- * @return Returns `true` only if \a sym_csr could be `static`.
+ * @param cursor The cursor to check.
+ * @return Returns `true` only if \a cursor is within an ignored class (or
+ * enumeration).
  */
 NODISCARD
-static bool cursor_is_maybe_int_link( CXCursor sym_csr ) {
-  enum CXCursorKind const kind = clang_getCursorKind( sym_csr );
-  switch ( kind ) {
-    case CXCursor_FunctionDecl:
-    case CXCursor_VarDecl:
-      break;
-    default:
-      return false;
-  } // switch
+static bool cursor_in_ignored_class( CXCursor cursor ) {
+  CXCursor scope_csr = clang_getCursorSemanticParent( cursor );
 
-  if ( !tidy_Cursor_isExternalLinkage( sym_csr ) )
-    return false;                       // already static
+  while ( !tidy_Cursor_isInvalid( scope_csr ) ) {
+    enum CXCursorKind const kind = clang_getCursorKind( scope_csr );
+    if ( kind == CXCursor_TranslationUnit )
+      break;
+
+    if ( (tidy_Cursor_isClassDecl( scope_csr ) || kind == CXCursor_EnumDecl) &&
+         cursor_is_ignored( scope_csr ) ) {
+      return true;
+    }
+
+    scope_csr = clang_getCursorSemanticParent( scope_csr );
+  } // while
+
+  return false;
+}
+
+/**
+ * Gets whether \a sym_csr is configured to be a root symbol, either:
+ *
+ *  + Directly, via cursor_is_explicit_config_root(); or:
+ *  + Being a C++ member function of a class that's a root so the member
+ *    functions of a root class needn't be listed individually.
+ *
+ * @remarks Being configured as a root isn't sufficient to be treated as one.
+ *
+ * @param sym_csr The symbol's (canonical) cursor to check.
+ * @param sym_name The scoped name of the symbol.
+ * @return Returns `true` only if \a sym_csr is configured to be a root.
+ *
+ * @sa cursor_is_explicit_config_root()
+ */
+NODISCARD
+static bool cursor_is_config_root( CXCursor sym_csr, char const *sym_name ) {
+  assert( sym_name != NULL );
+
+  if ( cursor_is_explicit_config_root( sym_csr, sym_name ) )
+    return true;
+  if ( !tidy_Cursor_isClassFunction( sym_csr ) )
+    return false;
 
   CXCursor const parent_csr = clang_getCursorSemanticParent( sym_csr );
-  if ( tidy_Cursor_isClassDecl( parent_csr ) )
-    return false;                       // static data member
-
-  CXCursor const tmpl_csr = clang_getSpecializedCursorTemplate( sym_csr );
-  if ( !tidy_Cursor_isInvalid( tmpl_csr ) ) {
-    //
-    // If it's not invalid, it means it's a function template specialization
-    // which means it can't be static.
-    //
+  CXCursor const cls_csr = clang_getCanonicalCursor( parent_csr );
+  if ( !tidy_Cursor_isClassDecl( cls_csr ) )
     return false;
-  }
 
-  return true;
+  char *const cls_name = tidy_Cursor_getScopedSpelling( cls_csr );
+  if ( cls_name == NULL )
+    return false;                       // LCOV_EXCL_LINE
+  bool const is_root = cursor_is_explicit_config_root( cls_csr, cls_name );
+  free( cls_name );
+  return is_root;
 }
 
 /**
@@ -280,34 +307,6 @@ static bool cursor_is_definition( CXCursor cursor ) {
     default:
       return false;
   } // switch
-}
-
-/**
- * Gets whether \a cursor is nested, at any depth, within a class (or
- * enumeration) that is ignored via the `ignore-symbols` key.
- *
- * @param cursor The cursor to check.
- * @return Returns `true` only if \a cursor is within an ignored class (or
- * enumeration).
- */
-NODISCARD
-static bool cursor_in_ignored_class( CXCursor cursor ) {
-  CXCursor scope_csr = clang_getCursorSemanticParent( cursor );
-
-  while ( !tidy_Cursor_isInvalid( scope_csr ) ) {
-    enum CXCursorKind const kind = clang_getCursorKind( scope_csr );
-    if ( kind == CXCursor_TranslationUnit )
-      break;
-
-    if ( (tidy_Cursor_isClassDecl( scope_csr ) || kind == CXCursor_EnumDecl) &&
-         cursor_is_ignored( scope_csr ) ) {
-      return true;
-    }
-
-    scope_csr = clang_getCursorSemanticParent( scope_csr );
-  } // while
-
-  return false;
 }
 
 /**
@@ -424,43 +423,6 @@ done:
 }
 
 /**
- * Gets whether \a sym_csr is configured to be a root symbol, either:
- *
- *  + Directly, via cursor_is_explicit_config_root(); or:
- *  + Being a C++ member function of a class that's a root so the member
- *    functions of a root class needn't be listed individually.
- *
- * @remarks Being configured as a root isn't sufficient to be treated as one.
- *
- * @param sym_csr The symbol's (canonical) cursor to check.
- * @param sym_name The scoped name of the symbol.
- * @return Returns `true` only if \a sym_csr is configured to be a root.
- *
- * @sa cursor_is_explicit_config_root()
- */
-NODISCARD
-static bool cursor_is_config_root( CXCursor sym_csr, char const *sym_name ) {
-  assert( sym_name != NULL );
-
-  if ( cursor_is_explicit_config_root( sym_csr, sym_name ) )
-    return true;
-  if ( !tidy_Cursor_isClassFunction( sym_csr ) )
-    return false;
-
-  CXCursor const parent_csr = clang_getCursorSemanticParent( sym_csr );
-  CXCursor const cls_csr = clang_getCanonicalCursor( parent_csr );
-  if ( !tidy_Cursor_isClassDecl( cls_csr ) )
-    return false;
-
-  char *const cls_name = tidy_Cursor_getScopedSpelling( cls_csr );
-  if ( cls_name == NULL )
-    return false;                       // LCOV_EXCL_LINE
-  bool const is_root = cursor_is_explicit_config_root( cls_csr, cls_name );
-  free( cls_name );
-  return is_root;
-}
-
-/**
  * Gets whether \a sym_csr is explicitly listed as a root symbol via the config
  * file's `root-symbols` or `root-symbols-from` keys.
  *
@@ -510,6 +472,44 @@ static bool cursor_is_ignored( CXCursor cursor ) {
 
   free( name );
   return is_ignored;
+}
+
+/**
+ * Gets whether \a sym_csr is a definition of the kind of symbol that could be
+ * given internal linkage: a non-member, non-template function or variable that
+ * currently has external linkage.
+ *
+ * @param sym_csr The definition's cursor to check.
+ * @return Returns `true` only if \a sym_csr could be `static`.
+ */
+NODISCARD
+static bool cursor_is_maybe_int_link( CXCursor sym_csr ) {
+  enum CXCursorKind const kind = clang_getCursorKind( sym_csr );
+  switch ( kind ) {
+    case CXCursor_FunctionDecl:
+    case CXCursor_VarDecl:
+      break;
+    default:
+      return false;
+  } // switch
+
+  if ( !tidy_Cursor_isExternalLinkage( sym_csr ) )
+    return false;                       // already static
+
+  CXCursor const parent_csr = clang_getCursorSemanticParent( sym_csr );
+  if ( tidy_Cursor_isClassDecl( parent_csr ) )
+    return false;                       // static data member
+
+  CXCursor const tmpl_csr = clang_getSpecializedCursorTemplate( sym_csr );
+  if ( !tidy_Cursor_isInvalid( tmpl_csr ) ) {
+    //
+    // If it's not invalid, it means it's a function template specialization
+    // which means it can't be static.
+    //
+    return false;
+  }
+
+  return true;
 }
 
 /**
