@@ -1,0 +1,1 @@
+#define UNUSED_SYMBOL 1

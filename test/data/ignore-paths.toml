@@ -1,0 +1,7 @@
+[symbol-tidy]
+ignore-paths = [
+  "ignore-paths.h",
+  "enoent.c"
+]
+
+# vim:se et sw=2 ts=2:

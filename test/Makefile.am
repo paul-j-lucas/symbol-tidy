@@ -49,6 +49,7 @@ TESTS+=	tests/config-bad-semantics-1.test \
 	tests/config-bad-semantics-3.test \
 	tests/config-bad-toml.test \
 	tests/config-enoent.test \
+	tests/config-ignore-paths.test \
 	tests/config-ignore-symbols.test
 
 # Error tests.
