@@ -405,6 +405,10 @@ bool tidy_Cursor_isLocalVarDecl( CXCursor cursor );
  * @param lang The language to use.
  * @return Returns `true` only if \a cursor has a name that is reserved in \a
  * lang.
+ *
+ * @note We can't use `clang_getCursorLanguage()` on \a cursor because libclang
+ * doesn't initially set what it thinks the current language is until it
+ * encounters something language-specific.
  */
 NODISCARD
 bool tidy_Cursor_isReservedName( CXCursor cursor, enum CXLanguageKind lang );
