@@ -56,7 +56,7 @@ TESTS+=	tests/enoent.test \
 
 # Other tests.
 TESTS+=	tests/home.test \
-	tests/xdg_config_home.test
+	tests/xdg.test
 
 # C++ tests.
 TESTS+=	tests/auto_delete_pool.test \
