@@ -1350,6 +1350,7 @@ bool config_bool_get( config_bool *cb, char const *s ) {
 
 void config_bool_init( config_bool *cb ) {
   assert( cb != NULL );
+  cb->global_value = false;
   ht_table_init(
     &cb->bool_str_set, HT_DINT, 2.0, 10,
     //
