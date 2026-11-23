@@ -2,6 +2,7 @@ EXPECTED_EXIT=0
 
 test_symbol_tidy $TIDY_TEST_OPTIONS \
   $TIDY_TEST_CONFIG \
+  -Xtidy --verbose=s \
   c-cxx.c c-cxx.cpp c-cxx-main.cpp
 
 printf '%s\n' c-cxx.c c-cxx.cpp c-cxx-main.cpp | \

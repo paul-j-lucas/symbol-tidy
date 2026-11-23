@@ -2447,7 +2447,7 @@ tidy_symbol* symbol_add( CXCursor sym_csr, symbols_visit_data *svd ) {
 
   if ( IS_VERBOSE( SYMBOLS ) ) {
     if ( verbose_new_section( &svd->printed_symbols_header  ) )
-      verbose_printf( "symbols:\n" );
+      verbose_printf( "%s symbols:\n", svd->source->path );
     verbose_printf( "  " );
     symbol_print_name_quoted( sym, stdout );
     putchar( '\n' );
