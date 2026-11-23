@@ -313,48 +313,22 @@ static bool cursor_is_definition( CXCursor cursor ) {
  * Gets whether \a sym_csr should be excluded from the global set.
  *
  * @param sym_csr The symbol's cursor to check.
- * @param source The tidy_source to use.
+ * @param sym_file The cursor's file.
+ * @param sym_name The scoped name of \a sym_csr.
  * @return Returns `true` only if \a sym_csr is excluded.
  */
 NODISCARD
-static bool cursor_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
-  if ( tidy_Cursor_isInvalid( sym_csr ) )
-    return true;                        // LCOV_EXCL_LINE
-
-  CXFile const sym_file = tidy_getCursorLocation_File( sym_csr );
-  if ( sym_file == NULL )
-    return true;
-
-  assert( source != NULL );
-
-  if ( tidy_Cursor_inAnonymousClass( sym_csr ) )
-    return true;
-
-  //
-  // We can't use clang_getCursorLanguage() because libclang doesn't initially
-  // set what it thinks the current language is until it encounters something
-  // language-specific.  So just use source->lang.
-  //
-  if ( tidy_Cursor_isReservedName( sym_csr, source->lang ) )
-    return true;
-
-  char *cls_name = NULL;
-  bool  is_excluded = true;
-  char *sym_scoped_name = tidy_Cursor_getScopedSpelling( sym_csr );
-
-  if ( sym_scoped_name == NULL )
-    goto done;
-
-  if ( cursor_in_ignored_class( sym_csr ) )
-    goto done;
-
-  is_excluded = false;
+static bool cursor_is_excluded( CXCursor sym_csr, CXFile sym_file,
+                                char const *sym_name ) {
+  assert( sym_name != NULL );
 
   CXString const    sym_path_cxs = clang_getFileName( sym_file );
   char const *const sym_path_cs = clang_getCString( sym_path_cxs );
-  bool const ignored = config_symbol_is_ignored( sym_scoped_name, sym_path_cs );
+  bool const ignored = config_symbol_is_ignored( sym_name, sym_path_cs );
   clang_disposeString( sym_path_cxs );
 
+  char                   *cls_name = NULL;
+  bool                    is_excluded = false;
   CXCursor const          parent_csr = clang_getCursorSemanticParent( sym_csr );
   enum CXCursorKind const sym_kind = clang_getCursorKind( sym_csr );
 
@@ -416,9 +390,7 @@ static bool cursor_is_excluded( CXCursor sym_csr, tidy_source const *source ) {
       /* suppress warning */;
   } // switch
 
-done:
   free( cls_name );
-  free( sym_scoped_name );
   return is_excluded;
 }
 
@@ -2369,20 +2341,39 @@ tidy_symbol* symbol_add( CXCursor sym_csr, symbols_visit_data *svd ) {
 
   sym_csr = tidy_getSpecializedCursorTemplate( sym_csr );
   sym_csr = clang_getCanonicalCursor( sym_csr );
-  if ( cursor_is_excluded( sym_csr, svd->source ) )
+
+  if ( tidy_Cursor_isInvalid( sym_csr ) )
     return NULL;
+  CXFile const sym_file = tidy_getCursorLocation_File( sym_csr );
+  if ( sym_file == NULL )
+    return NULL;
+  if ( tidy_Cursor_inAnonymousClass( sym_csr ) )
+    return NULL;
+  if ( tidy_Cursor_isReservedName( sym_csr, svd->source->lang ) )
+    return NULL;
+  if ( cursor_in_ignored_class( sym_csr ) )
+    return NULL;
+
+  char *sym_name = tidy_Cursor_getScopedSpelling( sym_csr );
+  if ( sym_name == NULL )
+    return NULL;
+
+  tidy_symbol *sym = NULL;
+
+  if ( cursor_is_excluded( sym_csr, sym_file, sym_name ) )
+    goto skip;
 
   char *key = tidy_getCursorUSR( sym_csr );
   if ( unlikely( key == NULL ) )
-    return NULL;                        // LCOV_EXCL_LINE
+    goto skip;                          // LCOV_EXCL_LINE
 
   tidy_symbol new_sym = {
     .key = str_move( &key ),
-    .name = tidy_Cursor_getScopedSpelling( sym_csr )
+    .name = str_move( &sym_name )
   };
   ht_insert_rv_t const hti =
     ht_table_insert( &tidy_symbol_set, &new_sym, sizeof new_sym );
-  tidy_symbol *const sym = HT_DINT( hti.entry );
+  sym = HT_DINT( hti.entry );
   if ( !hti.inserted ) {
     symbol_cleanup( &new_sym );
     goto done;
@@ -2472,6 +2463,8 @@ done:
     sym->dec_loc = loc_from_SourceLocation( sloc );
   }
 
+skip:
+  free( sym_name );
   return sym;
 }
 
