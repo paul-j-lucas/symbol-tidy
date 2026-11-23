@@ -8,6 +8,7 @@ ignore-symbols = [
 [ignore-symbols.cpp]
 ignore-symbols = [
   "*::const_pointer",
+  "const_reference",
   "const_reference"
 ]
 
