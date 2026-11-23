@@ -1,0 +1,4 @@
+$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --config=bad-semantics-3.toml minimal.c
+"bad-semantics-3.toml":2,1: error: "color": key not allowed in source table; allowed only in symbol-tidy table
+symbol-tidy: 1 error generated
+
