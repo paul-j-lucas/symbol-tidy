@@ -93,8 +93,10 @@ struct tidy_header {
 
 ////////// local functions ////////////////////////////////////////////////////
 
+
 NODISCARD
-static bool cursor_is_explicit_config_root( CXCursor, char const* );
+static bool cursor_is_explicit_config_root( CXCursor, char const* ),
+            cursor_is_ignored( CXCursor );
 
 static void symbol_update_macro_name_loc( tidy_symbol*, CXFile,
                                           symbols_visit_data const* );
@@ -297,21 +299,9 @@ static bool cursor_in_ignored_class( CXCursor cursor ) {
     if ( kind == CXCursor_TranslationUnit )
       break;
 
-    if ( tidy_Cursor_isClassDecl( scope_csr ) || kind == CXCursor_EnumDecl ) {
-      CXFile const  scope_file = tidy_getCursorLocation_File( scope_csr );
-      char *const   scope_name = tidy_Cursor_getScopedSpelling( scope_csr );
-      bool          is_ignored = false;
-
-      if ( scope_file != NULL && scope_name != NULL && scope_name[0] != '\0' ) {
-        CXString const    path_cxs = clang_getFileName( scope_file );
-        char const *const path_cs = clang_getCString( path_cxs );
-        is_ignored = config_symbol_is_ignored( scope_name, path_cs );
-        clang_disposeString( path_cxs );
-      }
-      free( scope_name );
-
-      if ( is_ignored )
-        return true;
+    if ( (tidy_Cursor_isClassDecl( scope_csr ) || kind == CXCursor_EnumDecl) &&
+         cursor_is_ignored( scope_csr ) ) {
+      return true;
     }
 
     scope_csr = clang_getCursorSemanticParent( scope_csr );
@@ -495,6 +485,31 @@ static bool cursor_is_explicit_config_root( CXCursor sym_csr,
 
   clang_disposeString( path_cxs );
   return is_root;
+}
+
+/**
+ * Gets whether \a cursor should be ignored.
+ *
+ * @param cursor The cursor to check.
+ * @return Returns `true` only if \a cursor should be ignored.
+ */
+NODISCARD
+static bool cursor_is_ignored( CXCursor cursor ) {
+  CXFile const file = tidy_getCursorLocation_File( cursor );
+  if ( file == NULL )
+    return false;
+
+  char *const name = tidy_Cursor_getScopedSpelling( cursor );
+  bool is_ignored = false;
+  if ( name != NULL && name[0] != '\0' ) {
+    CXString const    path_cxs = clang_getFileName( file );
+    char const *const path_cs = clang_getCString( path_cxs );
+    is_ignored = config_symbol_is_ignored( name, path_cs );
+    clang_disposeString( path_cxs );
+  }
+
+  free( name );
+  return is_ignored;
 }
 
 /**
