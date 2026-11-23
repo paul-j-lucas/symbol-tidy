@@ -1,0 +1,10 @@
+EXPECTED_EXIT=1
+
+(
+  export XDG_CONFIG_HOME="$PWD/data/xdg_config_home"
+
+  test_symbol_tidy $TIDY_TEST_OPTIONS \
+    fwd_dec.c
+)
+
+# vim:set syntax=bash et sw=2 ts=2:
