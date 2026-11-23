@@ -4,3 +4,5 @@ root-symbols = [
   "root_var"
 ]
 root-symbols-from = "root-symbols.h"
+
+# vim:se et sw=2 ts=2:

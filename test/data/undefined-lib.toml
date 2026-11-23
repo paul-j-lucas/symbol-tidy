@@ -1,2 +1,4 @@
 [symbol-tidy]
 root-symbols-from = "undefined-lib.h"
+
+# vim:se et sw=2 ts=2:

@@ -3,3 +3,5 @@ ignore-cxx-copy-ctors = true
 ignore-cxx-move-ctors = true
 ignore-cxx-copy-assigns = true
 ignore-cxx-move-assigns = true
+
+# vim:se et sw=2 ts=2:

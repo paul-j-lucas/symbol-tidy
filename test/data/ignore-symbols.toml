@@ -10,3 +10,5 @@ ignore-symbols = [
   "*::const_pointer",
   "const_reference"
 ]
+
+# vim:se et sw=2 ts=2:
