@@ -32,6 +32,7 @@
 #include "hash_table.h"
 #include "path_util.h"
 #include "print.h"
+#include "str_util.h"
 #include "symbol.h"
 #include "symbol-tidy.h"
 #include "util.h"
@@ -93,7 +94,7 @@ static void include_visitor( CXFile included_file,
   CXString const  path_cxs = clang_getFileName( included_file );
   char const     *path_cs = clang_getCString( path_cxs );
 
-  if ( unlikely( path_cs == NULL || path_cs[0] == '\0' ) )
+  if ( unlikely( null_or_empty( path_cs ) ) )
     goto skip;                              // LCOV_EXCL_LINE
   if ( path_is_absolute( path_cs ) )
     goto skip;
@@ -352,7 +353,7 @@ static void sources_cleanup( void ) {
 ////////// extern functions ///////////////////////////////////////////////////
 
 bool is_source_path( char const *path ) {
-  if ( path == NULL || path[0] == '\0' )
+  if ( null_or_empty( path ) )
     return false;                       // LCOV_EXCL_LINE
   path = path_no_dot_slash( path );
   ht_entry_t const *const found_ht = ht_table_find( &source_file_set, path );
