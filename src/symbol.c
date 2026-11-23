@@ -2411,20 +2411,15 @@ tidy_symbol* symbol_add( CXCursor sym_csr, symbols_visit_data *svd ) {
        tidy_Cursor_isExternalGlobalFunction( sym_csr ) ) {
     sym->is_root = true;
   }
-
-  //
-  // A library has no main(), so additional roots can be configured: by name,
-  // as all the symbols declared in a public API header, or as the member
-  // functions of a root class.  Since sym_csr is
-  // the canonical cursor, i.e., the first declaration, a function declared in
-  // an API header and defined in a source file is matched via its declaration
-  // in the header.
-  //
-  // Unlike is_root, a configured root isn't unconditionally used: it must also
-  // be defined or referenced.
-  //
-  if ( !sym->is_root && cursor_is_config_root( sym_csr, sym->name ) )
-    sym->is_root = true;
+  else {
+    //
+    // Additional roots can be configured, e.g., for a library that has no
+    // main(), by name, or by all the symbols declared in a public API header,
+    // or as the member functions of a root class.
+    //
+    if ( cursor_is_config_root( sym_csr, sym->name ) )
+      sym->is_root = true;
+  }
 
   if ( tidy_Cursor_isEnclosingScope( sym_csr ) )
     sym->is_scope = true;
