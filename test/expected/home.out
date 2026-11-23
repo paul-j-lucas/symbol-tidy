@@ -1,0 +1,7 @@
+$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers fwd_dec.c
+"fwd_dec.c": warning: unused symbols:
+   49,13 | "necessary_mutual_a"
+   50,13 | "necessary_mutual_b"
+   59,13 | "necessary_dead"
+symbol-tidy: 3 unused symbols
+

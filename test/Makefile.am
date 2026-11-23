@@ -50,9 +50,12 @@ TESTS+=	tests/config-bad-semantics-1.test \
 	tests/config-enoent.test \
 	tests/config-ignore-symbols.test
 
-# Error tests
+# Error tests.
 TESTS+=	tests/enoent.test \
 	tests/error.test
+
+# Other tests.
+TESTS+=	tests/home.test
 
 # C++ tests.
 TESTS+=	tests/auto_delete_pool.test \

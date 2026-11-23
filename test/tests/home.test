@@ -1,0 +1,11 @@
+EXPECTED_EXIT=1
+
+(
+  SYMBOL_TIDY_TEST=$(echo $SYMBOL_TIDY_TEST | sed 's/h//')
+  export HOME="$PWD/data/home"
+
+  test_symbol_tidy $TIDY_TEST_OPTIONS \
+    fwd_dec.c
+)
+
+# vim:set syntax=bash et sw=2 ts=2:

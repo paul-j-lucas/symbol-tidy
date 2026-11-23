@@ -1,0 +1,3 @@
+[symbol-tidy]
+ignore-unneeded-externs = true
+ignore-unneeded-forwards = true
