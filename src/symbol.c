@@ -98,6 +98,7 @@ NODISCARD
 static bool cursor_is_explicit_config_root( CXCursor, char const* ),
             cursor_is_ignored( CXCursor );
 
+static void symbol_print_name_quoted( tidy_symbol const*, FILE* );
 static void symbol_update_macro_name_loc( tidy_symbol*, CXFile,
                                           symbols_visit_data const* );
 
@@ -175,20 +176,6 @@ static inline bool symbol_is_undefined( tidy_symbol const *sym ) {
 NODISCARD
 static inline bool symbol_is_unused( tidy_symbol const *sym ) {
   return !sym->is_used && !sym->is_dead && !symbol_is_undefined( sym );
-}
-
-/**
- * Gets the name of \a sym that should be used for printing.
- *
- * @remarks For C, it's just the symbol's plain name; for C++, it's the
- * symbol's prototype so overloaded functions can be distinguished.
- *
- * @param sym The tidy_symbol to get the name of.
- * @return Returns said name.
- */
-NODISCARD
-static inline char const* symbol_name_for_print( tidy_symbol const *sym ) {
-  return sym->cxx_prototype != NULL ? sym->cxx_prototype : sym->name;
 }
 
 ////////// local functions ////////////////////////////////////////////////////
@@ -1079,9 +1066,9 @@ static void print_max_lf_stats( verbose_stat_ctx *vsc, size_t mbr_off,
 
   ++vsc->indent;
   verbose_statf( vsc, "%s-max-load-factor:\n", abbr );
-  verbose_statf( vsc,
-    "%s-name = \"%s\"\n", abbr, symbol_name_for_print( max_sym )
-  );
+  verbose_statf( vsc, "%s-name = ", abbr );
+  symbol_print_name_quoted( max_sym, stdout );
+  putchar( '\n' );
   if ( max_sym->def_loc.path != NULL )
     verbose_statf( vsc, "%s-path = \"%s\"\n", abbr, max_sym->def_loc.path );
   verbose_statf( vsc, "%s-load-factor = " TIDY_STAT_LF_FMT "\n", abbr, max_lf );
@@ -1392,7 +1379,8 @@ static void symbol_print( tidy_symbol const *sym, size_t mbr_off ) {
     color_end( stderr, sgr_locus );
   }
 
-  EPRINTF( " | \"%s\"", symbol_name_for_print( sym ) );
+  EPUTS( " | " );
+  symbol_print_name_quoted( sym, stderr );
   if ( is_def_in_macro ) {
     EPUTS( " (defined at " );
     loc_print( &sym->macro.spelling_loc );
@@ -1402,6 +1390,21 @@ static void symbol_print( tidy_symbol const *sym, size_t mbr_off ) {
     }
     EPUTC( ')' );
   }
+}
+
+/**
+ * Prints a symbol's name, quoted and escaped, to \a file.
+ *
+ * @param sym The tidy_symbol's name to print.
+ * @param file The file to print to.
+ */
+static void symbol_print_name_quoted( tidy_symbol const *sym, FILE *file ) {
+  fputc( '"', file );
+  if ( sym->cxx_prototype != NULL )
+    fputs_escaped( sym->cxx_prototype, file );
+  else
+    fputs( sym->name, file );
+  fputc( '"', file );
 }
 
 /**
@@ -2442,7 +2445,9 @@ tidy_symbol* symbol_add( CXCursor sym_csr, symbols_visit_data *svd ) {
   if ( IS_VERBOSE( SYMBOLS ) ) {
     if ( verbose_new_section( &svd->printed_symbols_header  ) )
       verbose_printf( "symbols:\n" );
-    verbose_printf( "  \"%s\"\n", symbol_name_for_print( sym ) );
+    verbose_printf( "  " );
+    symbol_print_name_quoted( sym, stdout );
+    putchar( '\n' );
   }
 
 done:
