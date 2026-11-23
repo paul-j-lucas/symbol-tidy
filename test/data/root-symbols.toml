@@ -1,0 +1,6 @@
+[symbol-tidy]
+root-symbols = [
+  "root_var",
+  "root_var"
+]
+root-symbols-from = "root-symbols.h"

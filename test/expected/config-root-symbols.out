@@ -1,0 +1,4 @@
+$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --config=root-symbols.toml root-symbols.c
+"root-symbols.toml":4,3: warning: "root_var" already rooted
+symbol-tidy: 1 warning generated
+
