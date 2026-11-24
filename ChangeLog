@@ -1,5 +1,10 @@
 2026-11-23  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * cli_options.c, cli_options.h, print.c, print.h: Moved print_usage().
+   * cli_options.c, print.c, print.h: Moved print_version.
+   * src/Makefile.am, cli_options.c, cli_options.h, cli_util.c, cli_util.h:
+     Split off cli_util.
+   * cli_options.c: Reworked way source file arguments are determined.
    * ignore-paths.toml, config-ignore-paths.out: Duplicate ignore-paths test.
    * test/Makefile.am, bad-semantics-4.toml, config-bad-semantics-4.out,
      config-bad-semantics-4.test: Invalid symbol name test.
