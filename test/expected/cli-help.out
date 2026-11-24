@@ -1,5 +1,5 @@
 $ symbol-tidy --help
-usage: symbol-tidy [-Xtidy tidy-option]... [compiler-option]... source-file...
+usage: symbol-tidy [-Xtidy tidy-option]... [compiler-option]... [source-file]...
        symbol-tidy other-option
 
 tidy options:

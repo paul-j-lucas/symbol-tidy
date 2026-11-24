@@ -95,7 +95,7 @@ $ symbol-tidy -Xtidy -VX
 symbol-tidy: error: "X": invalid value for --verbose/-V; must be [acCdFsSz]+
 
 $ symbol-tidy --help X
-usage: symbol-tidy [-Xtidy tidy-option]... [compiler-option]... source-file...
+usage: symbol-tidy [-Xtidy tidy-option]... [compiler-option]... [source-file]...
        symbol-tidy other-option
 
 tidy options:
@@ -129,7 +129,7 @@ $ symbol-tidy -xX
 symbol-tidy: error: "X": invalid value for -x/--language; must be one of "c", "c++", or "none"
 
 $ symbol-tidy --version X
-usage: symbol-tidy [-Xtidy tidy-option]... [compiler-option]... source-file...
+usage: symbol-tidy [-Xtidy tidy-option]... [compiler-option]... [source-file]...
        symbol-tidy other-option
 
 tidy options:

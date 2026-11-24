@@ -245,7 +245,7 @@ void print_usage( int status ) {
   FILE *const fout = status == EX_OK ? stdout : stderr;
 
   fprintf( fout,
-    "usage: %s [-Xtidy tidy-option]... [compiler-option]... source-file...\n"
+    "usage: %s [-Xtidy tidy-option]... [compiler-option]... [source-file]...\n"
     "       %s other-option\n"
     "\n"
     "tidy options:\n"
