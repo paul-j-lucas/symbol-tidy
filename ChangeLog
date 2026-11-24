@@ -1,3 +1,22 @@
+2026-11-24  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * man/man1/symbol-tidy.1, cli_options.c, cli_options.h, options.c,
+     options.h, symbol-tidy.c, run_test.sh, update_test.sh,
+     auto_delete_pool.out, c-cxx-1.out, c-cxx-2.out,
+     cli-compiler-no-exists.out, cli-compiler-no-include-end.out,
+     cli-compiler-no-include-start.out, cli-error-always.out, cli-help.out,
+     cli-options-error.out, cli-options.out, constructors.out, destructors.out,
+     dup-source.out, encoded_char.out, enoent.out, enum.out, error.out,
+     exception-unused.out, exception-used.out, extern-macro.out,
+     func-template.out, functor.out, fwd_dec.out, labels.out,
+     libclang-error.out, maybe_unused.out, new-delete.out, range-for.out,
+     std-exclude.out, streambuf-overflow.out, template-adl-unused.out,
+     template-adl.out, template-ctor.out, template-omanip.out, undefined.out,
+     unique_ptr.out, c-cxx-1.test, c-cxx-2.test, cli-compiler-no-exists.test,
+     cli-options-error.test, exception-used.test: Added --no-config option.
+   * print.c, cli-help.out, cli-options-error.out: Fixed [source-file] in help.
+   * clang_util.c, clang_util.h: Added tidy_dupCString().
+
 2026-11-23  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
    * cli_options.c, cli_options.h, print.c, print.h: Moved print_usage().
