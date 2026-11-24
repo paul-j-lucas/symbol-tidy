@@ -62,6 +62,7 @@ symbol_tidy_SOURCES =	array.c array.h \
 			bit_util.c bit_util.h \
 			clang_util.c clang_util.h \
 			cli_options.c cli_options.h \
+			cli_util.c cli_util.h \
 			color.c color.h \
 			config_file.c config_file.h \
 			cxx_symbol.c cxx_symbol.h \

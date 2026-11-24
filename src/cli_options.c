@@ -26,6 +26,7 @@
 // local
 #include "pjl_config.h"                 /* must go first */
 #include "cli_options.h"
+#include "cli_util.h"
 #include "array.h"
 #include "lang.h"
 #include "options.h"
@@ -82,14 +83,6 @@
  * @sa #COMPILER_SEARCH_START
  */
 #define COMPILER_SEARCH_END    "End of search list."
-
-/**
- * Convenience macro for iterating over all command-line options.
- *
- * @param VAR The `struct option` loop variable.
- */
-#define FOREACH_CLI_OPTION(VAR, OPTIONS) \
-  for ( struct option const *VAR = (OPTIONS); (VAR)->name != NULL; ++(VAR) )
 
 ////////// local constants ////////////////////////////////////////////////////
 
@@ -165,14 +158,6 @@ static array_t ptu_argv[2] = {
   ARRAY_INIT( sizeof(char*) ),
   ARRAY_INIT( sizeof(char*) ),
 };
-
-////////// local functions ////////////////////////////////////////////////////
-
-NODISCARD
-static char const*          get_opt_format( int );
-
-NODISCARD
-static struct option const* get_option_short( int );
 
 /////////// inline functions //////////////////////////////////////////////////
 
@@ -443,80 +428,6 @@ static void check_options( void ) {
 }
 
 /**
- * Checks whether the \a argv[\a *pargi] is a long option \a long_opt having an
- * argument: if so, returns that argument.
- *
- * @param argc The command-line argument count from `main()`.
- * @param argv The command-line argument values from `main()`.
- * @param long_opt The long option (without the `--`).
- * @param pargi A pointer to the current argument index variable.
- * @return Returns the value of the argument or NULL if \a argv[\a *pargi] is
- * not \a long_opt.
- *
- * @sa get_short_opt_value()
- */
-NODISCARD
-static char const* get_long_opt_value( int argc, char const *const argv[],
-                                       char const *long_opt, int *pargi ) {
-  assert(     argc > 0 );
-  assert(     argv != NULL );
-  assert( long_opt != NULL );
-  assert(    pargi != NULL );
-  assert(   *pargi > 0 );
-
-  char const *const arg = argv[ *pargi ];
-
-  if ( STRNCMPLIT( arg, "--" ) != 0 )
-    return NULL;
-  size_t const long_opt_len = strlen( long_opt );
-  if ( strncmp( arg + STRLITLEN( "--" ), long_opt, long_opt_len ) != 0 )
-    return NULL;
-  if ( arg[ STRLITLEN( "--" ) + long_opt_len ] == '=' ) {
-    char const *const value = arg + STRLITLEN( "--" ) + long_opt_len + 1;
-    if ( value[0] != '\0' )
-      return value;
-  }
-  else if ( ++*pargi < argc ) {
-    char const *const value = argv[ *pargi ];
-    if ( value != NULL && value[0] != '\0' && value[0] != '-' )
-      return value;
-  }
-
-  fatal_error( EX_USAGE, "\"--%s\" requires an argument\n", long_opt );
-}
-
-/**
- * Formats an option as `--%%s/-%%c` where `%%s` is the long option and `%%c`
- * is the short option.
- *
- * @param short_opt The short option (along with its corresponding long option)
- * to format.
- * @return Returns the formatted string.
- *
- * @warning The pointer returned is to one of a small number of static buffers,
- * so you can't do something like call this more than twice in the same
- * `printf()` statement.
- */
-NODISCARD
-static char const* get_opt_format( int short_opt ) {
-  static strbuf_t sbufs[2];
-  static unsigned buf_index;
-
-  strbuf_t *const sbuf = &sbufs[ buf_index++ % ARRAY_SIZE( sbufs ) ];
-  strbuf_reset( sbuf );
-
-  struct option const *const option = get_option_short( short_opt );
-  char const *const long_opt = option != NULL ? option->name : "";
-  return strbuf_printf(
-    sbuf, "%s%s%s-%c",
-    long_opt[0] != '\0' ? "--" : "",
-    long_opt,
-    long_opt[0] != '\0' ? "/" : "",
-    short_opt
-  );
-}
-
-/**
  * Gets the help message for \a short_opt.
  *
  * @param short_opt The option to get the help for.
@@ -529,81 +440,6 @@ static char const* get_opt_help( int short_opt ) {
   char const *const help = OPTIONS_HELP[ short_opt ];
   assert( help != NULL );
   return help;
-}
-
-/**
- * Gets the `option` corresponding to \a long_opt.
- *
- * @param long_opt The long option to get the option for.
- * @return Returns the corresponding `option` or NULL if not found.
- *
- * @sa get_option_short()
- */
-NODISCARD
-static struct option const* get_option_long( char const *long_opt ) {
-  assert( long_opt != NULL );
-  char const *const equal = strchr( long_opt, '=' );
-  size_t const n = equal != NULL ?
-    STATIC_CAST( size_t, equal - long_opt ) : strlen( long_opt );
-
-  FOREACH_CLI_OPTION( option, OPTIONS ) {
-    if ( strncmp( option->name, long_opt, n ) == 0 )
-      return option;
-  } // for
-  return NULL;
-}
-
-/**
- * Gets the `option` corresponding to \a short_opt.
- *
- * @param short_opt The short option to get the option for.
- * @return Returns the corresponding `option` or NULL if not found.
- *
- * @sa get_option_long()
- */
-NODISCARD
-static struct option const* get_option_short( int short_opt ) {
-  assert( short_opt > 0 && short_opt < 128 );
-  FOREACH_CLI_OPTION( option, OPTIONS ) {
-    if ( option->val == short_opt )
-      return option;
-  } // for
-  return NULL;
-}
-
-/**
- * Checks whether the \a argv[\a *pargi] is a short option \a short_opt having
- * an argument: if so, returns that argument.
- *
- * @param argc The command-line argument count from `main()`.
- * @param argv The command-line argument values from `main()`.
- * @param short_opt The short option character.
- * @param pargi A pointer to the current argument index variable.
- * @return Returns the value of the argument or NULL if \a argv[\a *pargi] is
- * not \a short_opt.
- *
- * @sa get_long_opt_value()
- */
-NODISCARD
-static char const* get_short_opt_value( int argc, char const *const argv[],
-                                        int short_opt, int *pargi ) {
-  assert(   argc > 0 );
-  assert(   argv != NULL );
-  assert(  pargi != NULL );
-  assert( *pargi > 0 );
-  assert( short_opt > 0 && short_opt < 128 );
-
-  if ( argv[ *pargi ][0] != '-' || argv[ *pargi ][1] != short_opt )
-    return NULL;
-  if ( argv[ *pargi ][2] != '\0' )    // -x<arg>, not -x <arg>
-    return argv[ *pargi ] + 2;
-  if ( ++*pargi < argc ) {
-    char const *const value = argv[ *pargi ];
-    if ( value != NULL && value[0] != '\0' && value[0] != '-' )
-      return value;
-  }
-
-  fatal_error( EX_USAGE, "\"-%c\" requires an argument\n", short_opt );
 }
 
 /**
@@ -732,47 +568,6 @@ static bool is_Xtidy_opt( int argc, char const *const argv[], int *pargi ) {
 
 error:
   fatal_error( EX_USAGE, "-Xtidy requires subsequent option\n" );
-}
-
-/**
- * Makes the `optstring` (short option) equivalent of \a opts for the third
- * argument of `getopt_long()`.
- *
- * @param options An array of options to make the short option string from.
- * Its last element must be all zeros.
- * @return Returns the `optstring` for the third argument of `getopt_long()`.
- *
- * @note The caller is responsible for freeing the returned string.
- */
-NODISCARD
-static char* make_short_opts( struct option const options[static const 2] ) {
-  // pre-flight to calculate string length
-  size_t len = 1 /* for leading ':' */;
-  FOREACH_CLI_OPTION( option, options ) {
-    assert( option->has_arg >= 0 && option->has_arg <= 2 );
-    len += 1 + STATIC_CAST( unsigned, option->has_arg );
-  } // for
-
-  char *const short_opts = MALLOC( char, len + 1/*\0*/ );
-  char *s = short_opts;
-
-  *s++ = ':';                           // return missing argument as ':'
-  FOREACH_CLI_OPTION( option, options ) {
-    assert( option->val > 0 && option->val < 128 );
-    *s++ = STATIC_CAST( char, option->val );
-    switch ( option->has_arg ) {
-      case optional_argument:
-        // LCOV_EXCL_START: tidy doesn't currently have any optional arguments.
-        *s++ = ':';
-        FALLTHROUGH;
-        // LCOV_EXCL_STOP
-      case required_argument:
-        *s++ = ':';
-    } // switch
-  } // for
-  *s = '\0';
-
-  return short_opts;
 }
 
 /**
@@ -960,7 +755,7 @@ _Noreturn
 static void print_usage( int status ) {
   // pre-flight to calculate longest long option length
   size_t longest_opt_len = 0;
-  FOREACH_CLI_OPTION( option, OPTIONS ) {
+  FOREACH_CLI_OPTION( option ) {
     size_t long_opt_len = strlen( option->name );
     switch ( option->has_arg ) {
       case no_argument:
@@ -988,7 +783,7 @@ static void print_usage( int status ) {
     , prog_name, prog_name
   );
 
-  FOREACH_CLI_OPTION( option, OPTIONS ) {
+  FOREACH_CLI_OPTION( option ) {
     switch ( option->val ) {
       case COPT(HELP):
       case COPT(VERSION):
@@ -1018,7 +813,7 @@ static void print_usage( int status ) {
 
   fputs( "\nother options:\n", fout );
 
-  FOREACH_CLI_OPTION( option, OPTIONS ) {
+  FOREACH_CLI_OPTION( option ) {
     switch ( option->val ) {
       case COPT(HELP):
       case COPT(VERSION):
@@ -1299,6 +1094,10 @@ static void sources_init_argv( array_t *sources, int argc,
 
 ////////// extern functions ///////////////////////////////////////////////////
 
+struct option const* cli_option_next( struct option const *option ) {
+  return option == NULL ? OPTIONS : (++option)->name == NULL ? NULL : option;
+}
+
 void cli_options_init( int argc, char const *argv[], array_t *rv_sources ) {
   assert( argc > 0 );
   assert( argv != NULL );
@@ -1311,7 +1110,7 @@ void cli_options_init( int argc, char const *argv[], array_t *rv_sources ) {
   char const   *opt_files_path = NULL;
   bool          opt_help = false;
   unsigned      opt_version = 0;
-  char *const   short_opts = make_short_opts( OPTIONS );
+  char *const   short_opts = make_short_opts();
   int           tidy_argc;
   char const  **tidy_argv;
 

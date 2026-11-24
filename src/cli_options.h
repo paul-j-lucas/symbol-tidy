@@ -34,7 +34,9 @@
 /// @cond DOXYGEN_IGNORE
 
 // standard
+#include <getopt.h>
 #include <stdbool.h>
+#include <stddef.h>                     /* for NULL */
 
 // in ascending option character ASCII order; sort using: sort -k3b,3f -k3b,3r
 #define OPT_CONFIG                c
@@ -62,7 +64,33 @@
 /// Command-line option character as a character literal.
 #define COPT(X)                   CHARIFY(OPT_##X)
 
+/**
+ * Convenience macro for iterating over all **cdecl** command-line options.
+ *
+ * @param VAR The `struct option` loop variable.
+ *
+ * @sa cli_option_next()
+ * @sa #FOREACH_SET_OPTION()
+ */
+#define FOREACH_CLI_OPTION(VAR) \
+  for ( struct option const *VAR = NULL; (VAR = cli_option_next( VAR )) != NULL; )
+
 ////////// extern functions ///////////////////////////////////////////////////
+
+/**
+ * Iterates to the next **symbol-tidy** command-line option.
+ *
+ * @param option A pointer to the previous option. For the first iteration,
+ * NULL should be passed.
+ * @return Returns the next command-line option or NULL for none.
+ *
+ * @note This function isn't normally called directly; use the
+ * #FOREACH_CLI_OPTION() macro instead.
+ *
+ * @sa #FOREACH_CLI_OPTION()
+ */
+NODISCARD
+struct option const* cli_option_next( struct option const *option );
 
 /**
  * Initializes **symbol-tidy** options from the command-line.
