@@ -117,7 +117,7 @@ static struct option const OPTIONS[] = {
  *
  * @note It is indexed by short option characters.
  *
- * @sa get_opt_help()
+ * @sa option_help()
  * @sa OPTIONS
  */
 static char const *const OPTIONS_HELP[] = {
@@ -428,21 +428,6 @@ static void check_options( void ) {
 }
 
 /**
- * Gets the help message for \a short_opt.
- *
- * @param short_opt The option to get the help for.
- * @return Returns said help message.
- */
-NODISCARD
-static char const* get_opt_help( int short_opt ) {
-  assert( short_opt > 0 );
-  assert( STATIC_CAST( size_t, short_opt ) < ARRAY_SIZE( OPTIONS_HELP ) );
-  char const *const help = OPTIONS_HELP[ short_opt ];
-  assert( help != NULL );
-  return help;
-}
-
-/**
  * Gets whether \a opt is a compiler option that takes its argument as a
  * separate command-line argument and whose argument is likely to be a file
  * that could be mistaken for a source file, e.g., `-include foo.h`.
@@ -743,100 +728,6 @@ short_opt_requires_argument:
   assert(  opt != NULL );
   assert( isalnum( *opt ) );
   fatal_error( EX_USAGE, "\"-%c\" requires an argument\n", *opt );
-}
-
-/**
- * Prints the usage message to standard error and exits.
- *
- * @param status The status to exit with.  If it is `EX_OK`, prints to standard
- * output; otherwise prints to standard error.
- */
-_Noreturn
-static void print_usage( int status ) {
-  // pre-flight to calculate longest long option length
-  size_t longest_opt_len = 0;
-  FOREACH_CLI_OPTION( option ) {
-    size_t long_opt_len = strlen( option->name );
-    switch ( option->has_arg ) {
-      case no_argument:
-        break;
-      case optional_argument:
-        // LCOV_EXCL_START: tidy doesn't currently have any optional arguments.
-        long_opt_len += STRLITLEN( "[=ARG]" );
-        break;
-        // LCOV_EXCL_STOP
-      case required_argument:
-        long_opt_len += STRLITLEN( "=ARG" );
-        break;
-    } // switch
-    if ( long_opt_len > longest_opt_len )
-      longest_opt_len = long_opt_len;
-  } // for
-
-  FILE *const fout = status == EX_OK ? stdout : stderr;
-
-  fprintf( fout,
-    "usage: %s [-Xtidy tidy-option]... [compiler-option]... source-file...\n"
-    "       %s other-option\n"
-    "\n"
-    "tidy options:\n"
-    , prog_name, prog_name
-  );
-
-  FOREACH_CLI_OPTION( option ) {
-    switch ( option->val ) {
-      case COPT(HELP):
-      case COPT(VERSION):
-        // These are special in that they are allowed directly rather than
-        // following -Xtidy.  Consequently, they must be printed seperately
-        // (below).
-        continue;
-    } // switch
-    fprintf( fout, "  --%s", option->name );
-    size_t long_opt_len = strlen( option->name );
-    switch ( option->has_arg ) {
-      case no_argument:
-        break;
-      case optional_argument:
-        // LCOV_EXCL_START: tidy doesn't currently have any optional arguments.
-        long_opt_len += STATIC_CAST( size_t, fprintf( fout, "[=ARG]" ) );
-        break;
-        // LCOV_EXCL_STOP
-      case required_argument:
-        long_opt_len += STATIC_CAST( size_t, fprintf( fout, "=ARG" ) );
-        break;
-    } // switch
-    assert( long_opt_len <= longest_opt_len );
-    FPUTNSP( longest_opt_len - long_opt_len, fout );
-    fprintf( fout, " (-%c) %s.\n", option->val, get_opt_help( option->val ) );
-  } // for
-
-  fputs( "\nother options:\n", fout );
-
-  FOREACH_CLI_OPTION( option ) {
-    switch ( option->val ) {
-      case COPT(HELP):
-      case COPT(VERSION):
-        break;
-      default:
-        continue;
-    } // switch
-    fprintf( fout, "  --%s", option->name );
-    size_t const long_opt_len = strlen( option->name );
-    assert( option->has_arg == no_argument );
-    assert( long_opt_len <= longest_opt_len );
-    FPUTNSP( longest_opt_len - long_opt_len, fout );
-    fprintf( fout, " (-%c) %s.\n", option->val, get_opt_help( option->val ) );
-  } // for
-
-  fputs(
-    "\n"
-    PACKAGE_NAME " home page: " PACKAGE_URL "\n"
-    "Report bugs to: " PACKAGE_BUGREPORT "\n",
-    fout
-  );
-
-  exit( status );
 }
 
 /**
@@ -1211,6 +1102,14 @@ void cli_options_init( int argc, char const *argv[], array_t *rv_sources ) {
     fatal_error( EX_USAGE, "no source files given\n" );
 
   fflush( stdout );
+}
+
+char const* option_help( int short_opt ) {
+  assert( short_opt > 0 );
+  assert( STATIC_CAST( size_t, short_opt ) < ARRAY_SIZE( OPTIONS_HELP ) );
+  char const *const help = OPTIONS_HELP[ short_opt ];
+  assert( help != NULL );
+  return help;
 }
 
 bool option_is_set( int short_opt ) {

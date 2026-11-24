@@ -104,6 +104,15 @@ struct option const* cli_option_next( struct option const *option );
 void cli_options_init( int argc, char const *argv[], array_t *rv_sources );
 
 /**
+ * Gets the help message for \a short_opt.
+ *
+ * @param short_opt The option to get the help for.
+ * @return Returns said help message.
+ */
+NODISCARD
+char const* option_help( int short_opt );
+
+/**
  * Gets whether the option has been set.
  *
  * @param short_opt The short option character.
