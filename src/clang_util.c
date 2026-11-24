@@ -743,13 +743,10 @@ char* tidy_Cursor_dupFileName( CXCursor cursor ) {
   if ( tidy_Cursor_isInvalid( cursor ) )
     return NULL;
 
-  CXFile const      file = tidy_getCursorLocation_File( cursor );
-  CXString const    path_cxs = clang_getFileName( file );
-  char const *const path_cs = clang_getCString( path_cxs );
-  char *const       rv_path = strdup_or_exit( path_cs );
+  CXFile const    file = tidy_getCursorLocation_File( cursor );
+  CXString const  path_cxs = clang_getFileName( file );
 
-  clang_disposeString( path_cxs );
-  return rv_path;
+  return tidy_dupCString( path_cxs );
 }
 
 CXCursor tidy_Cursor_getBaseSpecifierClass( CXCursor spec_csr ) {
@@ -1184,17 +1181,18 @@ int tidy_Cursor_isSpellingEqualToAny_impl( CXCursor cursor,
   return equal_idx;
 }
 
+char* tidy_dupCString( CXString cxs ) {
+  char const *const cs = clang_getCString( cxs );
+  char *const rv_cs = null_or_empty( cs ) ? NULL : strdup_or_exit( cs );
+  clang_disposeString( cxs );
+  return rv_cs;
+}
+
 char* tidy_dupCursorSpelling( CXCursor cursor ) {
   if ( tidy_Cursor_isInvalid( cursor ) )
     return NULL;
-
-  CXString const    name_cxs = clang_getCursorSpelling( cursor );
-  char const *const name_cs = clang_getCString( name_cxs );
-  char *const       rv_name = name_cs != NULL && name_cs[0] != '\0' ?
-                      strdup_or_exit( name_cs ) : NULL;
-
-  clang_disposeString( name_cxs );
-  return rv_name;
+  CXString const name_cxs = clang_getCursorSpelling( cursor );
+  return tidy_dupCString( name_cxs );
 }
 
 CXString tidy_File_getRealPathName( CXFile file ) {
@@ -1301,14 +1299,9 @@ char* tidy_getCursorUSR( CXCursor cursor ) {
     cursor = clang_getCanonicalCursor( tmpl_csr );
   } // for
 
-  char *usr = NULL;
-
   if ( !tidy_Cursor_isOrInClassTemplate( cursor ) ) {
-    CXString const    usr_cxs = clang_getCursorUSR( cursor );
-    char const *const usr_cs = clang_getCString( usr_cxs );
-    if ( usr_cs != NULL && usr_cs[0] != '\0' )
-      usr = strdup_or_exit( usr_cs );
-    clang_disposeString( usr_cxs );
+    CXString const usr_cxs = clang_getCursorUSR( cursor );
+    char *const usr = tidy_dupCString( usr_cxs );
     if ( usr != NULL )
       return usr;
   }
@@ -1329,6 +1322,7 @@ char* tidy_getCursorUSR( CXCursor cursor ) {
   CXString const    label_cxs = clang_getCursorSpelling( cursor );
   char const *const label_cs = clang_getCString( label_cxs );
 
+  char *usr = NULL;
   asprintf_or_exit( &usr, "tidy:%s@%u@%u@%s", path_cs, line, col, label_cs );
 
   clang_disposeString( label_cxs );

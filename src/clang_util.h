@@ -458,6 +458,16 @@ int tidy_Cursor_isSpellingEqualToAny_impl( CXCursor cursor,
                                            char const *values[] );
 
 /**
+ * Calls `clang_getCString()`, duplicates the result, and returns it.
+ *
+ * @param cxs The `CXString` to get and duplicate.  It is disposed of.
+ * @return Returns a copy of the C string for \a cxs or NULL if \a cxs is NULL
+ * or empty.
+ */
+NODISCARD
+char* tidy_dupCString( CXString cxs );
+
+/**
  * Similar to `clang_getCursorSpelling()` except the spelling is duplicated.
  *
  * @param cursor The cursor to get the spelling of.
