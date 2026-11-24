@@ -33,6 +33,7 @@
 /// @cond DOXYGEN_IGNORE
 
 // standard
+#include <stdbool.h>
 #include <stddef.h>                     /* for NULL */
 
 /// @endcond
@@ -222,6 +223,13 @@ void fl_print_warning( char const *caller_file, int caller_line,
  */
 void print_source_line( char const *path, unsigned line, unsigned col,
                         unsigned offset );
+
+/**
+ * Prints the **symbol-tidy** version.
+ *
+ * @param verbose If `true`, prints configure feature &amp; package options.
+ */
+void print_version( bool verbose );
 
 ///////////////////////////////////////////////////////////////////////////////
 
