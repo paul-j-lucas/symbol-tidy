@@ -9,7 +9,7 @@ test_symbol_tidy -Xtidy foo.c
 
 test_symbol_tidy -Xtidy --compiler
 test_symbol_tidy -Xtidy --compiler=
-test_symbol_tidy -Xtidy -C
+test_symbol_tidy -Xtidy -p
 
 test_symbol_tidy -Xtidy --config
 test_symbol_tidy -Xtidy --config=

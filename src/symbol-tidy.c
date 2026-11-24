@@ -185,7 +185,8 @@ int main( int argc, char const *argv[] ) {
   array_t sources = ARRAY_INIT( sizeof( tidy_source ) );
   cli_options_init( argc, argv, &sources );
   colors_init();
-  config_init();
+  if ( opt_read_config )
+    config_init();
   sources_init();
   symbols_init();
 

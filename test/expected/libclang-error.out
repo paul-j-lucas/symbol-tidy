@@ -1,4 +1,4 @@
-$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers --verbose=- minimal.c
+$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --no-config --verbose=- minimal.c
 libclang (via symbol-tidy): error: unknown argument: '--verbose=-'
 symbol-tidy: 1 error generated
 

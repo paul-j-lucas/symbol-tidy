@@ -7,7 +7,7 @@ test_symbol_tidy $TIDY_TEST_OPTIONS \
 
 printf '%s\n' c-cxx.c c-cxx.cpp c-cxx-main.cpp | \
 test_symbol_tidy $TIDY_TEST_OPTIONS \
-  -Xtidy -f- \
-  $TIDY_TEST_CONFIG
+  $TIDY_TEST_CONFIG \
+  -Xtidy -f-
 
 # vim:set syntax=bash et sw=2 ts=2:

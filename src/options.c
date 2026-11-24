@@ -64,6 +64,7 @@ config_bool   opt_ignore_cxx_move_ctors;
 config_bool   opt_ignore_externs;
 config_bool   opt_ignore_forwards;
 config_bool   opt_ignore_undefined;
+bool          opt_read_config = true;
 tidy_test     opt_test;
 tidy_verbose  opt_verbose;
 

@@ -1,4 +1,4 @@
-$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --verbose=s c-cxx.c c-cxx.cpp c-cxx-main.cpp
+$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --no-config -Xtidy --verbose=s c-cxx.c c-cxx.cpp c-cxx-main.cpp
 // tidy | c-cxx.c symbols:
 // tidy |   "c_msg"
 // tidy |   "printf"
@@ -11,5 +11,5 @@ $ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --verbose
 // tidy | c-cxx-main.cpp symbols:
 // tidy |   "main()"
 
-$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy -f-
+$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --no-config -Xtidy -f-
 

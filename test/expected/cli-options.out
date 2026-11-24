@@ -1,16 +1,16 @@
-$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --color=never minimal.c
+$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --no-config -Xtidy --color=never minimal.c
 
-$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --color never minimal.c
+$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --no-config -Xtidy --color never minimal.c
 
-$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy -knever minimal.c
+$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --no-config -Xtidy -knever minimal.c
 
-$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy -k never minimal.c
+$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --no-config -Xtidy -k never minimal.c
 
-$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --verbose=- minimal.c
+$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --no-config -Xtidy --verbose=- minimal.c
 
-$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --verbose=d minimal.c
+$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --no-config -Xtidy --verbose=d minimal.c
 // tidy | directory = "data"
 
-$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --verbose=F minimal.c
+$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --no-config -Xtidy --verbose=F minimal.c
 // tidy | source file = "minimal.c"
 

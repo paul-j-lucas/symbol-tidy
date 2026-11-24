@@ -40,7 +40,7 @@
 
 // in ascending option character ASCII order; sort using: sort -k3b,3f -k3b,3r
 #define OPT_CONFIG                c
-#define OPT_COMPILER              C
+#define OPT_NO_CONFIG             C
 #define OPT_DIRECTORY             d
 #define OPT_DEBUG                 D
 #define OPT_ERROR                 e
@@ -48,6 +48,7 @@
 #define OPT_HELP                  h
 #define OPT_COLOR                 k
 #define OPT_NO_CONFIG_LAYERS      L
+#define OPT_COMPILER              p
 #define OPT_VERSION               v
 #define OPT_VERBOSE               V
 

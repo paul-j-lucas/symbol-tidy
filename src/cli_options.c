@@ -106,6 +106,7 @@ static struct option const OPTIONS[] = {
   { "error",            required_argument,  NULL, COPT(ERROR)             },
   { "files",            required_argument,  NULL, COPT(FILES)             },
   { "help",             no_argument,        NULL, COPT(HELP)              },
+  { "no-config",        no_argument,        NULL, COPT(NO_CONFIG)         },
   { "no-config-layers", no_argument,        NULL, COPT(NO_CONFIG_LAYERS)  },
   { "verbose",          required_argument,  NULL, COPT(VERBOSE)           },
   { "version",          no_argument,        NULL, COPT(VERSION)           },
@@ -129,7 +130,8 @@ static char const *const OPTIONS_HELP[] = {
   [ COPT(ERROR) ] = "When to exit with a non-zero status",
   [ COPT(FILES) ] = "Read file paths from path or '-' for standard input",
   [ COPT(HELP) ] = "Print this help and exit",
-  [ COPT(NO_CONFIG_LAYERS) ] = "Don't do configuration file layering",
+  [ COPT(NO_CONFIG) ] = "Suppress reading configuration file",
+  [ COPT(NO_CONFIG_LAYERS) ] = "Suppress configuration file layering",
   [ COPT(VERBOSE) ] = "Print verbose output",
   [ COPT(VERSION) ] = "Print version and exit",
 };
@@ -1003,6 +1005,9 @@ void cli_options_init( int argc, char const *argv[], array_t *rv_sources ) {
         break;
       case COPT(HELP):
         opt_help = true;
+        break;
+      case COPT(NO_CONFIG):
+        opt_read_config = false;
         break;
       case COPT(NO_CONFIG_LAYERS):
         opt_config_layers = false;

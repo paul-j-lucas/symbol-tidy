@@ -1,9 +1,9 @@
-$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers undefined-prog.c
+$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --no-config undefined-prog.c
 "undefined-prog.c": warning: undefined symbols:
     1, 6 | "undefined"
 symbol-tidy: 1 undefined symbol
 
-$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers undefined-lib.c
+$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --no-config undefined-lib.c
 "undefined-lib.c": warning: unused symbols:
     3, 6 | "library_function_defined"
 "undefined-lib.h": warning: undefined symbols:

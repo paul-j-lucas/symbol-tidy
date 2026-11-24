@@ -35,7 +35,7 @@
 .if !'\\$1'0' .sp
 ..
 .\" ---------------------------------------------------------------------------
-.TH \f3symbol-tidy\fP 1 "November 19, 2026" "PJL TOOLS"
+.TH \f3symbol-tidy\fP 1 "November 24, 2026" "PJL TOOLS"
 .SH NAME
 symbol-tidy \(em Symbol tidier
 .SH SYNOPSIS
@@ -415,6 +415,14 @@ If
 .I f
 is \f(CW-\fP,
 source files are read from standard input.
+.TP
+.B \-\-no-config
+Suppresses reading of any configuration file,
+even one explicitly specified
+via either
+.B \-\-config
+or
+.BR \-c .
 .TP
 .BR \-\-no-config-layers " | " \-L
 Suppresses configuration file layering.

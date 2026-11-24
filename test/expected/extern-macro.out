@@ -1,4 +1,4 @@
-$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers extern-macro.c
+$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --no-config extern-macro.c
 "extern-macro.c": warning: unneeded external linkage:
     3    | "helper" (defined at 3,16 via macro "DEFINE_HELPER" at "extern-macro.h":4,9)
     4, 5 | "x"

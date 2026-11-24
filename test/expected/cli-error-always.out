@@ -1,4 +1,4 @@
-$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --error=always minimal.c
+$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --no-config -Xtidy --error=always minimal.c
 
-$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy -e always minimal.c
+$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --no-config -Xtidy -e always minimal.c
 

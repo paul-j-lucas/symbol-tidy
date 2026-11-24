@@ -19,8 +19,8 @@ symbol-tidy: error: "--compiler" requires an argument
 $ symbol-tidy -Xtidy --compiler=
 symbol-tidy: error: "--compiler" requires an argument
 
-$ symbol-tidy -Xtidy -C
-symbol-tidy: error: "-C" requires an argument
+$ symbol-tidy -Xtidy -p
+symbol-tidy: error: "-p" requires an argument
 
 $ symbol-tidy -Xtidy --config
 symbol-tidy: error: "--config" requires an argument
@@ -100,13 +100,14 @@ usage: symbol-tidy [-Xtidy tidy-option]... [compiler-option]... [source-file]...
 
 tidy options:
   --color=ARG        (-k) When to colorize output; default="not_file".
-  --compiler=ARG     (-C) Path of compiler to use or "none"; default="clang".
+  --compiler=ARG     (-p) Path of compiler to use or "none"; default="clang".
   --config=ARG       (-c) Configuration file path.
   --debug            (-D) Print symbol-tidy debug output.
   --directory=ARG    (-d) Change directory before tidying.
   --error=ARG        (-e) When to exit with a non-zero status.
   --files=ARG        (-f) Read file paths from path or '-' for standard input.
-  --no-config-layers (-L) Don't do configuration file layering.
+  --no-config        (-C) Suppress reading configuration file.
+  --no-config-layers (-L) Suppress configuration file layering.
   --verbose=ARG      (-V) Print verbose output.
 
 other options:
@@ -134,13 +135,14 @@ usage: symbol-tidy [-Xtidy tidy-option]... [compiler-option]... [source-file]...
 
 tidy options:
   --color=ARG        (-k) When to colorize output; default="not_file".
-  --compiler=ARG     (-C) Path of compiler to use or "none"; default="clang".
+  --compiler=ARG     (-p) Path of compiler to use or "none"; default="clang".
   --config=ARG       (-c) Configuration file path.
   --debug            (-D) Print symbol-tidy debug output.
   --directory=ARG    (-d) Change directory before tidying.
   --error=ARG        (-e) When to exit with a non-zero status.
   --files=ARG        (-f) Read file paths from path or '-' for standard input.
-  --no-config-layers (-L) Don't do configuration file layering.
+  --no-config        (-C) Suppress reading configuration file.
+  --no-config-layers (-L) Suppress configuration file layering.
   --verbose=ARG      (-V) Print verbose output.
 
 other options:
