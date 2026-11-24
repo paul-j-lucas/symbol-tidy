@@ -64,4 +64,8 @@ dl.remark dd {
   margin-left: 42px;
 }
 
+dl.remark .tt {
+  background: none;
+}
+
 /* vim:set et sw=2 ts=2: */
