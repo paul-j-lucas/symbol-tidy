@@ -607,6 +607,101 @@ static char const* get_short_opt_value( int argc, char const *const argv[],
 }
 
 /**
+ * Gets whether \a opt is a compiler option that takes its argument as a
+ * separate command-line argument and whose argument is likely to be a file
+ * that could be mistaken for a source file, e.g., `-include foo.h`.
+ *
+ * @remarks This is _not_ a list of all compiler options that take a separate
+ * argument.  It's only those whose argument could look like a source file.
+ * For example, `-I` isn't included since the argument of `-I` is a directory
+ * that doesn't (normally) have a source file extension.
+ *
+ * @note If a compiler option that belongs here is missing, the worst that
+ * happens is that its argument is treated as an additional source file.
+ *
+ * @param opt The command-line argument to check.
+ * @return Returns `true` only if \a opt is such an option.
+ *
+ * @sa is_source_arg()
+ */
+NODISCARD
+static bool is_compiler_opt_file_arg( char const *opt ) {
+  assert( opt != NULL );
+
+  static char const *const FILE_ARG_OPTIONS[] = {
+    "-imacros",
+    "-include",
+    "-include-pch",
+    "-MF",
+    "-MJ",
+    "-MQ",
+    "-MT",
+    "-o",
+    "--output",
+    "-Xassembler",
+    "-Xclang",
+    "-Xlinker",
+    "-Xpreprocessor",
+  };
+
+  FOREACH_ARRAY_ELEMENT( char const*, popt, FILE_ARG_OPTIONS ) {
+    if ( strcmp( opt, *popt ) == 0 )
+      return true;
+  } // for
+
+  return false;
+}
+
+/**
+ * Gets whether \a arg is likely a source file as opposed to an option or an
+ * option's argument.
+ *
+ * @remarks
+ * @parblock
+ * An argument is a source file only if _all_ of the following are true:
+ *
+ *  + It doesn't start with `-` (that includes `-` alone for standard input).
+ *
+ *  + The preceding argument isn't an option that takes a file as its argument
+ *    (see is_compiler_opt_file_arg()).
+ *
+ *  + Either \a x_lang is not `CXLanguage_Invalid` (because a `-x`/`--language`
+ *    option is in effect, in which case the extension, if any, doesn't matter)
+ *    or \a arg has a recognized source file extension.
+ *
+ * @endparblock
+ *
+ * @note With a `-x`/`--language` option in effect, the argument of any option
+ * that takes a separate argument that isn't in is_compiler_opt_file_arg()
+ * (e.g., the `dir` in `-I dir`) would be mistaken for a source file.
+ *
+ * @param arg The command-line argument to check.
+ * @param prev_arg The argument that preceded \a arg, if any.
+ * @param x_lang The language set by the most recent `-x`/`--language` option,
+ * if any.
+ * @return Returns `true` only if \a arg is likely a source file.
+ *
+ * @sa is_compiler_opt_file_arg()
+ */
+NODISCARD
+static bool is_source_arg( char const *arg, char const *prev_arg,
+                           enum CXLanguageKind x_lang ) {
+  assert( arg != NULL );
+
+  if ( arg[0] == '-' || arg[0] == '\0' )
+    return false;
+  if ( prev_arg != NULL && is_compiler_opt_file_arg( prev_arg ) )
+    return false;
+  if ( x_lang != CXLanguage_Invalid )
+    return true;
+  char const *const ext = path_ext( arg );
+  if ( ext == NULL )
+    return false;
+  enum CXLanguageKind ext_lang = lang_parse_ext( ext );
+  return ext_lang != CXLanguage_Invalid;
+}
+
+/**
  * Checks whether the \a argv[\a *pargi] is `-Xtidy` and followed by a
  * subsequent option.
  *
@@ -691,6 +786,8 @@ static char* make_short_opts( struct option const options[static const 2] ) {
  *    to \a *ptidy_argv.
  *  + <tt>--help</tt>, <tt>-h</tt>, <tt>--version</tt>, or <tt>-v</tt> are
  *    moved to \a *ptidy_argv.
+ *  + <tt>-x</tt> _lang_ or <tt>--language=</tt>_lang_ are checked and used to
+ *    determine the return value, but are left in \a argv.
  *
  * All other options and arguments are left as-is in \a argv.  Examples:
  *
@@ -810,7 +907,10 @@ static enum CXLanguageKind move_tidy_args( int *pargc, char const *argv[],
           lang_value
         );
       }
-      continue;
+      //
+      // Don't "continue" here: leave -x/--language and its value in argv so
+      // sources_from_argv() can apply it to the source files that follow it.
+      //
     }
 
     static char const *const OTHER_OPTIONS[] = {
@@ -1028,84 +1128,78 @@ static void source_add( char const *source_path, enum CXLanguageKind x_lang,
 }
 
 /**
- * Creates a tidy_source object for each source file given in \a argv to and
- * adds them to \a rv_sources.
+ * Creates a tidy_source object for each source file given in \a argv and adds
+ * them to \a rv_sources.
+ *
+ * @remarks
+ * @parblock
+ * Source files, `-x`/`--language` options and their values, and `--` are
+ * removed from \a argv (in place) leaving only the options for libclang.
+ * Source files may appear anywhere in \a argv.
+ *
+ * An argument is a source file if it doesn't start with `-`, has a recognized
+ * source file extension (or a `-x`/`--language` option is in effect), and
+ * isn't the argument of an option like `-include` or `-o`.  Every argument
+ * after `--` is a source file regardless.
+ *
+ * A `-x`/`--language` option applies to every source file that follows it.
+ * @endparblock
  *
  * @param argc The command-line argument count from `main()`.
  * @param argv The command-line argument values from `main()`.
  * @param rv_sources An array to receive the tidy_source files to be tidied.
- * @return Returns \a argc minus all the source file and language options
- * removed.
+ * @return Returns \a argc without all the source files, language options, and
+ * `--`.
  *
+ * @sa is_source_arg()
+ * @sa move_tidy_args()
  * @sa source_add()
  * @sa sources_from_file()
  */
-static int sources_from_argv( int argc, char const *const argv[],
+static int sources_from_argv( int argc, char const *argv[],
                               array_t *rv_sources ) {
   assert( argc > 0 );
   assert( argv != NULL );
   assert( rv_sources != NULL );
 
-  int argi = 0;
+  int new_argc = 1;
+  char const *prev_arg = NULL;          // previous libclang argument, if any
+  enum CXLanguageKind x_lang = CXLanguage_Invalid;
 
-  //
-  // Find the first -x/--language option: if found, it marks the start of the
-  // source files in argv.
-  //
   for ( int i = 1; i < argc; ++i ) {
-    int i_copy = i;
-    char const *lang_value = get_short_opt_value( argc, argv, 'x', &i_copy );
-    if ( lang_value == NULL )
-      lang_value = get_long_opt_value( argc, argv, "language", &i_copy );
-    if ( lang_value == NULL )
-      continue;
-    argi = i;
-  } // for
+    if ( strcmp( argv[i], "--" ) == 0 ) {
+      //
+      // Everything after "--" is a source file, no matter what it looks like.
+      //
+      for ( ++i; i < argc; ++i )
+        source_add( argv[i], x_lang, rv_sources );
+      break;
+    }
 
-  //
-  // If there's no -x/--language option, iterate backwards looking for the last
-  // option or argument without a filename extension: the argument after it
-  // marks the start of the source files in argv.
-  //
-  if ( argi == 0 ) {
-    for ( int i = argc - 1; i >= 1; --i ) {
-      char const *const argv_i = argv[i];
-      if ( argv_i[0] == '-' )
-        break;
-      char const *const ext = path_ext( argv_i );
-      if ( ext == NULL )
-        break;
-      enum CXLanguageKind lang = lang_parse_ext( ext );
-      if ( lang == CXLanguage_Invalid )
-        break;
-      argi = i;
-    } // for
-  }
-
-  if ( argi == 0 )
-    return argc;
-
-  //
-  // Finally, iterate forwards starting at argi constructing tidy_source
-  // objects.
-  //
-  enum CXLanguageKind lang = CXLanguage_Invalid;
-  for ( int i = argi; i < argc; ++i ) {
     char const *lang_value = get_short_opt_value( argc, argv, 'x', &i );
     if ( lang_value == NULL )
       lang_value = get_long_opt_value( argc, argv, "language", &i );
     if ( lang_value != NULL ) {
       MAYBE_UNUSED bool const is_lang_valid =
-        lang_parse_name( lang_value, &lang );
+        lang_parse_name( lang_value, &x_lang );
       // Value of -x/--language was checked in move_tidy_args().
       assert( is_lang_valid );
+      prev_arg = NULL;
+      continue;
     }
-    else {
-      source_add( argv[i], lang, rv_sources );
+
+    if ( is_source_arg( argv[i], prev_arg, x_lang ) ) {
+      source_add( argv[i], x_lang, rv_sources );
+      prev_arg = NULL;
+      continue;
     }
+
+    prev_arg = argv[i];
+    argv[ new_argc++ ] = argv[i];
   } // for
 
-  return argi;
+  argv[ new_argc ] = NULL;
+  return new_argc;
 }
 
 /**
