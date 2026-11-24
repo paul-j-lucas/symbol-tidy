@@ -48,7 +48,7 @@
 ////////// enums //////////////////////////////////////////////////////////////
 
 /**
- * **include-tidy**-specific exit status codes.
+ * **symbol-tidy**-specific exit status codes.
  */
 enum {
   TIDY_EX_VIOLATIONS          = 1,      ///< One or more violations.
