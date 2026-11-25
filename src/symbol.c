@@ -98,6 +98,8 @@ NODISCARD
 static bool cursor_is_explicit_config_root( CXCursor, char const* ),
             cursor_is_ignored( CXCursor );
 
+static void symbol_add_def( tidy_symbol*, CXSourceLocation,
+                            symbols_visit_data const* );
 static void symbol_print_name_quoted( tidy_symbol const*, FILE* );
 static void symbol_update_macro_name_loc( tidy_symbol*, CXFile,
                                           symbols_visit_data const* );
@@ -1124,6 +1126,45 @@ static void print_statistics( verbose_stat_ctx *vsc ) {
 // LCOV_EXCL_STOP
 
 /**
+ * Adds a symbol for a declaration that isn't a definition (e.g., a function
+ * prototype in a header).
+ *
+ * @note Only the canonical (first) declaration is considered.
+ *
+ * @param dec_csr The declaration's cursor.
+ * @param dec_loc The source location of \a dec_csr.
+ * @param svd The symbols_visit_data to use.
+ *
+ * @sa symbols_print_undefined()
+ */
+static void symbol_add_dec( CXCursor dec_csr, CXSourceLocation dec_loc,
+                            symbols_visit_data *svd ) {
+  assert( svd != NULL );
+
+  if ( !tidy_Cursor_isForwardDeclarable( dec_csr ) ) {
+    //
+    // A symbol that isn't forward-declarable means its declaration is also its
+    // definition.
+    //
+    return;
+  }
+
+  CXCursor const canon_dec_csr = clang_getCanonicalCursor( dec_csr );
+  if ( !clang_equalCursors( dec_csr, canon_dec_csr ) )
+    return;
+
+  tidy_symbol *const sym = symbol_add( dec_csr, svd );
+  if ( sym == NULL )
+    return;                             // e.g., excluded
+
+  if ( sym->parent_sym == NULL )
+    sym->parent_sym = svd->curr_sym;
+
+  if ( sym->is_root && sym->def_loc.path == NULL )
+    symbol_add_def( sym, dec_loc, svd );
+}
+
+/**
  * Add the symbol's path, line, and column to \a sym.
  *
  * @param sym The tidy_symbol to add the definition for.
@@ -1582,45 +1623,6 @@ static void symbols_cleanup( void ) {
   ht_table_cleanup(
     &tidy_symbol_set, POINTER_CAST( ht_free_fn_t, &symbol_cleanup )
   );
-}
-
-/**
- * Adds a symbol for a declaration that isn't a definition (e.g., a function
- * prototype in a header).
- *
- * @note Only the canonical (first) declaration is considered.
- *
- * @param dec_csr The declaration's cursor.
- * @param dec_loc The source location of \a dec_csr.
- * @param svd The symbols_visit_data to use.
- *
- * @sa symbols_print_undefined()
- */
-static void symbol_add_dec( CXCursor dec_csr, CXSourceLocation dec_loc,
-                            symbols_visit_data *svd ) {
-  assert( svd != NULL );
-
-  if ( !tidy_Cursor_isForwardDeclarable( dec_csr ) ) {
-    //
-    // A symbol that isn't forward-declarable means its declaration is also its
-    // definition.
-    //
-    return;
-  }
-
-  CXCursor const canon_dec_csr = clang_getCanonicalCursor( dec_csr );
-  if ( !clang_equalCursors( dec_csr, canon_dec_csr ) )
-    return;
-
-  tidy_symbol *const sym = symbol_add( dec_csr, svd );
-  if ( sym == NULL )
-    return;                             // e.g., excluded
-
-  if ( sym->parent_sym == NULL )
-    sym->parent_sym = svd->curr_sym;
-
-  if ( sym->is_root && sym->def_loc.path == NULL )
-    symbol_add_def( sym, dec_loc, svd );
 }
 
 /**
