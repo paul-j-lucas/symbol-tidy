@@ -1241,14 +1241,13 @@ Symbols formed via the preprocessor's \f(CW##\fP (paste) operator
 aren't ``seen'' by
 .BR libclang .
 Consequently,
-if such a symbol is declared in a header is referenced
-and no other symbols from that header
-are referenced,
+if such a symbol is declared normally,
+but refereced only via a \f(CW##\fP,
 .B symbol-tidy
-won't think the header is necessary.
+won't think the symbol is used.
 For example:
 .cS
-#include <readline/readline.h>
+#define RL_PROMPT_START_IGNORE '\1'
 
 #define RL_PROMPT_IGNORE(SBUF, WHEN) \\
   strbuf_putc( (SBUF), RL_PROMPT_ ## WHEN ## _IGNORE )
@@ -1258,11 +1257,10 @@ void prompt_create( strbuf_t *sbuf ) {
   // ...
 .cE
 The expansion of \f(CWRL_PROMPT_IGNORE\fP
-will create \f(CWRL_PROMPT_START_IGNORE\fP
-that's declared in \f(CWreadline.h\fP.
-If no other symbols from it are referenced,
+will create \f(CWRL_PROMPT_START_IGNORE\fP.
+If \f(CWRL_PROMPT_START_IGNORE\fP is not referenced explicitly anywhere else,
 .B symbol-tidy
-will incorrectly think the header is unnecessary.
+will incorrectly think it's unused.
 .PP
 As an alternative to not using \f(CW##\fP here,
 you can add dummy code
@@ -1283,7 +1281,7 @@ via dummy code,
 will ``see'' it
 and
 .B symbol-tidy
-will correctly think the header is necessary.
+will correctly think the symbols is referenced.
 Because such code is never compiled,
 the code can be anything
 (but it still has to be legal
