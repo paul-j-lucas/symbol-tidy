@@ -208,7 +208,7 @@ int main( int argc, char const *argv[] ) {
 
     source_parse( &svd );
     symbols_visit( &svd );
-    if ( !svd.ignore_forwards )
+    if ( !svd.ignore_forward )
       unneeded_forwards += fwd_decs_print_unneeded( svd.source );
     source_cleanup( source );
   } // for

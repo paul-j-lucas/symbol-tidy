@@ -234,8 +234,8 @@ static void   ignore_symbol_cleanup( ignore_symbol* );
 static void   ignore_symbols_parse( config_parse_fn_args const* );
 static void   ignore_symbols_parse_string( config_parse_fn_args const* );
 static void   ignore_undefined_parse( config_parse_fn_args const* );
-static void   ignore_unneeded_externs_parse( config_parse_fn_args const* );
-static void   ignore_unneeded_forwards_parse( config_parse_fn_args const* );
+static void   ignore_unneeded_extern_parse( config_parse_fn_args const* );
+static void   ignore_unneeded_forward_parse( config_parse_fn_args const* );
 static void   ignore_unused_parse( config_parse_fn_args const* );
 static void   print_statistics( verbose_stat_ctx* );
 static void   print_invalid_value( config_parse_fn_args const*,
@@ -265,10 +265,10 @@ static config_key const CONFIG_KEYS[] = {
                                 &ignore_cxx_move_ctors_parse                },
   { "ignore-undefined",         TABLE_ANY,
                                 &ignore_undefined_parse                     },
-  { "ignore-unneeded-externs",  TABLE_ANY,
-                                &ignore_unneeded_externs_parse              },
-  { "ignore-unneeded-forwards", TABLE_ANY,
-                                &ignore_unneeded_forwards_parse             },
+  { "ignore-unneeded-extern",   TABLE_ANY,
+                                &ignore_unneeded_extern_parse               },
+  { "ignore-unneeded-forward",  TABLE_ANY,
+                                &ignore_unneeded_forward_parse              },
   { "ignore-paths",             TABLE_SYMBOL_TIDY,    &ignore_paths_parse   },
   { "ignore-symbols",           TABLE_TIDY_OR_SOURCE, &ignore_symbols_parse },
   { "ignore-unused",            TABLE_ANY,            &ignore_unused_parse },
@@ -518,23 +518,23 @@ void ignore_undefined_parse( config_parse_fn_args const *config ) {
 }
 
 /**
- * Parses the value of an `"ignore-unneeded-externs"` key.
+ * Parses the value of an `"ignore-unneeded-extern"` key.
  *
  * @param config The config_parse_fn_args to use.
  */
 static
-void ignore_unneeded_externs_parse( config_parse_fn_args const *config ) {
-  config_bool_parse( config, &opt_ignore_externs );
+void ignore_unneeded_extern_parse( config_parse_fn_args const *config ) {
+  config_bool_parse( config, &opt_ignore_extern );
 }
 
 /**
- * Parses the value of an `"ignore-unneeded-forwards"` key.
+ * Parses the value of an `"ignore-unneeded-forward"` key.
  *
  * @param config The config_parse_fn_args to use.
  */
 static
-void ignore_unneeded_forwards_parse( config_parse_fn_args const *config ) {
-  config_bool_parse( config, &opt_ignore_forwards );
+void ignore_unneeded_forward_parse( config_parse_fn_args const *config ) {
+  config_bool_parse( config, &opt_ignore_forward );
 }
 
 /**

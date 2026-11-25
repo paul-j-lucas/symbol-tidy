@@ -1337,7 +1337,7 @@ static int symbol_cmp_by_def_loc( tidy_symbol const *i_sym,
 /**
  * Gets whether unneeded forward declarations are to be ignored for a symbol,
  * either because they're ignored for the source being visited or because
- * `opt_ignore_forwards` is set for the symbol's name.
+ * `opt_ignore_forward` is set for the symbol's name.
  *
  * @remarks If \a sym is not NULL, uses the result cached in \a sym when it was
  * first added.  Otherwise (e.g., the symbol is excluded so has no
@@ -1355,10 +1355,10 @@ static bool symbol_ignores_forwards( tidy_symbol const *sym, CXCursor sym_csr,
                                      symbols_visit_data const *svd ) {
   assert( svd != NULL );
 
-  if ( svd->ignore_forwards )
+  if ( svd->ignore_forward )
     return true;
   if ( sym != NULL )
-    return sym->ignore_forwards;
+    return sym->ignore_forward;
 
   sym_csr = tidy_getSpecializedCursorTemplate( sym_csr );
   sym_csr = clang_getCanonicalCursor( sym_csr );
@@ -1368,7 +1368,7 @@ static bool symbol_ignores_forwards( tidy_symbol const *sym, CXCursor sym_csr,
   char *const name = tidy_Cursor_getScopedSpelling( sym_csr );
   if ( unlikely( name == NULL ) )
     return false;                       // LCOV_EXCL_LINE
-  bool const is_ignored = config_bool_get( &opt_ignore_forwards, name );
+  bool const is_ignored = config_bool_get( &opt_ignore_forward, name );
   free( name );
   return is_ignored;
 }
@@ -1809,7 +1809,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
         if ( sym->parent_sym == NULL )
           sym->parent_sym = svd->curr_sym;
         if ( !svd->ignore_extern &&
-             !config_bool_get( &opt_ignore_externs, sym->name ) ) {
+             !config_bool_get( &opt_ignore_extern, sym->name ) ) {
           symbol_check_int_link( sym, cursor, sym_loc, svd );
         }
         cursor_visit_def( cursor, sym, svd );
@@ -2391,8 +2391,8 @@ void svd_init( symbols_visit_data *svd, tidy_source *source ) {
 
   *svd = (symbols_visit_data){
     .source = source,
-    .ignore_extern = config_bool_get( &opt_ignore_externs, source->path ),
-    .ignore_forwards = config_bool_get( &opt_ignore_forwards, source->path ),
+    .ignore_extern = config_bool_get( &opt_ignore_extern, source->path ),
+    .ignore_forward = config_bool_get( &opt_ignore_forward, source->path ),
     .ignore_undefined = config_bool_get( &opt_ignore_undefined, source->path ),
     .cxx_constructor = {
       .ctor_csr = clang_getNullCursor()
@@ -2482,10 +2482,10 @@ tidy_symbol* symbol_add( CXCursor sym_csr, symbols_visit_data *svd ) {
   // Whether unneeded forward declarations of the symbol are ignored by name is
   // likewise determined once here so it needn't be looked up on every visit.
   // (Ignoring them for the source being visited is checked separately via
-  // svd->ignore_forwards.)
+  // svd->ignore_forward.)
   //
-  if ( config_bool_get( &opt_ignore_forwards, sym->name ) )
-    sym->ignore_forwards = true;
+  if ( config_bool_get( &opt_ignore_forward, sym->name ) )
+    sym->ignore_forward = true;
 
   //
   // Whether the symbol is exempt from being reported as unused depends on the

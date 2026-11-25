@@ -299,9 +299,9 @@ struct tidy_symbol {
    * Is this symbol's name exempt from unneeded forward declarations?
    *
    * @note Ignoring symbols for the source being visited is handled separately
-   * via symbols_visit_data::ignore_forwards.
+   * via symbols_visit_data::ignore_forward.
    */
-  bool          ignore_forwards;
+  bool          ignore_forward;
 
   /**
    * Is this symbol exempt from being reported as unused?
@@ -430,7 +430,7 @@ struct symbols_visit_data {
   tidy_source        *source;           ///< Source file being tidied.
   tidy_symbol        *curr_sym;         ///< Current symbol, if any.
   bool                ignore_extern;    ///< Ignore unneeded external linkage?
-  bool                ignore_forwards;  ///< Ignore unneeded forward decl's?
+  bool                ignore_forward;   ///< Ignore unneeded forward decl's?
   bool                ignore_undefined; ///< Ignore undefined symbols?
 
   /**

@@ -61,8 +61,8 @@ config_bool   opt_ignore_cxx_copy_assigns;
 config_bool   opt_ignore_cxx_copy_ctors;
 config_bool   opt_ignore_cxx_move_assigns;
 config_bool   opt_ignore_cxx_move_ctors;
-config_bool   opt_ignore_externs;
-config_bool   opt_ignore_forwards;
+config_bool   opt_ignore_extern;
+config_bool   opt_ignore_forward;
 config_bool   opt_ignore_undefined;
 config_bool   opt_ignore_unused;
 bool          opt_read_config = true;
@@ -231,8 +231,8 @@ static void options_cleanup( void ) {
   config_bool_cleanup( &opt_ignore_cxx_copy_ctors );
   config_bool_cleanup( &opt_ignore_cxx_move_assigns );
   config_bool_cleanup( &opt_ignore_cxx_move_ctors );
-  config_bool_cleanup( &opt_ignore_externs );
-  config_bool_cleanup( &opt_ignore_forwards );
+  config_bool_cleanup( &opt_ignore_extern );
+  config_bool_cleanup( &opt_ignore_forward );
   config_bool_cleanup( &opt_ignore_undefined );
   config_bool_cleanup( &opt_ignore_unused );
 }
@@ -244,8 +244,8 @@ void options_init( void ) {
   config_bool_init( &opt_ignore_cxx_copy_ctors );
   config_bool_init( &opt_ignore_cxx_move_assigns );
   config_bool_init( &opt_ignore_cxx_move_ctors );
-  config_bool_init( &opt_ignore_externs );
-  config_bool_init( &opt_ignore_forwards );
+  config_bool_init( &opt_ignore_extern );
+  config_bool_init( &opt_ignore_forward );
   config_bool_init( &opt_ignore_undefined );
   config_bool_init( &opt_ignore_unused );
 
