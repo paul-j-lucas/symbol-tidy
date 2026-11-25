@@ -1,3 +1,19 @@
+2026-11-25  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * cli_util.c, cxx_symbol.c, source.c, symbol.c: Using null_or_empty().
+   * symbol-tidy.toml: Added OPT_NO_CONFIG.
+   * Makefile.am: Added symbol-tidy.toml to EXTRA_DIST.
+   * symbol-tidy.css: Fixed notes' blockquotes' background color.
+   * clang_util.c, cxx_symbol.c, symbol.c: Added code coverage exclusion
+     comments.
+   * cli-usage.out, cli-usage.test: Added missing/unknown extension tests.
+   * cli_options.c: Added code coverage exclusion comments.
+   * c-cxx-1.out, c-cxx-2.out, c-cxx-1.test, c-cxx-2.test: Added
+     --files=file.txt tests.
+   * man/man1/symbol-tidy.1: BUGS changes for symbol-tidy.
+   * man/man1/symbol-tidy.1: s/unused symbols/violations/
+   * clang_util.c, clang_util.h, symbol.c: Added tidy_getLocation_File().
+
 2026-11-24  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
    * config_file.c: In config_bool_parse, now using switch on table_kind.
