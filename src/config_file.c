@@ -122,7 +122,34 @@ typedef void (*config_parse_fn)( config_parse_fn_args const *config );
  * A Boolean value plus a possible constraint to make it constraint-specific.
  */
 struct bool_constraint {
-  char const *constraint;               ///< The constraint, if any.
+  /**
+   * The constraint, if any.
+   *
+   * @remarks
+   * @parblock
+   * A constraint can be any string that's interpreted however the user wants,
+   * e.g.:
+   *
+   *  + A path so \ref value applies only for that path; or:
+   *  + A symbol's name so \ref value applies only to that symbol.
+   *
+   * @endparblock
+   *
+   * @note
+   * @parblock
+   * This member _must_ be declared first since both comparison and hash
+   * functions rely on C11 §6.7.2.1¶15:
+   *
+   * > Within a structure object, the ... members ... have addresses that
+   * > increase in the order in which they are declared. A pointer to a
+   * > structure object ... points to its initial member ... and vice versa.
+   * > There may be unnamed padding within a structure object, but not at its
+   * > beginning.
+   *
+   * @endparblock
+   */
+  char const *constraint;
+
   bool        value;                    ///< The Boolean value.
 };
 
@@ -150,7 +177,24 @@ struct config_parse_fn_args {
  * A symbol to ignore set via the `ignore-symbols` key.
  */
 struct ignore_symbol {
-  char const *name;                     ///< Symbol name.
+  /**
+   * The symbol's name.
+   *
+   * @note
+   * @parblock
+   * This member _must_ be declared first since both comparison and hash
+   * functions rely on C11 §6.7.2.1¶15:
+   *
+   * > Within a structure object, the ... members ... have addresses that
+   * > increase in the order in which they are declared. A pointer to a
+   * > structure object ... points to its initial member ... and vice versa.
+   * > There may be unnamed padding within a structure object, but not at its
+   * > beginning.
+   *
+   * @endparblock
+   */
+  char const *name;
+
   char const *path;                     ///< Symbol path; if NULL, any path.
   bool        in_any_cxx_scope;         ///< Match \ref name in any C++ scope?
 };
@@ -1138,15 +1182,7 @@ static void ignore_symbols_dump( void ) {
 
   array_qsort(
     &ignore_symbol_array,
-    //
-    // This relies on C11 §6.7.2.1¶15:
-    //
-    //    Within a structure object, the ... members ... have addresses that
-    //    increase in the order in which they are declared. A pointer to a
-    //    structure object ... points to its initial member ... and vice versa.
-    //    There may be unnamed padding within a structure object, but not at
-    //    its beginning.
-    //
+    // See comment for ignore_symbol::name.
     POINTER_CAST( array_cmp_fn_t, &str_ptr_cmp )
   );
 
@@ -1378,15 +1414,7 @@ void config_bool_init( config_bool *cb ) {
   cb->global_value = false;
   ht_table_init(
     &cb->bool_constraint_set, HT_DINT, 2.0, 10,
-    //
-    // This relies on C11 §6.7.2.1¶15:
-    //
-    //    Within a structure object, the ... members ... have addresses that
-    //    increase in the order in which they are declared. A pointer to a
-    //    structure object ... points to its initial member ... and vice versa.
-    //    There may be unnamed padding within a structure object, but not at
-    //    its beginning.
-    //
+    // See comment for bool_constraint::constraint.
     POINTER_CAST( ht_cmp_fn_t, &str_ptr_cmp ),
     POINTER_CAST( ht_hash_fn_t, &fnv1a_str_ptr )
   );
@@ -1403,15 +1431,7 @@ void config_init( void ) {
   ht_table_init(
     &ignore_symbol_set, HT_DINT, 2.0, 10,
     POINTER_CAST( ht_cmp_fn_t, &ignore_symbol_cmp ),
-    //
-    // This relies on C11 §6.7.2.1¶15:
-    //
-    //    Within a structure object, the ... members ... have addresses that
-    //    increase in the order in which they are declared. A pointer to a
-    //    structure object ... points to its initial member ... and vice versa.
-    //    There may be unnamed padding within a structure object, but not at
-    //    its beginning.
-    //
+    // See comment for ignore_symbol::name.
     POINTER_CAST( ht_hash_fn_t, &fnv1a_str_ptr )
   );
   ht_table_init(

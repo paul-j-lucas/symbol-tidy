@@ -72,7 +72,24 @@ struct tidy_loc {
  * A symbol referenced in a translation unit.
  */
 struct tidy_symbol {
-  char const   *key;                    ///< Unique key.
+  /**
+   * The symbol's unique key.
+   *
+   * @note
+   * @parblock
+   * This member _must_ be declared first since both comparison and hash
+   * functions rely on C11 §6.7.2.1¶15:
+   *
+   * > Within a structure object, the ... members ... have addresses that
+   * > increase in the order in which they are declared. A pointer to a
+   * > structure object ... points to its initial member ... and vice versa.
+   * > There may be unnamed padding within a structure object, but not at its
+   * > beginning.
+   *
+   * @endparblock
+   */
+  char const   *key;
+
   char const   *name;                   ///< Symbol's name.
   char const   *cxx_prototype;          ///< C++ prototype.
   tidy_symbol  *parent_sym;             ///< Parent symbol, if any.

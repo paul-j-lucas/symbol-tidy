@@ -2464,15 +2464,7 @@ tidy_symbol* symbol_add( CXCursor sym_csr, symbols_visit_data *svd ) {
 
   ht_table_init(
     &sym->ref_sym_set, HT_DPTR, 2.0, 128,
-    //
-    // This relies on C11 §6.7.2.1¶15:
-    //
-    //    Within a structure object, the ... members ... have addresses that
-    //    increase in the order in which they are declared. A pointer to a
-    //    structure object ... points to its initial member ... and vice versa.
-    //    There may be unnamed padding within a structure object, but not at
-    //    its beginning.
-    //
+    // See comment for tidy_symbol::key.
     POINTER_CAST( ht_cmp_fn_t, &str_ptr_cmp ),
     POINTER_CAST( ht_hash_fn_t, &fnv1a_str_ptr )
   );
@@ -2528,15 +2520,7 @@ void symbols_init( void ) {
   );
   ht_table_init(
     &tidy_symbol_set, HT_DINT, 2.0, 4096,
-    //
-    // This relies on C11 §6.7.2.1¶15:
-    //
-    //    Within a structure object, the ... members ... have addresses that
-    //    increase in the order in which they are declared. A pointer to a
-    //    structure object ... points to its initial member ... and vice versa.
-    //    There may be unnamed padding within a structure object, but not at
-    //    its beginning.
-    //
+    // See comment for tidy_symbol::key.
     POINTER_CAST( ht_cmp_fn_t, &str_ptr_cmp ),
     POINTER_CAST( ht_hash_fn_t, &fnv1a_str_ptr )
   );
