@@ -1350,12 +1350,12 @@ bool config_bool_get( config_bool *cb, char const *constraint ) {
   assert( cb != NULL );
 
   if ( constraint != NULL ) {
-    bool_constraint find_bs = { .constraint = constraint };
+    bool_constraint find_bc = { .constraint = constraint };
     ht_entry_t const *const entry =
-      ht_table_find( &cb->bool_constraint_set, &find_bs );
+      ht_table_find( &cb->bool_constraint_set, &find_bc );
     if ( entry != NULL ) {
-      bool_constraint const *const found_bs = HT_DINT( entry );
-      return found_bs->value;
+      bool_constraint const *const found_bc = HT_DINT( entry );
+      return found_bc->value;
     }
   }
 
