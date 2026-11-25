@@ -4,6 +4,10 @@ test_symbol_tidy $TIDY_TEST_OPTIONS \
   $TIDY_TEST_CONFIG \
   c-cxx.cpp c-cxx.c c-cxx-main.cpp
 
+test_symbol_tidy $TIDY_TEST_OPTIONS \
+  $TIDY_TEST_CONFIG \
+  -Xtidy --files=c-cxx-2.txt
+
 printf '%s\n' c-cxx.cpp c-cxx.c c-cxx-main.cpp | \
 test_symbol_tidy $TIDY_TEST_OPTIONS \
   $TIDY_TEST_CONFIG \

@@ -11,5 +11,7 @@ $ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --no-conf
 // tidy | c-cxx-main.cpp symbols:
 // tidy |   "main()"
 
+$ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --no-config -Xtidy --files=c-cxx-1.txt
+
 $ symbol-tidy -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --no-config -Xtidy -f-
 
