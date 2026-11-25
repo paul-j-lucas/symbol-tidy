@@ -42,6 +42,7 @@ ignore-symbols = [
   "OPT_FILES",
   "OPT_HELP",
   "OPT_COLOR",
+  "OPT_NO_CONFIG",
   "OPT_NO_CONFIG_LAYERS",
   "OPT_VERSION",
   "OPT_VERBOSE",
