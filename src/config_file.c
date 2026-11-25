@@ -192,6 +192,7 @@ static void   ignore_symbols_parse_string( config_parse_fn_args const* );
 static void   ignore_undefined_parse( config_parse_fn_args const* );
 static void   ignore_unneeded_externs_parse( config_parse_fn_args const* );
 static void   ignore_unneeded_forwards_parse( config_parse_fn_args const* );
+static void   ignore_unused_parse( config_parse_fn_args const* );
 static void   print_statistics( verbose_stat_ctx* );
 static void   print_invalid_value( config_parse_fn_args const*,
                                    toml_value const*, toml_type );
@@ -226,6 +227,7 @@ static config_key const CONFIG_KEYS[] = {
                                 &ignore_unneeded_forwards_parse             },
   { "ignore-paths",             TABLE_SYMBOL_TIDY,    &ignore_paths_parse   },
   { "ignore-symbols",           TABLE_TIDY_OR_SOURCE, &ignore_symbols_parse },
+  { "ignore-unused",            TABLE_TIDY_OR_SOURCE, &ignore_unused_parse },
   { "root-symbols",             TABLE_TIDY_OR_SOURCE, &root_symbols_parse   },
   { "root-symbols-from",        TABLE_SYMBOL_TIDY,
                                 &root_symbols_from_parse                    },
@@ -566,6 +568,15 @@ static void ignore_symbols_parse_string( config_parse_fn_args const *config ) {
     );
     ++warning_count;
   }
+}
+
+/**
+ * Parses the value of an `"ignore-unused"` key.
+ *
+ * @param config The config_parse_fn_args to use.
+ */
+static void ignore_unused_parse( config_parse_fn_args const *config ) {
+  config_bool_parse( config, &opt_ignore_unused );
 }
 
 /**

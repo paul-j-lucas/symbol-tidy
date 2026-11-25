@@ -711,6 +711,11 @@ If true,
 this option causes unneeded forward declarations
 to be ignored.
 .TP
+.BI ignore-unused " \f1=\fP b"
+If true,
+this option causes unused symbols
+to be ignored.
+.TP
 .BI root-symbols " \f1=\fP s" "\f1 | \fP[" s " \f1[,\fP " s "\f1]*\fP ]"
 The symbol names
 (that can be specified as a single string)
@@ -783,6 +788,11 @@ Same as in the
 but only for the source file given for the table name.
 .TP
 .BI ignore-unneeded-forwards " \f1=\fP b"
+Same as in the
+.BR "symbol-tidy Table" ,
+but only for the source file given for the table name.
+.TP
+.BI ignore-unused " \f1=\fP b"
 Same as in the
 .BR "symbol-tidy Table" ,
 but only for the source file given for the table name.

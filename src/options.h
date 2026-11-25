@@ -119,6 +119,7 @@ extern config_bool  opt_ignore_cxx_move_ctors;   ///< Ignore move constructors?
 extern config_bool  opt_ignore_externs; ///< Ignore unneeded external linkage?
 extern config_bool  opt_ignore_forwards;///< Ignore unneeded forwards?
 extern config_bool  opt_ignore_undefined; ///< Ignore undefined symbols?
+extern config_bool  opt_ignore_unused;  ///< Ignore unused symbols?
 extern bool         opt_read_config;    ///< Read configuration file?
 extern tidy_test    opt_test;           ///< Is **symbol-tidy** under test?
 extern tidy_verbose opt_verbose;        ///< Print verbose output?

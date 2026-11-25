@@ -175,7 +175,8 @@ static inline bool symbol_is_undefined( tidy_symbol const *sym ) {
  */
 NODISCARD
 static inline bool symbol_is_unused( tidy_symbol const *sym ) {
-  return !sym->is_used && !sym->is_dead && !symbol_is_undefined( sym );
+  return  !sym->is_used && !sym->is_dead && !sym->is_ignored_if_unused &&
+          !symbol_is_undefined( sym );
 }
 
 ////////// local functions ////////////////////////////////////////////////////
@@ -693,6 +694,23 @@ static char* dup_if_source_path( CXFile file ) {
     strdup_or_exit( path_no_dot_slash( path_cs ) ) : NULL;
   clang_disposeString( path_cxs );
   return rv_path;
+}
+
+/**
+ * Gets whether symbols declared in \a file are exempt from being reported as
+ * unused, either globally or for \a file specifically via `opt_ignore_unused`.
+ *
+ * @param file The file in which a symbol is declared.
+ * @return Returns `true` only if unused symbols declared in \a file are not to
+ * be reported.
+ */
+NODISCARD
+static bool file_ignores_unused( CXFile file ) {
+  CXString const    path_cxs = clang_getFileName( file );
+  char const *const path_cs = path_no_dot_slash( clang_getCString( path_cxs ) );
+  bool const        is_ignored = config_bool_get( &opt_ignore_unused, path_cs );
+  clang_disposeString( path_cxs );
+  return is_ignored;
 }
 
 /**
@@ -2406,6 +2424,15 @@ tidy_symbol* symbol_add( CXCursor sym_csr, symbols_visit_data *svd ) {
   //
   if ( !tidy_Cursor_isForwardDeclarable( sym_csr ) )
     sym->is_defined = true;
+
+  //
+  // Whether the symbol is exempt from being reported as unused depends on the
+  // file in which it's declared, not on the source being visited.  Since this
+  // is done only when the symbol is first added, the result doesn't depend on
+  // the order of sources either.
+  //
+  if ( file_ignores_unused( sym_file ) )
+    sym->is_ignored_if_unused = true;
 
   //
   // If the symbol's name is "main", we have to mark it as a root since nothing
