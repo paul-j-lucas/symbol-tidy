@@ -1,5 +1,7 @@
 2026-11-24  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * config_file.c: In config_bool_parse, now using switch on table_kind.
+   * config_file.c: Eliminated TABLE_NONE -- not used.
    * man/man1/symbol-tidy.1, config_file.c, options.c, options.h, symbol.c,
      symbol.h: Added ignore-unused.
    * man/man1/symbol-tidy.1: Changed --compiler short option to -p; added
