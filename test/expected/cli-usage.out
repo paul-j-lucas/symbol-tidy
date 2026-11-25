@@ -4,3 +4,9 @@ symbol-tidy: error: no source files given
 $ symbol-tidy foo
 symbol-tidy: error: no source files given
 
+$ symbol-tidy -- no-extension
+symbol-tidy: error: "no-extension": can't deduce language without extension; use -x/--language
+
+$ symbol-tidy -- unknown-extension.x
+symbol-tidy: error: "unknown-extension.x": can't deduce language from extension; use -x/--language
+
