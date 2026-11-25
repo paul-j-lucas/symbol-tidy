@@ -366,8 +366,20 @@ static void config_bool_parse( config_parse_fn_args const *config,
   if ( !toml_bool_parse( config, &value ) )
     return;
 
-  char const *const constraint = config->table_kind == TABLE_SYMBOL_TIDY ?
-    NULL : path_no_dot_slash( config->table->key.name );
+  char const *constraint;
+
+  switch ( config->table_kind ) {
+    case TABLE_SYMBOL_TIDY:
+      constraint = NULL;
+      break;
+    case TABLE_SOURCE:
+      constraint = path_no_dot_slash( config->table->key.name );
+      break;
+    case TABLE_SYMBOL:
+      constraint = config->table->key.name;
+      break;
+  } // switch
+
   config_bool_set( rv_cb, value, constraint );
 }
 
@@ -678,7 +690,7 @@ static void bool_constraint_cleanup( bool_constraint *bc ) {
  *
  * @param cb The config_bool to set or insert \a constraint into.
  * @param value The Boolean value.
- * @param constraint The constrainttring this config_bool applies to, if any.
+ * @param constraint The constraint this config_bool applies to, if any.
  */
 static void config_bool_set( config_bool *cb, bool value,
                              char const *constraint ) {
