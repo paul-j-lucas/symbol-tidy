@@ -420,8 +420,8 @@ static bool cursor_is_explicit_config_root( CXCursor sym_csr,
 NODISCARD
 static bool cursor_is_ignored( CXCursor cursor ) {
   CXFile const file = tidy_getCursorLocation_File( cursor );
-  if ( file == NULL )
-    return false;
+  if ( unlikely( file == NULL ) )
+    return false;                       // LCOV_EXCL_LINE
 
   char *const name = tidy_Cursor_getScopedSpelling( cursor );
   bool is_ignored = false;
@@ -1521,8 +1521,8 @@ static void symbol_update_macro_name_loc( tidy_symbol *sym, CXFile sym_file,
     return;
 
   CXCursor const macro_def_csr = clang_getCursorReferenced( macro_exp_csr );
-  if ( tidy_Cursor_isInvalid( macro_def_csr ) )
-    return;
+  if ( unlikely( tidy_Cursor_isInvalid( macro_def_csr ) ) )
+    return;                             // LCOV_EXCL_LINE
 
   CXSourceLocation const macro_name_loc =
     clang_getCursorLocation( macro_def_csr );
@@ -1533,14 +1533,14 @@ static void symbol_update_macro_name_loc( tidy_symbol *sym, CXFile sym_file,
     macro_name_loc, &macro_def_file, &macro_def_line, &macro_def_col,
     /*offset=*/NULL
   );
-  if ( macro_def_file == NULL )
-    return;
+  if ( unlikely( macro_def_file == NULL ) )
+    return;                             // LCOV_EXCL_LINE
 
   char *macro_def_path = NULL;          // NULL means same file as sym
   if ( !clang_File_isEqual( macro_def_file, sym_file ) ) {
     macro_def_path = dup_if_source_path( macro_def_file );
     if ( macro_def_path == NULL )       // e.g., defined in a system header
-      return;
+      return;                           // LCOV_EXCL_LINE
   }
 
   char *const macro_name = tidy_dupCursorSpelling( macro_def_csr );
@@ -2211,7 +2211,7 @@ static void visit_OverloadedDeclRef( CXCursor overloaded_csr,
   unsigned const num_decls = clang_getNumOverloadedDecls( overloaded_csr );
   for ( unsigned i = 0; i < num_decls; ++i ) {
     CXCursor dec_csr = clang_getOverloadedDecl( overloaded_csr, i );
-    if ( tidy_Cursor_isInvalid( dec_csr ) )
+    if ( unlikely( tidy_Cursor_isInvalid( dec_csr ) ) )
       continue;                         // LCOV_EXCL_LINE
     dec_csr = clang_getCanonicalCursor( dec_csr );
     if ( !svd->ignore_forwards )
@@ -2368,8 +2368,8 @@ tidy_symbol* symbol_add( CXCursor sym_csr, symbols_visit_data *svd ) {
   sym_csr = tidy_getSpecializedCursorTemplate( sym_csr );
   sym_csr = clang_getCanonicalCursor( sym_csr );
 
-  if ( tidy_Cursor_isInvalid( sym_csr ) )
-    return NULL;
+  if ( unlikely( tidy_Cursor_isInvalid( sym_csr ) ) )
+    return NULL;                        // LCOV_EXCL_LINE
 
   CXSourceLocation const sym_loc = clang_getCursorLocation( sym_csr );
   CXFile const sym_file = tidy_getLocation_File( sym_loc );

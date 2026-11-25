@@ -154,7 +154,7 @@ enum CXChildVisitResult cxx_base_dtor_add_ref_visitor( CXCursor cursor,
     base_cls_csr = clang_getTypeDeclaration( type );
   }
   base_cls_csr = clang_getCanonicalCursor( base_cls_csr );
-  if ( tidy_Cursor_isInvalid( base_cls_csr ) )
+  if ( unlikely( tidy_Cursor_isInvalid( base_cls_csr ) ) )
     goto skip;                          // LCOV_EXCL_LINE
 
   assert( data != NULL );
@@ -299,7 +299,7 @@ static bool cxx_member_add_refs_by_name( CXCursor cls_csr, char const *name,
   assert( name != NULL );
   assert( svd != NULL );
 
-  if ( tidy_Cursor_isInvalid( cls_csr ) || name[0] == '\0' )
+  if ( unlikely( tidy_Cursor_isInvalid( cls_csr ) || name[0] == '\0' ) )
     return false;                       // LCOV_EXCL_LINE
 
   svd_cxx_member const prev_svd_cxx_member = svd->cxx_member;
@@ -461,7 +461,7 @@ static enum CXChildVisitResult cxx_operator_base_visitor( CXCursor cursor,
     goto skip;
 
   CXCursor const base_csr = tidy_Cursor_getBaseSpecifierClass( cursor );
-  if ( tidy_Cursor_isInvalid( base_csr ) )
+  if ( unlikely( tidy_Cursor_isInvalid( base_csr ) ) )
     goto skip;                          // LCOV_EXCL_LINE
 
   //
@@ -1085,7 +1085,7 @@ enum CXChildVisitResult cxx_find_begin_end_visitor( CXCursor cursor,
         goto skip;
 
       CXCursor param_cls_csr = clang_getTypeDeclaration( canon_type );
-      if ( tidy_Cursor_isInvalid( param_cls_csr ) )
+      if ( unlikely( tidy_Cursor_isInvalid( param_cls_csr ) ) )
         goto skip;                      // LCOV_EXCL_LINE
       param_cls_csr = clang_getCanonicalCursor( param_cls_csr );
       if ( !clang_equalCursors( param_cls_csr, svd->cxx_for_range.cls_csr ) )

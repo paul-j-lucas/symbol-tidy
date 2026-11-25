@@ -146,7 +146,7 @@ enum CXChildVisitResult callsBaseConstructor_visitor( CXCursor cursor,
     goto skip;
 
   CXCursor const ref_csr = clang_getCursorReferenced( cursor );
-  if ( tidy_Cursor_isInvalid( ref_csr ) )
+  if ( unlikely( tidy_Cursor_isInvalid( ref_csr ) ) )
     goto skip;                          // LCOV_EXCL_LINE
 
   enum CXCursorKind const ref_kind = clang_getCursorKind( ref_csr );
@@ -191,7 +191,7 @@ static enum CXChildVisitResult getConstructorInfo_visitor( CXCursor cursor,
         CXType const type = clang_getCursorType( cursor );
         base_cls_csr = clang_getTypeDeclaration( type );
       }
-      if ( tidy_Cursor_isInvalid( base_cls_csr ) )
+      if ( unlikely( tidy_Cursor_isInvalid( base_cls_csr ) ) )
         break;                          // LCOV_EXCL_LINE
       if ( !tidy_Cursor_getConstructorInfo( base_cls_csr, ctor_info ) )
         break;
@@ -210,8 +210,8 @@ static enum CXChildVisitResult getConstructorInfo_visitor( CXCursor cursor,
 
     case CXCursor_UsingDeclaration:;
       CXCursor const ref_csr = clang_getCursorReferenced( cursor );
-      if ( tidy_Cursor_isInvalid( ref_csr ) )
-        break;
+      if ( unlikely( tidy_Cursor_isInvalid( ref_csr ) ) )
+        break;                          // LCOV_EXCL_LINE
       enum CXCursorKind const ref_kind = clang_getCursorKind( ref_csr );
       if ( ref_kind != CXCursor_Constructor )
         break;
@@ -740,8 +740,8 @@ bool tidy_Cursor_callsBaseConstructor( CXCursor ctor_csr,
 }
 
 char* tidy_Cursor_dupFileName( CXCursor cursor ) {
-  if ( tidy_Cursor_isInvalid( cursor ) )
-    return NULL;
+  if ( unlikely( tidy_Cursor_isInvalid( cursor ) ) )
+    return NULL;                        // LCOV_EXCL_LINE
 
   CXFile const    file = tidy_getCursorLocation_File( cursor );
   CXString const  path_cxs = clang_getFileName( file );
@@ -766,7 +766,7 @@ CXCursor tidy_Cursor_getBaseSpecifierClass( CXCursor spec_csr ) {
 
 bool tidy_Cursor_getConstructorInfo( CXCursor cursor,
                                      tidy_ConstructorInfo *ctor_info ) {
-  if ( tidy_Cursor_isInvalid( cursor ) )
+  if ( unlikely( tidy_Cursor_isInvalid( cursor ) ) )
     return false;                       // LCOV_EXCL_LINE
 
   CXType type = clang_getCursorType( cursor );
@@ -816,7 +816,7 @@ CXCursor tidy_Cursor_getDefaultConstructor( CXCursor cls_csr ) {
 }
 
 CXCursor tidy_Cursor_getDestructor( CXCursor cls_csr ) {
-  if ( tidy_Cursor_isInvalid( cls_csr ) )
+  if ( unlikely( tidy_Cursor_isInvalid( cls_csr ) ) )
     return cls_csr;                     // LCOV_EXCL_LINE
   CXCursor const cls_def_csr = tidy_getCursorDefinition( cls_csr );
   CXCursor dtor_csr = clang_getNullCursor();
@@ -863,7 +863,7 @@ char* tidy_Cursor_getScopedSpelling( CXCursor cursor ) {
 }
 
 CXCursor tidy_Cursor_getUnderlyingTypeDecl( CXCursor cursor ) {
-  if ( tidy_Cursor_isInvalid( cursor ) )
+  if ( unlikely( tidy_Cursor_isInvalid( cursor ) ) )
     return cursor;                      // LCOV_EXCL_LINE
 
   CXType  type = clang_getCursorType( cursor );
@@ -1189,8 +1189,8 @@ char* tidy_dupCString( CXString cxs ) {
 }
 
 char* tidy_dupCursorSpelling( CXCursor cursor ) {
-  if ( tidy_Cursor_isInvalid( cursor ) )
-    return NULL;
+  if ( unlikely( tidy_Cursor_isInvalid( cursor ) ) )
+    return NULL;                        // LCOV_EXCL_LINE
   CXString const name_cxs = clang_getCursorSpelling( cursor );
   return tidy_dupCString( name_cxs );
 }
@@ -1442,8 +1442,8 @@ bool tidy_isEscapedNewline( CXTranslationUnit tu, CXToken const *tokens,
 }
 
 bool tidy_Location_isFromFile( CXSourceLocation sloc, CXFile file ) {
-  if ( file == NULL )
-    return false;
+  if ( unlikely( file == NULL ) )
+    return false;                       // LCOV_EXCL_LINE
   CXFile const loc_file = tidy_getFileLocation_File( sloc );
   return loc_file != NULL && clang_File_isEqual( loc_file, file );
 }
@@ -1494,7 +1494,7 @@ CXCursor tidy_Token_getScopedNameCursor( CXTranslationUnit tu,
       if ( (t = tidy_Token_getNext( tokens, token_count, &next_idx )) == NULL )
         break;
       CXCursor const next_csr = tidy_getCursorByNameToken( tu, *t, rv_csr );
-      if ( tidy_Cursor_isInvalid( next_csr ) )
+      if ( unlikely( tidy_Cursor_isInvalid( next_csr ) ) )
         break;                          // LCOV_EXCL_LINE
 
       rv_csr = next_csr;
