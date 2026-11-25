@@ -744,8 +744,8 @@ static bool file_previously_seen( CXFile file, symbols_visit_data *svd ) {
   // Consecutive top-level cursors are usually from the same file: if so,
   // return the last result.
   //
-  if ( clang_File_isEqual( file, svd->fps.last_file ) )
-    return svd->fps.last_seen;
+  if ( clang_File_isEqual( file, svd->fps_cache.last_file ) )
+    return svd->fps_cache.last_seen;
 
   bool seen = false;
 
@@ -765,8 +765,8 @@ static bool file_previously_seen( CXFile file, symbols_visit_data *svd ) {
       ++stats.header.revisit_count;
   }
 
-  svd->fps.last_file = file;
-  svd->fps.last_seen = seen;
+  svd->fps_cache.last_file = file;
+  svd->fps_cache.last_seen = seen;
   return seen;
 }
 

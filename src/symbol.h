@@ -463,10 +463,10 @@ struct symbols_visit_data {
    * Mini file_previously_seen() result cache that allows cursors from header
    * files we've already visited to be skipped.
    */
-  struct svd_fps {
+  struct svd_fps_cache {
     CXFile      last_file;        ///< The file for the last cursor.
     bool        last_seen;        ///< Saw \ref last_file?
-  } fps;
+  } fps_cache;
 
   /**
    * Additional data for visit_Constructor().
