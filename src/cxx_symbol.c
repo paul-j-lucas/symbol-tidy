@@ -31,6 +31,7 @@
 #include "fnv1a.h"
 #include "hash_table.h"
 #include "source.h"
+#include "str_util.h"
 #include "symbol.h"
 #include "symbol-tidy.h"
 #include "util.h"
@@ -545,10 +546,10 @@ static bool cxx_tmpl_ctors_param( CXCursor spec_csr, unsigned param_idx ) {
 
   bool              is_param_constructed = true;
   CXString const    name_cxs = clang_getCursorSpelling( tpvd.found_csr );
-  char const *const name = clang_getCString( name_cxs );
+  char const *const name_cs = clang_getCString( name_cxs );
 
-  if ( name != NULL && name[0] != '\0' ) {
-    cxx_tmpl_ctors_visitor_data tcvd = { .find_param_name = name };
+  if ( !null_or_empty( name_cs ) ) {
+    cxx_tmpl_ctors_visitor_data tcvd = { .find_param_name = name_cs };
     tidy_visitClassChildren( tmpl_csr, &cxx_tmpl_ctors_visitor, &tcvd );
     is_param_constructed = tcvd.is_param_constructed;
   }
@@ -708,13 +709,8 @@ static bool cxx_type_ctors_param( CXType type, char const *find_param_name,
   decl_csr = clang_getTypeDeclaration( type );
   enum CXCursorKind kind = clang_getCursorKind( decl_csr );
 
-  if ( kind == CXCursor_TemplateTypeParameter ) {
-    CXString const    name_cxs = clang_getCursorSpelling( decl_csr );
-    char const *const name = clang_getCString( name_cxs );
-    bool const found = name != NULL && strcmp( name, find_param_name ) == 0;
-    clang_disposeString( name_cxs );
-    return found;
-  }
+  if ( kind == CXCursor_TemplateTypeParameter )
+    return tidy_Cursor_isSpellingEqualTo( decl_csr, find_param_name );
 
   int const num_args = clang_Type_getNumTemplateArguments( type );
   for ( int i = 0; i < num_args; ++i ) {
@@ -1160,8 +1156,8 @@ void cxx_member_add_ref( CXCursor member_csr, symbols_visit_data *svd ) {
     if ( clang_getTokenKind( tokens[i] ) != CXToken_Identifier )
       continue;
     CXString const    name_cxs = clang_getTokenSpelling( tu, tokens[i] );
-    char const *const name = clang_getCString( name_cxs );
-    cxx_member_add_refs_by_name( cls_csr, name, svd );
+    char const *const name_cs = clang_getCString( name_cxs );
+    cxx_member_add_refs_by_name( cls_csr, name_cs, svd );
     clang_disposeString( name_cxs );
     break;
   } // for

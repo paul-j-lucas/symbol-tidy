@@ -150,7 +150,7 @@ static void source_check_diagnostics( tidy_source const *source ) {
         CXString const    diag_path_cxs = clang_getFileName( diag_file );
         char const *const diag_path_cs = clang_getCString( diag_path_cxs );
 
-        if ( diag_path_cs != NULL && diag_path_cs[0] != '\0' ) {
+        if ( !null_or_empty( diag_path_cs ) ) {
           print_file_error(
             diag_path_cs, diag_line, diag_col, "%s\n", diag_msg_cs
           );

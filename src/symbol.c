@@ -425,7 +425,7 @@ static bool cursor_is_ignored( CXCursor cursor ) {
 
   char *const name = tidy_Cursor_getScopedSpelling( cursor );
   bool is_ignored = false;
-  if ( name != NULL && name[0] != '\0' ) {
+  if ( !null_or_empty( name ) ) {
     CXString const    path_cxs = clang_getFileName( file );
     char const *const path_cs = clang_getCString( path_cxs );
     is_ignored = config_symbol_is_ignored( name, path_cs );
@@ -1686,7 +1686,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       //
       CXString const    name_cxs = clang_getCursorSpelling( cursor );
       char const *const name = clang_getCString( name_cxs );
-      if ( name != NULL && name[0] != '\0' )
+      if ( !null_or_empty( name ) )
         cxx_adl_name_set_add( name );
       clang_disposeString( name_cxs );
     }

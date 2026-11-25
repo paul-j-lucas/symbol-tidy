@@ -27,6 +27,7 @@
 #include "pjl_config.h"                 /* must go first */
 #include "cli_util.h"
 #include "cli_options.h"
+#include "str_util.h"
 #include "strbuf.h"
 #include "util.h"
 
@@ -70,7 +71,7 @@ char const* get_long_opt_value( int argc, char const *const argv[],
   }
   else if ( ++*pargi < argc ) {
     char const *const value = argv[ *pargi ];
-    if ( value != NULL && value[0] != '\0' && value[0] != '-' )
+    if ( !null_or_empty( value ) && value[0] != '-' )
       return value;
   }
 
@@ -131,7 +132,7 @@ char const* get_short_opt_value( int argc, char const *const argv[],
     return argv[ *pargi ] + 2;
   if ( ++*pargi < argc ) {
     char const *const value = argv[ *pargi ];
-    if ( value != NULL && value[0] != '\0' && value[0] != '-' )
+    if ( !null_or_empty( value ) && value[0] != '-' )
       return value;
   }
 
