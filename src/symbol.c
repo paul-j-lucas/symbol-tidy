@@ -100,6 +100,11 @@ static bool cursor_is_explicit_config_root( CXCursor, char const* ),
 
 static void symbol_add_def( tidy_symbol*, CXSourceLocation,
                             symbols_visit_data const* );
+
+NODISCARD
+static bool symbol_ignores_forwards( tidy_symbol const*, CXCursor,
+                                     symbols_visit_data const* );
+
 static void symbol_print_name_quoted( tidy_symbol const*, FILE* );
 static void symbol_update_macro_name_loc( tidy_symbol*, CXFile,
                                           symbols_visit_data const* );
@@ -664,7 +669,7 @@ static void cursor_visit_ref( CXCursor cursor, symbols_visit_data *svd ) {
       break;
 
     case CXCursor_FunctionDecl:
-      if ( !svd->ignore_forwards )
+      if ( !symbol_ignores_forwards( /*sym=*/NULL, cursor, svd ) )
         fwd_dec_maybe_unneeded( cursor, svd );
       break;
 
@@ -1330,6 +1335,45 @@ static int symbol_cmp_by_def_loc( tidy_symbol const *i_sym,
 }
 
 /**
+ * Gets whether unneeded forward declarations are to be ignored for a symbol,
+ * either because they're ignored for the source being visited or because
+ * `opt_ignore_forwards` is set for the symbol's name.
+ *
+ * @remarks If \a sym is not NULL, uses the result cached in \a sym when it was
+ * first added.  Otherwise (e.g., the symbol is excluded so has no
+ * tidy_symbol), looks up the name of \a sym_csr, resolved the same way
+ * symbol_add() does so that the name is the same as tidy_symbol::name.
+ *
+ * @param sym The symbol for \a sym_csr, if any.
+ * @param sym_csr The cursor of \a sym.
+ * @param svd The symbols_visit_data to use.
+ * @return Returns `true` only if unneeded forward declarations are are to be
+ * ignored.
+ */
+NODISCARD
+static bool symbol_ignores_forwards( tidy_symbol const *sym, CXCursor sym_csr,
+                                     symbols_visit_data const *svd ) {
+  assert( svd != NULL );
+
+  if ( svd->ignore_forwards )
+    return true;
+  if ( sym != NULL )
+    return sym->ignore_forwards;
+
+  sym_csr = tidy_getSpecializedCursorTemplate( sym_csr );
+  sym_csr = clang_getCanonicalCursor( sym_csr );
+  if ( unlikely( tidy_Cursor_isInvalid( sym_csr ) ) )
+    return false;                       // LCOV_EXCL_LINE
+
+  char *const name = tidy_Cursor_getScopedSpelling( sym_csr );
+  if ( unlikely( name == NULL ) )
+    return false;                       // LCOV_EXCL_LINE
+  bool const is_ignored = config_bool_get( &opt_ignore_forwards, name );
+  free( name );
+  return is_ignored;
+}
+
+/**
  * Gets whether \a sym is within a scope that is ununsed.
  *
  * @param sym The symbol to check.
@@ -1764,8 +1808,10 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
         sym->is_defined = true;
         if ( sym->parent_sym == NULL )
           sym->parent_sym = svd->curr_sym;
-        if ( !svd->ignore_extern )
+        if ( !svd->ignore_extern &&
+             !config_bool_get( &opt_ignore_externs, sym->name ) ) {
           symbol_check_int_link( sym, cursor, sym_loc, svd );
+        }
         cursor_visit_def( cursor, sym, svd );
       }
     }
@@ -2074,7 +2120,7 @@ static void visit_FieldDecl( CXCursor field_csr, symbols_visit_data *svd ) {
 static void visit_FunctionDecl( CXCursor fn_csr, symbols_visit_data *svd ) {
   assert( svd != NULL );
 
-  if ( !svd->ignore_forwards )
+  if ( !symbol_ignores_forwards( svd->curr_sym, fn_csr, svd ) )
     fwd_dec_visit_def( fn_csr, svd );
 
   if ( svd->source->lang != CXLanguage_CPlusPlus || svd->curr_sym == NULL )
@@ -2168,10 +2214,10 @@ static void visit_most_Ref( CXCursor cursor, symbols_visit_data *svd ) {
     return;
   }
 
-  if ( !svd->ignore_forwards )
+  tidy_symbol *const ref_sym = symbol_add( ref_csr, svd );
+  if ( !symbol_ignores_forwards( ref_sym, ref_csr, svd ) )
     fwd_dec_visit_ref( ref_csr, svd );
 
-  tidy_symbol *const ref_sym = symbol_add( ref_csr, svd );
   if ( ref_sym != NULL ) {
     symbol_add_ref( svd->curr_sym, ref_sym, svd );
     if ( svd->source->lang == CXLanguage_CPlusPlus )
@@ -2214,9 +2260,11 @@ static void visit_OverloadedDeclRef( CXCursor overloaded_csr,
     if ( unlikely( tidy_Cursor_isInvalid( dec_csr ) ) )
       continue;                         // LCOV_EXCL_LINE
     dec_csr = clang_getCanonicalCursor( dec_csr );
-    if ( !svd->ignore_forwards )
+    tidy_symbol *const dec_sym = symbol_add( dec_csr, svd );
+    if ( !symbol_ignores_forwards( dec_sym, dec_csr, svd ) )
       fwd_dec_visit_ref( dec_csr, svd );
-    cursor_add_ref( dec_csr, svd );
+    if ( dec_sym != NULL )
+      symbol_add_ref( svd->curr_sym, dec_sym, svd );
   } // for
 }
 
@@ -2431,13 +2479,24 @@ tidy_symbol* symbol_add( CXCursor sym_csr, symbols_visit_data *svd ) {
     sym->is_defined = true;
 
   //
+  // Whether unneeded forward declarations of the symbol are ignored by name is
+  // likewise determined once here so it needn't be looked up on every visit.
+  // (Ignoring them for the source being visited is checked separately via
+  // svd->ignore_forwards.)
+  //
+  if ( config_bool_get( &opt_ignore_forwards, sym->name ) )
+    sym->ignore_forwards = true;
+
+  //
   // Whether the symbol is exempt from being reported as unused depends on the
   // file in which it's declared, not on the source being visited.  Since this
   // is done only when the symbol is first added, the result doesn't depend on
   // the order of sources either.
   //
-  if ( file_ignores_unused( sym_file ) )
+  if ( config_bool_get( &opt_ignore_unused, sym->name ) ||
+       file_ignores_unused( sym_file ) ) {
     sym->is_ignored_if_unused = true;
+  }
 
   //
   // If the symbol's name is "main", we have to mark it as a root since nothing
@@ -2484,8 +2543,9 @@ done:
   // once by a source for which checking is enabled, no matter which source is
   // visited first, so the result doesn't depend on the order of sources.
   //
-  if ( !svd->ignore_undefined && !sym->is_defined &&
-       sym->dec_loc.path == NULL ) {
+  if ( !sym->is_defined && sym->dec_loc.path == NULL &&
+       !svd->ignore_undefined &&
+       !config_bool_get( &opt_ignore_undefined, sym->name ) ) {
     sym->dec_loc = loc_from_SourceLocation( sym_loc );
   }
 

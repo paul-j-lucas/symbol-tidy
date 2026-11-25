@@ -296,6 +296,36 @@ struct tidy_symbol {
   hash_table_t  cxx_adl_usr_set;
 
   /**
+   * Is this symbol's name exempt from unneeded forward declarations?
+   *
+   * @note Ignoring symbols for the source being visited is handled separately
+   * via symbols_visit_data::ignore_forwards.
+   */
+  bool          ignore_forwards;
+
+  /**
+   * Is this symbol exempt from being reported as unused?
+   *
+   * @remarks
+   * @parblock
+   * This is determined by \ref opt_ignore_unused for the file in which the
+   * symbol is declared --- _not_ by the source file that happens to include
+   * that file.  For example, if \ref opt_ignore_unused is set for `foo.h`,
+   * then only the symbols declared in `foo.h` are exempt no matter which
+   * source includes it.
+   *
+   * Unlike \ref is_dead "is_dead", it affects _only_ whether the symbol is
+   * reported as unused: the symbol is still \ref is_defined "defined" (so it
+   * is never reported as undefined), still marks everything it references as
+   * used (if it's itself used), and is still considered for unneeded external
+   * linkage and unneeded forward declarations.
+   * @endparblock
+   *
+   * @sa symbol_is_unused()
+   */
+  bool          is_ignored_if_unused;
+
+  /**
    * Is this symbol defined somewhere (or doesn't need to be)?
    *
    * @remarks
@@ -366,28 +396,6 @@ struct tidy_symbol {
    * @sa symbol_in_unused_scope()
    */
   bool          is_dead;
-
-  /**
-   * Is this symbol exempt from being reported as unused?
-   *
-   * @remarks
-   * @parblock
-   * This is determined by \ref opt_ignore_unused for the file in which the
-   * symbol is declared --- _not_ by the source file that happens to include
-   * that file.  For example, if \ref opt_ignore_unused is set for `foo.h`,
-   * then only the symbols declared in `foo.h` are exempt no matter which
-   * source includes it.
-   *
-   * Unlike \ref is_dead "is_dead", it affects _only_ whether the symbol is
-   * reported as unused: the symbol is still \ref is_defined "defined" (so it
-   * is never reported as undefined), still marks everything it references as
-   * used (if it's itself used), and is still considered for unneeded external
-   * linkage and unneeded forward declarations.
-   * @endparblock
-   *
-   * @sa symbol_is_unused()
-   */
-  bool          is_ignored_if_unused;
 
   /**
    * Is this symbol a scope?

@@ -92,6 +92,7 @@ enum config_table_kind {
 };
 
 /// @cond DOXYGEN_IGNORE
+#define TABLE_ANY                 STATIC_CAST( config_table_kind, ~0 )
 #define TABLE_TIDY_OR_SOURCE      (TABLE_SYMBOL_TIDY | TABLE_SOURCE)
 #define TABLE_TIDY_OR_SYMBOL      (TABLE_SYMBOL_TIDY | TABLE_SYMBOL)
 /// @endcond
@@ -262,15 +263,15 @@ static config_key const CONFIG_KEYS[] = {
                                 &ignore_cxx_move_assigns_parse              },
   { "ignore-cxx-move-ctors",    TABLE_TIDY_OR_SYMBOL,
                                 &ignore_cxx_move_ctors_parse                },
-  { "ignore-undefined",         TABLE_TIDY_OR_SOURCE,
+  { "ignore-undefined",         TABLE_ANY,
                                 &ignore_undefined_parse                     },
-  { "ignore-unneeded-externs",  TABLE_TIDY_OR_SOURCE,
+  { "ignore-unneeded-externs",  TABLE_ANY,
                                 &ignore_unneeded_externs_parse              },
-  { "ignore-unneeded-forwards", TABLE_TIDY_OR_SOURCE,
+  { "ignore-unneeded-forwards", TABLE_ANY,
                                 &ignore_unneeded_forwards_parse             },
   { "ignore-paths",             TABLE_SYMBOL_TIDY,    &ignore_paths_parse   },
   { "ignore-symbols",           TABLE_TIDY_OR_SOURCE, &ignore_symbols_parse },
-  { "ignore-unused",            TABLE_TIDY_OR_SOURCE, &ignore_unused_parse },
+  { "ignore-unused",            TABLE_ANY,            &ignore_unused_parse },
   { "root-symbols",             TABLE_TIDY_OR_SOURCE, &root_symbols_parse   },
   { "root-symbols-from",        TABLE_SYMBOL_TIDY,
                                 &root_symbols_from_parse                    },
