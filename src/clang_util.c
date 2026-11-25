@@ -1270,19 +1270,8 @@ CXSourceRange tidy_getCursorExtent( CXCursor cursor ) {
 }
 
 CXFile tidy_getCursorLocation_File( CXCursor cursor ) {
-  CXSourceLocation const  sloc = clang_getCursorLocation( cursor );
-  CXFile                  file = tidy_getSpellingLocation_File( sloc );
-
-  if ( file == NULL ) {
-    //
-    // If tidy_getSpellingLocation_File() returns a NULL file, it can mean that
-    // the symbol was formed via preprocessor token pasting, e.g., foo_ ## bar.
-    // Fall back to tidy_getFileLocation_File().
-    //
-    file = tidy_getFileLocation_File( sloc );
-  }
-
-  return file;
+  CXSourceLocation const sloc = clang_getCursorLocation( cursor );
+  return tidy_getLocation_File( sloc );
 }
 
 char* tidy_getCursorUSR( CXCursor cursor ) {
@@ -1350,6 +1339,21 @@ CXFileUniqueID tidy_getFileUniqueID( CXFile file ) {
     // LCOV_EXCL_STOP
   }
   return fuid;
+}
+
+CXFile tidy_getLocation_File( CXSourceLocation sloc ) {
+  CXFile file = tidy_getSpellingLocation_File( sloc );
+
+  if ( file == NULL ) {
+    //
+    // If tidy_getSpellingLocation_File() returns a NULL file, it can mean that
+    // the symbol was formed via preprocessor token pasting, e.g., foo_ ## bar.
+    // Fall back to tidy_getFileLocation_File().
+    //
+    file = tidy_getFileLocation_File( sloc );
+  }
+
+  return file;
 }
 
 CXCursor tidy_getSpecializedCursorTemplate( CXCursor cursor ) {

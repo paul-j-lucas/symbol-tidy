@@ -561,6 +561,8 @@ CXSourceRange tidy_getCursorExtent( CXCursor cursor );
  *
  * @param cursor The cursor to use.
  * @return Returns the file \a cursor is in, if any.
+ *
+ * @sa tidy_getLocation_File()
  */
 NODISCARD
 CXFile tidy_getCursorLocation_File( CXCursor cursor );
@@ -604,6 +606,16 @@ inline CXFile tidy_getFileLocation_File( CXSourceLocation sloc ) {
  */
 NODISCARD
 CXFileUniqueID tidy_getFileUniqueID( CXFile file );
+
+/**
+ * Calls tidy_getSpellingLocation_File() on \a sloc and returns only the file.
+ *
+ * @param sloc The source location to get the file from.
+ * @return Returns the file of \a sloc.
+ *
+ * @sa tidy_getCursorLocation_File()
+ */
+CXFile tidy_getLocation_File( CXSourceLocation sloc );
 
 /**
  * Calls `clang_getSpellingLocation()` and returns only the file.

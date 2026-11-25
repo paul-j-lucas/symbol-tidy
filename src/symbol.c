@@ -2368,9 +2368,12 @@ tidy_symbol* symbol_add( CXCursor sym_csr, symbols_visit_data *svd ) {
 
   if ( tidy_Cursor_isInvalid( sym_csr ) )
     return NULL;
-  CXFile const sym_file = tidy_getCursorLocation_File( sym_csr );
+
+  CXSourceLocation const sym_loc = clang_getCursorLocation( sym_csr );
+  CXFile const sym_file = tidy_getLocation_File( sym_loc );
   if ( sym_file == NULL )
     return NULL;
+
   if ( tidy_Cursor_inAnonymousClass( sym_csr ) )
     return NULL;
   if ( tidy_Cursor_isReservedName( sym_csr, svd->source->lang ) )
@@ -2489,8 +2492,7 @@ done:
   //
   if ( !svd->ignore_undefined && !sym->is_defined &&
        sym->dec_loc.path == NULL ) {
-    CXSourceLocation const sloc = clang_getCursorLocation( sym_csr );
-    sym->dec_loc = loc_from_SourceLocation( sloc );
+    sym->dec_loc = loc_from_SourceLocation( sym_loc );
   }
 
 skip:
