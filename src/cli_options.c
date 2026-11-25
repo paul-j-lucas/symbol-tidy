@@ -929,7 +929,7 @@ static void sources_init_argv( array_t *sources, int argc,
   } // for
 
   if ( compiler_path == NULL )
-    return;
+    return;                             // LCOV_EXCL_LINE
 
   if ( did_lang[0] )
     argv_add_include_paths( &ptu_argv[0], compiler_path, CXLanguage_C );
@@ -986,8 +986,10 @@ void cli_options_init( int argc, char const *argv[], array_t *rv_sources ) {
         opt_config_path = optarg;
         break;
       case COPT(DEBUG):
+        // LCOV_EXCL_START
         opt_debug = true;
         break;
+        // LCOV_EXCL_STOP
       case COPT(DIRECTORY):
         opt_directory = optarg;
         break;
