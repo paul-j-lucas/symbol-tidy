@@ -22,14 +22,14 @@ ACLOCAL_AMFLAGS =	-I m4
 SUBDIRS =		lib src man test
 
 EXTRA_DIST =		bootstrap \
-			Doxygen.sed \
 			Doxyfile \
+			Doxygen-pjl.css \
+			Doxygen.sed \
 			lcovrc \
 			m4/gnulib-cache.m4 \
 			m4/update_m4.sh \
 			makedoc.sh \
 			src/include-tidy.toml \
-			symbol-tidy.css \
 			README.md
 
 DOCS_DIR =		docs
