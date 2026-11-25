@@ -354,6 +354,7 @@ struct tidy_symbol {
    * Is this symbol a scope?
    *
    * @remarks
+   * @parblock
    * Consider a class:
    *
    *      struct point {
@@ -365,6 +366,7 @@ struct tidy_symbol {
    * If all are unused (meaning the entire `struct` is unused), it's much less
    * verbose and necessary to report only that `point` (the `struct`) is unused
    * rather than reporting that every symbol "in" `point` is unused also.
+   * @endparblock
    *
    * @sa symbol_in_unused_scope()
    * @sa tidy_Cursor_isEnclosingScope()
