@@ -1341,7 +1341,8 @@ static void toml_value_print( toml_value const *value, FILE *fout ) {
 void config_bool_cleanup( config_bool *cb ) {
   if ( cb != NULL ) {
     ht_table_cleanup(
-      &cb->bool_constraint_set, POINTER_CAST( ht_free_fn_t, &bool_constraint_cleanup )
+      &cb->bool_constraint_set,
+      POINTER_CAST( ht_free_fn_t, &bool_constraint_cleanup )
     );
   }
 }
