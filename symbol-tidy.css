@@ -46,6 +46,12 @@
   padding-right: 1em;
 }
 
+/* Make blockquotes inside @note match the note's background */
+dl.note blockquote.doxtable {
+  background-color: var(--note-color-bg);
+  border-left-color: var(--note-color-hl);
+}
+
 /* Make "Remarks" section look like it used to. */
 dl.remark {
   background: var(--page-background-color);
