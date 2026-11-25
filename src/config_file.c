@@ -86,7 +86,6 @@ enum config_opts {
  * Table kind.
  */
 enum config_table_kind {
-  TABLE_NONE        = 0,                ///< No table.
   TABLE_SYMBOL_TIDY = 1 << 0,           ///< The `symbol-tidy` table.
   TABLE_SOURCE      = 1 << 1,           ///< Source table.
   TABLE_SYMBOL      = 1 << 2            ///< Symbol table.
@@ -237,7 +236,6 @@ static config_key const CONFIG_KEYS[] = {
  * Strings for table kinds.
  */
 static char const *const TABLE_KINDS[] = {
-  [ TABLE_NONE ] = "none",
   [ TABLE_SYMBOL_TIDY ] = TABLE_SYMBOL_TIDY_NAME,
   [ TABLE_SOURCE ] = "source",
   [ TABLE_SYMBOL ] = "symbol",
