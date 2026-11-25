@@ -368,9 +368,9 @@ static void config_bool_parse( config_parse_fn_args const *config,
   if ( !toml_bool_parse( config, &value ) )
     return;
 
-  char const *const s = config->table_kind == TABLE_SYMBOL_TIDY ?
+  char const *const constraint = config->table_kind == TABLE_SYMBOL_TIDY ?
     NULL : path_no_dot_slash( config->table->key.name );
-  config_bool_set( rv_cb, value, s );
+  config_bool_set( rv_cb, value, constraint );
 }
 
 /**
