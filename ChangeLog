@@ -1,5 +1,7 @@
 2026-11-25  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * man/man1/symbol-tidy.1, config_file.c, symbol.c, symbol.h: Can now ignore
+     based either on file or symbol.
    * cli_util.c, cxx_symbol.c, source.c, symbol.c: Using null_or_empty().
    * symbol-tidy.toml: Added OPT_NO_CONFIG.
    * Makefile.am: Added symbol-tidy.toml to EXTRA_DIST.
