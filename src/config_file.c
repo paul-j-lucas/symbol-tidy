@@ -99,7 +99,7 @@ enum config_table_kind {
 
 ////////// typedefs ///////////////////////////////////////////////////////////
 
-typedef struct  bool_str              bool_str;
+typedef struct  bool_constraint       bool_constraint;
 typedef enum    config_opts           config_opts;
 typedef struct  config_key            config_key;
 typedef struct  config_parse_fn_args  config_parse_fn_args;
@@ -120,10 +120,10 @@ typedef void (*config_parse_fn)( config_parse_fn_args const *config );
 ////////// structs ////////////////////////////////////////////////////////////
 
 /**
- * A "bool string" is a Boolean value plus a string to make it string-specific.
+ * A Boolean value plus a possible constraint to make it constraint-specific.
  */
-struct bool_str {
-  char const *s;                        ///< The string.
+struct bool_constraint {
+  char const *constraint;               ///< The constraint, if any.
   bool        value;                    ///< The Boolean value.
 };
 
@@ -170,7 +170,7 @@ struct root_symbol {
 ////////// local functions ////////////////////////////////////////////////////
 
 static void   color_parse( config_parse_fn_args const* );
-static void   config_str_set( config_bool*, bool, char const* );
+static void   config_bool_set( config_bool*, bool, char const* );
 
 NODISCARD
 static FILE*  config_open( char const*, config_opts );
@@ -370,7 +370,7 @@ static void config_bool_parse( config_parse_fn_args const *config,
 
   char const *const s = config->table_kind == TABLE_SYMBOL_TIDY ?
     NULL : path_no_dot_slash( config->table->key.name );
-  config_str_set( rv_cb, value, s );
+  config_bool_set( rv_cb, value, s );
 }
 
 /**
@@ -666,34 +666,35 @@ static void root_symbols_parse_string( config_parse_fn_args const *config ) {
 ////////// local functions ////////////////////////////////////////////////////
 
 /**
- * Cleans-up a bool_str.
+ * Cleans-up a bool_constraint.
  *
- * @param bs The bool_str to clean-up.  If NULL, does nothing.
+ * @param bc The bool_constraint to clean-up.  If NULL, does nothing.
  */
-static void bool_str_cleanup( bool_str *bs ) {
-  if ( bs != NULL )
-    FREE( bs->s );
+static void bool_constraint_cleanup( bool_constraint *bc ) {
+  if ( bc != NULL )
+    FREE( bc->constraint );
 }
 
 /**
- * Sets the Boolean value for \a cb, either globally or only for \a s.
+ * Sets the Boolean value for \a cb, either globally or only for \a constraint.
  *
- * @param cb The config_bool to set or insert \a s into.
+ * @param cb The config_bool to set or insert \a constraint into.
  * @param value The Boolean value.
- * @param s The string this config_bool applies to, if any.
+ * @param constraint The constrainttring this config_bool applies to, if any.
  */
-static void config_str_set( config_bool *cb, bool value, char const *s ) {
+static void config_bool_set( config_bool *cb, bool value,
+                             char const *constraint ) {
   assert( cb != NULL );
-  if ( s == NULL ) {
+  if ( constraint == NULL ) {
     cb->global_value = value;
   }
   else {
-    bool_str new_bs = { .s = s, .value = value };
+    bool_constraint new_bc = { .value = value, .constraint = constraint };
     ht_insert_rv_t const hti =
-      ht_table_insert( &cb->bool_str_set, &new_bs, sizeof new_bs );
+      ht_table_insert( &cb->bool_constraint_set, &new_bc, sizeof new_bc );
     if ( hti.inserted ) {
-      bool_str *const bs = HT_DINT( hti.entry );
-      bs->s = strdup_or_exit( s );
+      bool_constraint *const bc = HT_DINT( hti.entry );
+      bc->constraint = strdup_or_exit( constraint );
     }
   }
 }
@@ -1340,23 +1341,24 @@ static void toml_value_print( toml_value const *value, FILE *fout ) {
 void config_bool_cleanup( config_bool *cb ) {
   if ( cb != NULL ) {
     ht_table_cleanup(
-      &cb->bool_str_set, POINTER_CAST( ht_free_fn_t, &bool_str_cleanup )
+      &cb->bool_constraint_set, POINTER_CAST( ht_free_fn_t, &bool_constraint_cleanup )
     );
   }
 }
 
-bool config_bool_get( config_bool *cb, char const *s ) {
+bool config_bool_get( config_bool *cb, char const *constraint ) {
   assert( cb != NULL );
 
-  if ( s != NULL ) {
-    bool_str find_bs = { .s = s };
+  if ( constraint != NULL ) {
+    bool_constraint find_bs = { .constraint = constraint };
     ht_entry_t const *const entry =
-      ht_table_find( &cb->bool_str_set, &find_bs );
+      ht_table_find( &cb->bool_constraint_set, &find_bs );
     if ( entry != NULL ) {
-      bool_str const *const found_bs = HT_DINT( entry );
+      bool_constraint const *const found_bs = HT_DINT( entry );
       return found_bs->value;
     }
   }
+
   return cb->global_value;
 }
 
@@ -1364,7 +1366,7 @@ void config_bool_init( config_bool *cb ) {
   assert( cb != NULL );
   cb->global_value = false;
   ht_table_init(
-    &cb->bool_str_set, HT_DINT, 2.0, 10,
+    &cb->bool_constraint_set, HT_DINT, 2.0, 10,
     //
     // This relies on C11 §6.7.2.1¶15:
     //

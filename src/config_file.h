@@ -57,7 +57,8 @@ typedef struct config_bool config_bool;
  * @remarks
  * @parblock
  * A `config_bool` is like a built-in `bool` except it can have per-string
- * (symbol) overrides.  For example, a configuration file that contains:
+ * constraint (file or symbol) overrides.  For example, a configuration file
+ * that contains:
  *
  *      [symbol-tidy]
  *      ignore-cxx-copy-assigns = true
@@ -71,7 +72,7 @@ typedef struct config_bool config_bool;
  */
 struct config_bool {
   bool          global_value;           // The global value.
-  hash_table_t  bool_str_set;           // String-specific value(s).
+  hash_table_t  bool_constraint_set;    // Contraint-specific value(s).
 };
 
 ////////// extern functions ///////////////////////////////////////////////////
@@ -89,12 +90,12 @@ void config_bool_cleanup( config_bool *cb );
  * Gets the value of a config_bool.
  *
  * @param cb The config_bool to get the value of.
- * @param path The source path, if any, to get the value for.
- * @return Returns the Boolean value for \a path, if any, or the global value,
- * if not.
+ * @param constraint The constraint, if any, to get the value for.
+ * @return Returns the Boolean value for \a constraint, if any, or the global
+ * value, if not.
  */
 NODISCARD
-bool config_bool_get( config_bool *cb, char const *path );
+bool config_bool_get( config_bool *cb, char const *constraint );
 
 /**
  * Initializes a config_bool.
