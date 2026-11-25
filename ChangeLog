@@ -1,5 +1,9 @@
 2026-11-24  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
+   * man/man1/symbol-tidy.1, config_file.c, options.c, options.h, symbol.c,
+     symbol.h: Added ignore-unused.
+   * man/man1/symbol-tidy.1: Changed --compiler short option to -p; added
+     missing -C for --no-config.
    * man/man1/symbol-tidy.1, cli_options.c, cli_options.h, options.c,
      options.h, symbol-tidy.c, run_test.sh, update_test.sh,
      auto_delete_pool.out, c-cxx-1.out, c-cxx-2.out,
