@@ -182,7 +182,7 @@ static inline bool symbol_is_undefined( tidy_symbol const *sym ) {
  */
 NODISCARD
 static inline bool symbol_is_unused( tidy_symbol const *sym ) {
-  return  !sym->is_used && !sym->is_dead && !sym->is_ignored_if_unused &&
+  return  !sym->is_used && !sym->is_dead && !sym->ignore_unused &&
           !symbol_is_undefined( sym );
 }
 
@@ -2495,7 +2495,7 @@ tidy_symbol* symbol_add( CXCursor sym_csr, symbols_visit_data *svd ) {
   //
   if ( config_bool_get( &opt_ignore_unused, sym->name ) ||
        file_ignores_unused( sym_file ) ) {
-    sym->is_ignored_if_unused = true;
+    sym->ignore_unused = true;
   }
 
   //

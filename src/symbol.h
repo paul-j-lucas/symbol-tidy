@@ -323,7 +323,7 @@ struct tidy_symbol {
    *
    * @sa symbol_is_unused()
    */
-  bool          is_ignored_if_unused;
+  bool          ignore_unused;
 
   /**
    * Is this symbol defined somewhere (or doesn't need to be)?
