@@ -427,16 +427,16 @@ struct tidy_symbol {
  * Additional data passed to symbols_visitor().
  */
 struct symbols_visit_data {
-  tidy_source        *source;           ///< Source file being tidied.
-  tidy_symbol        *curr_sym;         ///< Current symbol, if any.
-  bool                ignore_extern;    ///< Ignore unneeded external linkage?
-  bool                ignore_forward;   ///< Ignore unneeded forward decl's?
-  bool                ignore_undefined; ///< Ignore undefined symbols?
+  tidy_source  *source;           ///< Source file being tidied.
+  tidy_symbol  *curr_sym;         ///< Current symbol, if any.
+  bool          ignore_extern;    ///< Ignore unneeded external linkage?
+  bool          ignore_forward;   ///< Ignore unneeded forward declarations?
+  bool          ignore_undefined; ///< Ignore undefined symbols?
 
   /**
    * Printed "symbols:" header?
    */
-  bool                printed_symbols_header;
+  bool          printed_symbols_header;
 
   /**
    * A unique ID for every non-standard-header cursor visited by
@@ -457,56 +457,56 @@ struct symbols_visit_data {
    * @sa fwd_dec_visit_def()
    * @sa fwd_dec_visit_ref()
    */
-  unsigned            visit_id;
+  unsigned      visit_id;
 
   /**
    * Mini file_previously_seen() result cache that allows cursors from header
    * files we've already visited to be skipped.
    */
   struct svd_fps {
-    CXFile            last_file;        ///< The file for the last cursor.
-    bool              last_seen;        ///< Saw \ref last_file?
+    CXFile      last_file;        ///< The file for the last cursor.
+    bool        last_seen;        ///< Saw \ref last_file?
   } fps;
 
   /**
    * Additional data for visit_Constructor().
    */
   struct svd_cxx_constructor {
-    CXCursor          ctor_csr;         ///< Constructor's cursor.
+    CXCursor    ctor_csr;         ///< Constructor's cursor.
   } cxx_constructor;
 
   /**
    * Additional data for cxx_dtor_add_ref().
    */
   struct svd_cxx_dtor {
-    cxx_dtor_frame const *top;          ///< The top destructor frame.
+    cxx_dtor_frame const *top;    ///< The top destructor frame.
   } cxx_dtor;
 
   /**
    * Additional data for visit_CXXForRangeStmt().
    */
   struct svd_cxx_for_range {
-    CXCursor          cls_csr;          ///< Class being iterated over.
-    CXCursor          begin_csr;        ///< Found `begin()` cursor, if any.
-    CXCursor          end_csr;          ///< Found `end()` cursor, if any.
-    bool              is_const;         ///< Is the range-for `const`?
+    CXCursor    cls_csr;          ///< Class being iterated over.
+    CXCursor    begin_csr;        ///< Found `begin()` cursor, if any.
+    CXCursor    end_csr;          ///< Found `end()` cursor, if any.
+    bool        is_const;         ///< Is the range-for `const`?
   } cxx_for_range;
 
   /**
    * Additional data for cxx_member_add_refs_by_name().
    */
   struct svd_cxx_member {
-    char const       *name;             ///< Member name to match.
-    bool              found;            ///< Found at least one member?
+    char const *name;             ///< Member name to match.
+    bool        found;            ///< Found at least one member?
   } cxx_member;
 
   /**
    * Additional data for cxx_operator_add_refs().
    */
   struct svd_cxx_operator {
-    char const       *name;             ///< Name, e.g., `operator new`.
-    char const       *array_name;       ///< Array name, e.g., `operator new[]`.
-    bool              found;            ///< Found at least one operator?
+    char const *name;             ///< Operator name, e.g., `operator new`.
+    char const *array_name;       ///< Operator name, e.g., `operator new[]`.
+    bool        found;            ///< Found at least one operator?
   } cxx_operator;
 };
 
