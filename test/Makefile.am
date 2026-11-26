@@ -73,6 +73,7 @@ TESTS+=	tests/auto_delete_pool.test \
 	tests/functor.test \
 	tests/ignore-cxx.test \
 	tests/macros-scoped.test \
+	tests/member_by_name.test \
 	tests/new-delete.test \
 	tests/overloaded.test \
 	tests/range-for.test \
