@@ -237,9 +237,9 @@ static void   ignore_undefined_parse( config_parse_fn_args const* );
 static void   ignore_unneeded_extern_parse( config_parse_fn_args const* );
 static void   ignore_unneeded_forward_parse( config_parse_fn_args const* );
 static void   ignore_unused_parse( config_parse_fn_args const* );
-static void   print_statistics( verbose_stat_ctx* );
 static void   print_invalid_value( config_parse_fn_args const*,
                                    toml_value const*, toml_type );
+static void   print_statistics( verbose_stat_ctx* );
 static void   root_symbol_cleanup( root_symbol* );
 static void   root_symbols_from_parse( config_parse_fn_args const* );
 static void   root_symbols_from_parse_string( config_parse_fn_args const* );
