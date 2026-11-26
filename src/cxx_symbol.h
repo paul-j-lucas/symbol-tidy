@@ -83,11 +83,11 @@ void cxx_adl_type_set_add( CXType type );
  * to it, if any.
  *
  * @param cursor The cursor to visit.
- * @param parent Not used.
+ * @param parent_csr Not used.
  * @param data The symbols_visit_data to use.
  */
 enum CXChildVisitResult cxx_def_ctor_add_ref_visitor( CXCursor cursor,
-                                                      CXCursor parent,
+                                                      CXCursor parent_csr,
                                                       CXClientData data );
 
 /**
@@ -95,12 +95,12 @@ enum CXChildVisitResult cxx_def_ctor_add_ref_visitor( CXCursor cursor,
  * destructor of the object's class.
  *
  * @param cursor The cursor to visit.
- * @param parent Not used.
+ * @param parent_csr Not used.
  * @param data The symbols_visit_data to use.
  * @return Returns either `CXChildVisit_Break` or `CXChildVisit_Recurse`.
  */
 enum CXChildVisitResult cxx_DeleteExpr_visitor( CXCursor cursor,
-                                                CXCursor parent,
+                                                CXCursor parent_csr,
                                                 CXClientData data );
 
 /**
@@ -139,12 +139,12 @@ void cxx_field_def_ctor_add_ref( CXCursor field_csr, symbols_visit_data *svd );
  * A helper function for cxx_field_def_ctor_add_ref().
  *
  * @param cursor The cursor to visit.
- * @param parent Not used.
+ * @param parent_csr Not used.
  * @param data The symbols_visit_data to use.
  * @return Returns `CXChildVisit_Continue`.
  */
 enum CXChildVisitResult cxx_field_def_ctor_add_ref_visitor( CXCursor cursor,
-                                                            CXCursor parent,
+                                                            CXCursor parent_csr,
                                                             CXClientData data );
 
 /**
@@ -152,12 +152,12 @@ enum CXChildVisitResult cxx_field_def_ctor_add_ref_visitor( CXCursor cursor,
  * `begin()` and `end()` functions.
  *
  * @param cursor The cursor being visited.
- * @param parent Not used.
+ * @param parent_csr Not used.
  * @param data The symbols_visit_data to use.
  * @return Returns either `CXChildVisit_Break` or `CXChildVisit_Continue`.
  */
 enum CXChildVisitResult cxx_find_begin_end_visitor( CXCursor cursor,
-                                                    CXCursor parent,
+                                                    CXCursor parent_csr,
                                                     CXClientData data );
 
 /**

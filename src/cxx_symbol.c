@@ -135,15 +135,15 @@ static hash_table_t cxx_adl_type_set;
  * class's destructor.
  *
  * @param cursor The cursor to visit.
- * @param parent Not used.
+ * @param parent_csr Not used.
  * @param data The symbols_visit_data to use.
  * @return Returns either `CXChildVisit_Continue` or `CXChildVisit_Recurse`.
  */
 static
 enum CXChildVisitResult cxx_base_dtor_add_ref_visitor( CXCursor cursor,
-                                                       CXCursor parent,
+                                                       CXCursor parent_csr,
                                                        CXClientData data ) {
-  (void)parent;
+  (void)parent_csr;
 
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
   if ( kind != CXCursor_CXXBaseSpecifier )
@@ -256,15 +256,15 @@ static void cxx_dtor_add_ref( CXCursor cls_csr, symbols_visit_data *svd ) {
  * A helper function for cxx_dtors_add_refs().
  *
  * @param cursor The cursor to visit.
- * @param parent Not used.
+ * @param parent_csr Not used.
  * @param data The symbols_visit_data to use.
  * @return Returns `CXChildVisit_Continue`.
  */
 static enum
 CXChildVisitResult cxx_field_dtor_add_ref_visitor( CXCursor cursor,
-                                                   CXCursor parent,
+                                                   CXCursor parent_csr,
                                                    CXClientData data ) {
-  (void)parent;
+  (void)parent_csr;
 
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
   if ( kind == CXCursor_FieldDecl ) {
@@ -340,15 +340,15 @@ static bool cxx_member_add_refs_by_name( CXCursor cls_csr, char const *name,
  * data member whose name matches.
  *
  * @param cursor The cursor being visited.
- * @param parent Not used.
+ * @param parent_csr Not used.
  * @param data The symbols_visit_data to use.
  * @return Returns `CXChildVisit_Continue`.
  */
 static enum
 CXChildVisitResult cxx_member_add_refs_by_name_visitor( CXCursor cursor,
-                                                        CXCursor parent,
+                                                        CXCursor parent_csr,
                                                         CXClientData data ) {
-  (void)parent;
+  (void)parent_csr;
 
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
   switch ( kind ) {
@@ -375,15 +375,15 @@ CXChildVisitResult cxx_member_add_refs_by_name_visitor( CXCursor cursor,
  * base class.
  *
  * @param cursor The cursor being visited.
- * @param parent Not used.
+ * @param parent_csr Not used.
  * @param data The symbols_visit_data to use.
  * @return Always returns `CXChildVisit_Continue`.
  */
 static enum
 CXChildVisitResult cxx_member_by_name_base_visitor( CXCursor cursor,
-                                                    CXCursor parent,
+                                                    CXCursor parent_csr,
                                                     CXClientData data ) {
-  (void)parent;
+  (void)parent_csr;
   assert( data != NULL );
   symbols_visit_data *const svd = data;
 
@@ -411,15 +411,15 @@ skip:
  * member operator whose name matches.
  *
  * @param cursor The cursor being visited.
- * @param parent Not used.
+ * @param parent_csr Not used.
  * @param data The symbols_visit_data to use.
  * @return Always returns `CXChildVisit_Continue`.
  */
 static
 enum CXChildVisitResult cxx_operator_add_refs_visitor( CXCursor cursor,
-                                                       CXCursor parent,
+                                                       CXCursor parent_csr,
                                                        CXClientData data ) {
-  (void)parent;
+  (void)parent_csr;
   assert( data != NULL );
   symbols_visit_data *const svd = data;
 
@@ -446,14 +446,14 @@ enum CXChildVisitResult cxx_operator_add_refs_visitor( CXCursor cursor,
  * base class.
  *
  * @param cursor The cursor being visited.
- * @param parent Not used.
+ * @param parent_csr Not used.
  * @param data The symbols_visit_data to use.
  * @return Always returns `CXChildVisit_Continue`.
  */
 static enum CXChildVisitResult cxx_operator_base_visitor( CXCursor cursor,
-                                                          CXCursor parent,
+                                                          CXCursor parent_csr,
                                                           CXClientData data ) {
-  (void)parent;
+  (void)parent_csr;
   assert( data != NULL );
   symbols_visit_data *const svd = data;
 
@@ -563,14 +563,14 @@ static bool cxx_tmpl_ctors_param( CXCursor spec_csr, unsigned param_idx ) {
  * class template looking for evidence that it constructs its type parameter.
  *
  * @param cursor The cursor being visited.
- * @param parent Not used.
+ * @param parent_csr Not used.
  * @param data The cxx_tmpl_ctors_visitor_data to use.
  * @return Returns `CXChildVisit_Break` or `CXChildVisit_Recurse`.
  */
 static enum CXChildVisitResult cxx_tmpl_ctors_visitor( CXCursor cursor,
-                                                       CXCursor parent,
+                                                       CXCursor parent_csr,
                                                        CXClientData data ) {
-  (void)parent;
+  (void)parent_csr;
 
   enum CXCursorKind kind = clang_getCursorKind( cursor );
   CXType            type = clang_getCursorType( cursor );
@@ -611,14 +611,14 @@ skip:
  * children looking for its i-th template parameter.
  *
  * @param cursor The cursor being visited.
- * @param parent Not used.
+ * @param parent_csr Not used.
  * @param data The cxx_tmpl_param_visitor_data to use.
  * @return Returns `CXChildVisit_Break` or `CXChildVisit_Continue`.
  */
 static enum CXChildVisitResult cxx_tmpl_param_visitor( CXCursor cursor,
-                                                       CXCursor parent,
+                                                       CXCursor parent_csr,
                                                        CXClientData data ) {
-  (void)parent;
+  (void)parent_csr;
 
   enum CXCursorKind kind = clang_getCursorKind( cursor );
   switch ( kind ) {
@@ -870,9 +870,9 @@ void cxx_adl_type_set_add( CXType type ) {
 }
 
 enum CXChildVisitResult cxx_def_ctor_add_ref_visitor( CXCursor cursor,
-                                                      CXCursor parent,
+                                                      CXCursor parent_csr,
                                                       CXClientData data ) {
-  (void)parent;
+  (void)parent_csr;
   assert( data != NULL );
   symbols_visit_data *const svd = data;
 
@@ -917,9 +917,9 @@ skip:
 }
 
 enum CXChildVisitResult cxx_DeleteExpr_visitor( CXCursor cursor,
-                                                CXCursor parent,
+                                                CXCursor parent_csr,
                                                 CXClientData data ) {
-  (void)parent;
+  (void)parent_csr;
 
   CXType type = clang_getCursorType( cursor );
   if ( type.kind == CXType_Invalid )
@@ -1026,9 +1026,9 @@ void cxx_field_def_ctor_add_ref( CXCursor field_csr, symbols_visit_data *svd ) {
 
 enum
 CXChildVisitResult cxx_field_def_ctor_add_ref_visitor( CXCursor cursor,
-                                                       CXCursor parent,
+                                                       CXCursor parent_csr,
                                                        CXClientData data ) {
-  (void)parent;
+  (void)parent_csr;
 
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
   if ( kind == CXCursor_FieldDecl ) {
@@ -1039,9 +1039,9 @@ CXChildVisitResult cxx_field_def_ctor_add_ref_visitor( CXCursor cursor,
 }
 
 enum CXChildVisitResult cxx_find_begin_end_visitor( CXCursor cursor,
-                                                    CXCursor parent,
+                                                    CXCursor parent_csr,
                                                     CXClientData data ) {
-  (void)parent;
+  (void)parent_csr;
   assert( data != NULL );
   symbols_visit_data *const svd = data;
 

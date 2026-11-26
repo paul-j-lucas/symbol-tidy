@@ -1673,12 +1673,12 @@ static void symbols_cleanup( void ) {
  * Visits each symbol in a translation unit.
  *
  * @param cursor The cursor for the symbol in the AST being visited.
- * @param parent The parent cursor of \a cursor.
+ * @param parent_csr The parent cursor of \a cursor.
  * @param data A pointer to a symbols_visit_data.
  * @return Always returns `CXChildVisit_Continue`.
  */
 static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
-                                                CXCursor parent,
+                                                CXCursor parent_csr,
                                                 CXClientData data ) {
   assert( data != NULL );
   symbols_visit_data *const svd = data;
@@ -1702,7 +1702,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
       //
     }
 
-    enum CXCursorKind const parent_kind = clang_getCursorKind( parent );
+    enum CXCursorKind const parent_kind = clang_getCursorKind( parent_csr );
     if ( parent_kind == CXCursor_TranslationUnit ) {
       //
       // For a top-level cursor, skip it (and its whole subtree) if its file
@@ -1797,7 +1797,7 @@ static enum CXChildVisitResult symbols_visitor( CXCursor cursor,
     // Now, f() references x, so it would be marked used --- correctly.
     //
     if ( is_expression && svd->curr_sym != NULL && !svd->curr_sym->is_scope &&
-         tidy_Cursor_isLocalVarDecl( parent ) ) {
+         tidy_Cursor_isLocalVarDecl( parent_csr ) ) {
       svd->curr_sym = svd->curr_sym->parent_sym;
     }
 

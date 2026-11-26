@@ -131,15 +131,15 @@ static CXCursor tidy_getCursorDefinition( CXCursor );
  * explicit base class constructor call.
  *
  * @param cursor The cursor being visited.
- * @param parent Not used.
+ * @param parent_csr Not used.
  * @param data The getCursorByName_data to use.
  * @return Returns either `CXChildVisit_Break` or `CXChildVisit_Continue`.
  */
 static
 enum CXChildVisitResult callsBaseConstructor_visitor( CXCursor cursor,
-                                                      CXCursor parent,
+                                                      CXCursor parent_csr,
                                                       CXClientData data ) {
-  (void)parent;
+  (void)parent_csr;
 
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
   if ( kind != CXCursor_CallExpr )
@@ -171,15 +171,15 @@ skip:
  * A helper function for tidy_Cursor_getConstructorInfo().
  *
  * @param cursor The cursor being visited.
- * @param parent Not used.
+ * @param parent_csr Not used.
  * @param data A pointer to receive that the class has a constuctor.
  * @return Returns `CXChildVisit_Break` only if a base class is found;
  * otherwise returns `CXChildVisit_Continue`.
  */
 static enum CXChildVisitResult getConstructorInfo_visitor( CXCursor cursor,
-                                                           CXCursor parent,
+                                                           CXCursor parent_csr,
                                                            CXClientData data ) {
-  (void)parent;
+  (void)parent_csr;
   assert( data != NULL );
   tidy_ConstructorInfo *const ctor_info = data;
 
@@ -235,14 +235,14 @@ static enum CXChildVisitResult getConstructorInfo_visitor( CXCursor cursor,
  * "find_name".
  *
  * @param cursor The cursor being visited.
- * @param parent Not used.
+ * @param parent_csr Not used.
  * @param data The getCursorByName_data to use.
  * @return Returns either `CXChildVisit_Break` or `CXChildVisit_Recurse`.
  */
 static enum CXChildVisitResult getCursorByName_visitor( CXCursor cursor,
-                                                        CXCursor parent,
+                                                        CXCursor parent_csr,
                                                         CXClientData data ) {
-  (void)parent;
+  (void)parent_csr;
   assert( data != NULL );
 
   getCursorByName_data *const gcbnd = data;
@@ -292,15 +292,15 @@ skip:
  * symbol attempting to find a default constructor.
  *
  * @param cursor The cursor being visited.
- * @param parent Not used.
+ * @param parent_csr Not used.
  * @param data A pointer to receive the cursor for the default constructor.
  * @return Returns either `CXChildVisit_Break` or `CXChildVisit_Recurse`.
  */
 static
 enum CXChildVisitResult getDefaultConstructor_visitor( CXCursor cursor,
-                                                       CXCursor parent,
+                                                       CXCursor parent_csr,
                                                        CXClientData data ) {
-  (void)parent;
+  (void)parent_csr;
 
   if ( clang_CXXConstructor_isDefaultConstructor( cursor ) ) {
     assert( data != NULL );
@@ -317,14 +317,14 @@ enum CXChildVisitResult getDefaultConstructor_visitor( CXCursor cursor,
  * attempting to find a destructor.
  *
  * @param cursor The cursor being visited.
- * @param parent Not used.
+ * @param parent_csr Not used.
  * @param data A pointer to receive the cursor for the default constructor.
  * @return Returns either `CXChildVisit_Break` or `CXChildVisit_Recurse`.
  */
 static enum CXChildVisitResult getDestructor_visitor( CXCursor cursor,
-                                                      CXCursor parent,
+                                                      CXCursor parent_csr,
                                                       CXClientData data ) {
-  (void)parent;
+  (void)parent_csr;
 
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
   if ( kind == CXCursor_Destructor ) {
@@ -342,7 +342,7 @@ static enum CXChildVisitResult getDestructor_visitor( CXCursor cursor,
  * first expression child cursor, if any, of a cursor.
  *
  * @param cursor The cursor being visited.
- * @param parent The parent of \a cursor.
+ * @param parent_csr Not used.
  * @param data A pointer to receive the first expression child cursor.
  * @return Returns `CXChildVisit_Break` if \a cursor is an expression or
  * `CXChildVisit_Continue` otherwise.
@@ -350,9 +350,9 @@ static enum CXChildVisitResult getDestructor_visitor( CXCursor cursor,
  * @sa getFirstChild_visitor()
  */
 static enum CXChildVisitResult getFirstExprChild_visitor( CXCursor cursor,
-                                                          CXCursor parent,
+                                                          CXCursor parent_csr,
                                                           CXClientData data ) {
-  (void)parent;
+  (void)parent_csr;
 
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
   if ( clang_isExpression( kind ) ) {
@@ -378,16 +378,16 @@ static void getScopedName_impl( CXCursor cursor, getCursorName_fn name_fn,
   assert( name_fn != NULL );
   assert( sbuf != NULL );
 
-  CXCursor parent = clang_getCursorSemanticParent( cursor );
+  CXCursor parent_csr = clang_getCursorSemanticParent( cursor );
 
   if ( tidy_Cursor_isUnscopedEnumConstantDecl( cursor ) )
-    parent = clang_getCursorSemanticParent( parent );
+    parent_csr = clang_getCursorSemanticParent( parent_csr );
 
-  while ( clang_Cursor_isInlineNamespace( parent ) )
-    parent = clang_getCursorSemanticParent( parent );
+  while ( clang_Cursor_isInlineNamespace( parent_csr ) )
+    parent_csr = clang_getCursorSemanticParent( parent_csr );
 
-  if ( tidy_Cursor_isScopeDecl( parent ) )
-    getScopedName_impl( parent, name_fn, sbuf );
+  if ( tidy_Cursor_isScopeDecl( parent_csr ) )
+    getScopedName_impl( parent_csr, name_fn, sbuf );
 
   CXString const name_cxs = (*name_fn)( cursor );
   char const *const name = null_if_empty( clang_getCString( name_cxs ) );
@@ -428,13 +428,13 @@ static char* getScopedName_thunk( CXCursor cursor, getCursorName_fn name_fn ) {
  * a field is mem-initialized by a constructor.
  *
  * @param cursor The cursor being visited.
- * @param parent The parent of \a cursor.
+ * @param parent_csr The parent of \a cursor.
  * @param data The getFieldInitializer_data to use.
  * @return Returns either `CXChildVisit_Break` or `CXChildVisit_Continue`.
  */
 static
 enum CXChildVisitResult getFieldMemInitializer_visitor( CXCursor cursor,
-                                                        CXCursor parent,
+                                                        CXCursor parent_csr,
                                                         CXClientData data ) {
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
   if ( kind != CXCursor_MemberRef )
@@ -445,7 +445,7 @@ enum CXChildVisitResult getFieldMemInitializer_visitor( CXCursor cursor,
 
   CXCursor const ref_csr = clang_getCursorReferenced( cursor );
   if ( clang_equalCursors( ref_csr, gfid->field_csr ) ) {
-    gfid->init_csr = parent;
+    gfid->init_csr = parent_csr;
     return CXChildVisit_Break;
   }
 
@@ -458,15 +458,15 @@ skip:
  * construcor that mem-initializes a given field.
  *
  * @param cursor The cursor being visited.
- * @param parent Not used.
+ * @param parent_csr Not used.
  * @param data The getFieldInitializer_data to use.
  * @return Returns either `CXChildVisit_Break` or `CXChildVisit_Continue`.
  */
 static
 enum CXChildVisitResult getFieldInitializer_visitor( CXCursor cursor,
-                                                     CXCursor parent,
+                                                     CXCursor parent_csr,
                                                      CXClientData data ) {
-  (void)parent;
+  (void)parent_csr;
 
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
   if ( kind != CXCursor_Constructor )
@@ -487,15 +487,15 @@ skip:
  * attribute.
  *
  * @param cursor The cursor being visited.
- * @param parent Not used.
+ * @param parent_csr Not used.
  * @param data Not used.
  * @return Returns `CXChildVisit_Break` if \a cursor is an attribute; otherwise
  * returns `CXChildVisit_Continue`.
  */
 static enum CXChildVisitResult hasAnyAttr_visitor( CXCursor cursor,
-                                                   CXCursor parent,
+                                                   CXCursor parent_csr,
                                                    CXClientData data ) {
-  (void)parent;
+  (void)parent_csr;
   (void)data;
 
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
@@ -511,7 +511,7 @@ static enum CXChildVisitResult hasAnyAttr_visitor( CXCursor cursor,
  * through the cursor's tokens for it.
  *
  * @param cursor The cursor for the symbol in the AST being visited.
- * @param parent Not used.
+ * @param parent_csr Not used.
  * @param data Not used.
  * @return Returns `CXChildVisit_Break` if found or `CXChildVisit_Continue` if
  * not.
@@ -519,9 +519,9 @@ static enum CXChildVisitResult hasAnyAttr_visitor( CXCursor cursor,
  * @sa #ATTR_TOKENIZE_WINDOW_SIZE
  */
 static enum CXChildVisitResult hasMaybeUnusedAttr_visitor( CXCursor cursor,
-                                                           CXCursor parent,
+                                                           CXCursor parent_csr,
                                                            CXClientData data ) {
-  (void)parent;
+  (void)parent_csr;
   (void)data;
 
   if ( clang_getCursorKind( cursor ) != CXCursor_UnexposedAttr )
@@ -676,12 +676,12 @@ static bool tidy_Cursor_isUnscopedEnumConstantDecl( CXCursor cursor ) {
   if ( kind != CXCursor_EnumConstantDecl )
     return false;
 
-  CXCursor const parent = clang_getCursorSemanticParent( cursor );
-  kind = clang_getCursorKind( parent );
+  CXCursor const parent_csr = clang_getCursorSemanticParent( cursor );
+  kind = clang_getCursorKind( parent_csr );
   if ( kind != CXCursor_EnumDecl )
     return false;
 
-  return !clang_EnumDecl_isScoped( parent );
+  return !clang_EnumDecl_isScoped( parent_csr );
 }
 
 /**
@@ -1065,8 +1065,8 @@ bool tidy_Cursor_isExternalGlobalFunction( CXCursor cursor ) {
   enum CXCursorKind const kind = clang_getCursorKind( cursor );
   if ( kind != CXCursor_FunctionDecl )
     return false;
-  CXCursor const parent = clang_getCursorSemanticParent( cursor );
-  enum CXCursorKind const parent_kind = clang_getCursorKind( parent );
+  CXCursor const parent_csr = clang_getCursorSemanticParent( cursor );
+  enum CXCursorKind const parent_kind = clang_getCursorKind( parent_csr );
   if ( parent_kind != CXCursor_TranslationUnit )
     return false;
   if ( !tidy_Cursor_isExternalLinkage( cursor ) )
@@ -1131,8 +1131,8 @@ bool tidy_Cursor_isReservedName( CXCursor cursor, enum CXLanguageKind lang ) {
             is_reserved = true;
           break;
         case CXLanguage_CPlusPlus:;
-          CXCursor const parent = clang_getCursorSemanticParent( cursor );
-          enum CXCursorKind const kind = clang_getCursorKind( parent );
+          CXCursor const parent_csr = clang_getCursorSemanticParent( cursor );
+          enum CXCursorKind const kind = clang_getCursorKind( parent_csr );
           if ( kind == CXCursor_TranslationUnit )
             is_reserved = true;
           break;
@@ -1385,8 +1385,8 @@ bool tidy_isCursorDefinition( CXCursor cursor ) {
     return !clang_Cursor_isNull( init_csr );
   }
 
-  CXCursor const parent = clang_getCursorSemanticParent( cursor );
-  if ( tidy_Cursor_isClassDecl( parent ) ) {
+  CXCursor const parent_csr = clang_getCursorSemanticParent( cursor );
+  if ( tidy_Cursor_isClassDecl( parent_csr ) ) {
     CXCursor const init_csr = tidy_Cursor_getFirstExprChild( cursor );
     return !clang_Cursor_isNull( init_csr );
   }
