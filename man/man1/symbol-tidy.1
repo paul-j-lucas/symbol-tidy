@@ -152,7 +152,7 @@ TIDY_FLAGS  = -Xtidy --compiler=$(CC) -Xtidy --error=never
 TIDY_CFLAGS = $(CFLAGS) $(AM_CFLAGS) $(CPPFLAGS) $(AM_CPPFLAGS)
 
 stidy:
-        symbol-tidy $(TIDY_FLAGS) $(TIDY_CFLAGS) *.c
+        @symbol-tidy $(TIDY_FLAGS) $(TIDY_CFLAGS) *.c
 .cE
 then simply
 .B make stidy
