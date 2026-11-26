@@ -24,6 +24,7 @@ ignore-paths = [
 ]
 root-symbols-from = [
   "array.h",
+  "hash_table.h",
   "strbuf.h"
 ]
 
