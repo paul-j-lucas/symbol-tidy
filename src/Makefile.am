@@ -53,7 +53,7 @@ AM_CFLAGS +=		--coverage -g -O0
 AM_LDFLAGS +=		--coverage
 endif
 
-TIDY_FLAGS =		-Xtidy --error=never
+TIDY_FLAGS =		-Xtidy --compiler=$(CC) -Xtidy --error=never
 ITIDY_FLAGS =		$(TIDY_FLAGS) -Xtidy --verbose=f
 STIDY_FLAGS =		$(TIDY_FLAGS)
 TIDY_CFLAGS =		$(CFLAGS) $(AM_CFLAGS) $(CPPFLAGS) $(AM_CPPFLAGS)

@@ -35,7 +35,7 @@
 .if !'\\$1'0' .sp
 ..
 .\" ---------------------------------------------------------------------------
-.TH \f3symbol-tidy\fP 1 "November 25, 2026" "PJL TOOLS"
+.TH \f3symbol-tidy\fP 1 "November 26, 2026" "PJL TOOLS"
 .SH NAME
 symbol-tidy \(em Symbol tidier
 .SH SYNOPSIS
@@ -148,7 +148,7 @@ In your
 .BR Makefile ,
 have:
 .cS
-TIDY_FLAGS  = -Xtidy --error=never
+TIDY_FLAGS  = -Xtidy --compiler=$(CC) -Xtidy --error=never
 TIDY_CFLAGS = $(CFLAGS) $(AM_CFLAGS) $(CPPFLAGS) $(AM_CPPFLAGS)
 
 stidy:
@@ -160,14 +160,17 @@ to analyze all your source files
 at once.
 (For C++,
 substitute
-\f(CW.cpp\fP for \f(CW.c\fP,
+.B CXX
+for
+.BR CC ,
 .B CXXFLAGS
 for
 .BR CFLAGS ,
 and
 .B AM_CXXFLAGS
 for
-.BR AM_CFLAGS .
+.BR AM_CFLAGS ,
+\f(CW.cpp\fP for \f(CW.c\fP.
 The
 .BR AM_
 variables are needed
@@ -190,6 +193,12 @@ and
 options
 that affect compilation.
 .PP
+The
+.B \-\-compiler
+ensures
+.B symbol-tidy
+uses the same compiler
+you are using.
 The
 .B \-\-error=never
 causes
