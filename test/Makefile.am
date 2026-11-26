@@ -74,6 +74,7 @@ TESTS+=	tests/auto_delete_pool.test \
 	tests/ignore-cxx.test \
 	tests/macros-scoped.test \
 	tests/new-delete.test \
+	tests/overloaded.test \
 	tests/range-for.test \
 	tests/std-exclude.test \
 	tests/streambuf-overflow.test \
