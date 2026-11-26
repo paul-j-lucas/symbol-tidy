@@ -108,6 +108,10 @@ static struct option const OPTIONS[] = {
   { "help",             no_argument,        NULL, COPT(HELP)              },
   { "no-config",        no_argument,        NULL, COPT(NO_CONFIG)         },
   { "no-config-layers", no_argument,        NULL, COPT(NO_CONFIG_LAYERS)  },
+  { "no-extern",        no_argument,        NULL, COPT(NO_EXTERN)         },
+  { "no-forward",       no_argument,        NULL, COPT(NO_FORWARD)        },
+  { "no-undefined",     no_argument,        NULL, COPT(NO_UNDEFINED)      },
+  { "no-unused",        no_argument,        NULL, COPT(NO_UNUSED)         },
   { "verbose",          required_argument,  NULL, COPT(VERBOSE)           },
   { "version",          no_argument,        NULL, COPT(VERSION)           },
   { NULL,               0,                  NULL, 0                       }
@@ -132,6 +136,10 @@ static char const *const OPTIONS_HELP[] = {
   [ COPT(HELP) ] = "Print this help and exit",
   [ COPT(NO_CONFIG) ] = "Suppress reading configuration file",
   [ COPT(NO_CONFIG_LAYERS) ] = "Suppress configuration file layering",
+  [ COPT(NO_EXTERN) ] = "Suppress unnecessary external linkage",
+  [ COPT(NO_FORWARD) ] = "Suppress unnecessary forward declarations",
+  [ COPT(NO_UNDEFINED) ] = "Suppress undefined symbols",
+  [ COPT(NO_UNUSED) ] = "Suppress unused symbols",
   [ COPT(VERBOSE) ] = "Print verbose output",
   [ COPT(VERSION) ] = "Print version and exit",
 };
@@ -1013,6 +1021,18 @@ void cli_options_init( int argc, char const *argv[], array_t *rv_sources ) {
         break;
       case COPT(NO_CONFIG_LAYERS):
         opt_config_layers = false;
+        break;
+      case COPT(NO_EXTERN):
+        opt_ignore_extern.global_value = true;
+        break;
+      case COPT(NO_FORWARD):
+        opt_ignore_forward.global_value = true;
+        break;
+      case COPT(NO_UNDEFINED):
+        opt_ignore_undefined.global_value = true;
+        break;
+      case COPT(NO_UNUSED):
+        opt_ignore_unused.global_value = true;
         break;
       case COPT(VERBOSE):
         if ( !opt_verbose_parse( optarg ) ) {

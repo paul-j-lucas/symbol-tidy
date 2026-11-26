@@ -44,11 +44,15 @@
 #define OPT_DIRECTORY             d
 #define OPT_DEBUG                 D
 #define OPT_ERROR                 e
+#define OPT_NO_EXTERN             E
 #define OPT_FILES                 f
+#define OPT_NO_FORWARD            F
 #define OPT_HELP                  h
 #define OPT_COLOR                 k
 #define OPT_NO_CONFIG_LAYERS      L
 #define OPT_COMPILER              p
+#define OPT_NO_UNDEFINED          u
+#define OPT_NO_UNUSED             U
 #define OPT_VERSION               v
 #define OPT_VERBOSE               V
 

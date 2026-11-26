@@ -435,6 +435,24 @@ Only the first configuration file found is used.
 under
 .BR "CONFIGURATION FILES" .)
 .TP
+.BR \-\-no-extern " | " \-E
+Suppresses printing of symbols
+that have external linkage
+but could have internal linkage
+(be either \f(CWstatic\fP in C
+or be in an unnamed namespace in C++)
+instead.
+.TP
+.BR \-\-no-forward " | " \-F
+Suppresses printing of symbols
+that have unneeded forward declarations.
+.TP
+.BR \-\-no-undefined " | " \-u
+Suppresses printing of undefined symbols.
+.TP
+.BR \-\-no-unused " | " \-U
+Suppressed printing of unused symbols.
+.TP
 .BI \-\-verbose \f1=\fPs "\f1 | \fP" "" \-V " s"
 Specifies what to be verbose about.
 The choices for
@@ -697,27 +715,27 @@ in any scope.
 .TP
 .BI ignore-undefined " \f1=\fP b"
 If true,
-this option causes undefined symbols
-to be ignored.
+same as the
+.B \-\-no-undefined
+command-line option.
 .TP
 .BI ignore-unneeded-extern " \f1=\fP b"
 If true,
-this option causes functions
-or variables
-that have external linkage
-but could have internal linkage
-(\f(CWstatic\fP) instead
-to be ignored.
+same as the
+.B \-\-no-extern
+command-line option.
 .TP
 .BI ignore-unneeded-forward " \f1=\fP b"
 If true,
-this option causes unneeded forward declarations
-to be ignored.
+same as the
+.B \-\-no-forward
+command-line option.
 .TP
 .BI ignore-unused " \f1=\fP b"
 If true,
-this option causes unused symbols
-to be ignored.
+same as the
+.B \-\-no-unused
+command-line option.
 .TP
 .BI root-symbols " \f1=\fP s" "\f1 | \fP[" s " \f1[,\fP " s "\f1]*\fP ]"
 The symbol name

@@ -12,6 +12,10 @@ tidy options:
   --files=ARG        (-f) Read file paths from path or '-' for standard input.
   --no-config        (-C) Suppress reading configuration file.
   --no-config-layers (-L) Suppress configuration file layering.
+  --no-extern        (-E) Suppress unnecessary external linkage.
+  --no-forward       (-F) Suppress unnecessary forward declarations.
+  --no-undefined     (-u) Suppress undefined symbols.
+  --no-unused        (-U) Suppress unused symbols.
   --verbose=ARG      (-V) Print verbose output.
 
 other options:

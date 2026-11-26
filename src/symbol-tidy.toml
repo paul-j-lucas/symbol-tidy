@@ -35,18 +35,22 @@ ignore-symbols = [
 
 [cli_options.h]
 ignore-symbols = [
-  "OPT_CONFIG",
+  "OPT_COLOR",
   "OPT_COMPILER",
-  "OPT_DIRECTORY",
+  "OPT_CONFIG",
   "OPT_DEBUG",
+  "OPT_DIRECTORY",
   "OPT_ERROR",
   "OPT_FILES",
   "OPT_HELP",
-  "OPT_COLOR",
   "OPT_NO_CONFIG",
   "OPT_NO_CONFIG_LAYERS",
-  "OPT_VERSION",
+  "OPT_NO_EXTERN",
+  "OPT_NO_FORWARD",
+  "OPT_NO_UNDEFINED",
+  "OPT_NO_UNUSED",
   "OPT_VERBOSE",
+  "OPT_VERSION",
 ]
 
 [color.c]
