@@ -65,7 +65,7 @@ enum verbose_kind {
    * For one-line output, e.g.: _key_ `=`
    * <tt>&quot;</tt><i>value</i><tt>&quot;</tt>.
    *
-   * @note This needs to be non-zero to distinguish it from a zero-initialize
+   * @note This needs to be non-zero to distinguish it from a zero-initialized
    * `static` variable of this kind. A `VERBOSE_NONE` could have been declared
    * before this, but it's not otherwise used.
    */
