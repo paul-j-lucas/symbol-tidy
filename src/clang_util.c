@@ -271,14 +271,12 @@ static enum CXChildVisitResult getCursorByName_visitor( CXCursor cursor,
 
     case CXCursor_LabelStmt:
     case CXCursor_MacroDefinition:
+    case CXCursor_Namespace:
       if ( tidy_Cursor_isSpellingEqualTo( cursor, gcbnd->find_name ) ) {
         gcbnd->found_csr = cursor;
         return CXChildVisit_Break;
       }
-      break;
-
-    case CXCursor_Namespace:
-      if ( gcbnd->cxx_recurse_into_scope )
+      if ( kind == CXCursor_Namespace && gcbnd->cxx_recurse_into_scope )
         return CXChildVisit_Recurse;
       break;
   } // switch

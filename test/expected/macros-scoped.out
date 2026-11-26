@@ -1,0 +1,10 @@
+$ symbol-tidy -std=c++20 -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --no-config -Xtidy --no-extern macros-scoped.cpp
+"macros-scoped.cpp": warning: unused symbols:
+    8, 7 | "ns::unused_var"
+symbol-tidy: 1 unused symbol
+
+$ symbol-tidy -std=c++20 -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --no-config -Xtidy --no-extern macros-reopened-ns.cpp
+"macros-reopened-ns.cpp": warning: unused symbols:
+   26, 7 | "ns::c"
+symbol-tidy: 1 unused symbol
+

@@ -72,6 +72,7 @@ TESTS+=	tests/auto_delete_pool.test \
 	tests/func-template.test \
 	tests/functor.test \
 	tests/ignore-cxx.test \
+	tests/macros-scoped.test \
 	tests/new-delete.test \
 	tests/range-for.test \
 	tests/std-exclude.test \
