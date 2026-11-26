@@ -1,3 +1,18 @@
+2026-11-26  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * test/Makefile.am, member_by_name.cpp, member_by_name.out,
+     member_by_name.test: Added test for cxx_member_by_name_base_visitor.
+   * strbuf.c, strbuf.h: Removed strbuf_sepsn_puts -- not used.
+   * test/Makefile.am, overloaded.cpp, overloaded.out, overloaded.test: Added
+     overloaded.cpp test.
+   * clang_util.c, test/Makefile.am, macros-reopened-ns.cpp, macros-scoped.cpp,
+     macros-scoped.out, macros-scoped.test: Fixed getCursorByName_visitor.
+   * man/man1/symbol-tidy.1, cli_options.c, cli_options.h, symbol-tidy.toml,
+     cli-help.out, cli-options-error.out: Added --no-* command-line options.
+   * man/man1/symbol-tidy.1: Added @.
+   * symbol-tidy.toml: Added hash_table.h as a root.
+   * man/man1/symbol-tidy.1, src/Makefile.am: Added --compiler.
+
 2026-11-25  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
    * man/man1/symbol-tidy.1, config_file.c, symbol.c, symbol.h: Can now ignore
