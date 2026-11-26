@@ -214,8 +214,6 @@ char* strbuf_vprintf( strbuf_t *sbuf, char const *format, va_list args ) {
 extern inline void strbuf_init( strbuf_t* );
 extern inline char* strbuf_putc( strbuf_t*, char );
 extern inline char* strbuf_puts( strbuf_t*, char const* );
-extern inline void strbuf_sepsn_puts( strbuf_t*, char const*, size_t, bool*,
-                                      char const* );
 extern inline char* strbuf_take( strbuf_t* );
 
 /* vim:set et sw=2 ts=2: */
