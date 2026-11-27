@@ -116,8 +116,8 @@ extern config_bool  opt_ignore_cxx_copy_assigns; ///< Ignore copy assignments?
 extern config_bool  opt_ignore_cxx_copy_ctors;   ///< Ignore copy constructors?
 extern config_bool  opt_ignore_cxx_move_assigns; ///< Ignore move assignments?
 extern config_bool  opt_ignore_cxx_move_ctors;   ///< Ignore move constructors?
-extern config_bool  opt_ignore_extern;  ///< Ignore unneeded external linkage?
-extern config_bool  opt_ignore_forward; ///< Ignore unneeded forwards?
+extern config_bool  opt_ignore_extern;  ///< Ignore external linkage?
+extern config_bool  opt_ignore_forward; ///< Ignore forward declarations?
 extern config_bool  opt_ignore_undefined; ///< Ignore undefined symbols?
 extern config_bool  opt_ignore_unused;  ///< Ignore unused symbols?
 extern bool         opt_read_config;    ///< Read configuration file?

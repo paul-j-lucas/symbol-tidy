@@ -228,14 +228,14 @@ static void   ignore_cxx_copy_assigns_parse( config_parse_fn_args const* );
 static void   ignore_cxx_copy_ctors_parse( config_parse_fn_args const* );
 static void   ignore_cxx_move_assigns_parse( config_parse_fn_args const* );
 static void   ignore_cxx_move_ctors_parse( config_parse_fn_args const* );
+static void   ignore_extern_parse( config_parse_fn_args const* );
+static void   ignore_forward_parse( config_parse_fn_args const* );
 static void   ignore_paths_parse( config_parse_fn_args const* );
 static void   ignore_paths_parse_string( config_parse_fn_args const* );
 static void   ignore_symbol_cleanup( ignore_symbol* );
 static void   ignore_symbols_parse( config_parse_fn_args const* );
 static void   ignore_symbols_parse_string( config_parse_fn_args const* );
 static void   ignore_undefined_parse( config_parse_fn_args const* );
-static void   ignore_unneeded_extern_parse( config_parse_fn_args const* );
-static void   ignore_unneeded_forward_parse( config_parse_fn_args const* );
 static void   ignore_unused_parse( config_parse_fn_args const* );
 static void   print_invalid_value( config_parse_fn_args const*,
                                    toml_value const*, toml_type );
@@ -253,28 +253,25 @@ static void   toml_value_print( toml_value const*, FILE* );
  * Configuration keys.
  */
 static config_key const CONFIG_KEYS[] = {
-  { "color",                    TABLE_SYMBOL_TIDY,    &color_parse          },
-  { "error",                    TABLE_SYMBOL_TIDY,    &error_parse          },
+  { "color",                    TABLE_SYMBOL_TIDY,    &color_parse            },
+  { "error",                    TABLE_SYMBOL_TIDY,    &error_parse            },
   { "ignore-cxx-copy-assigns",  TABLE_TIDY_OR_SYMBOL,
-                                &ignore_cxx_copy_assigns_parse              },
+                                &ignore_cxx_copy_assigns_parse                },
   { "ignore-cxx-copy-ctors",    TABLE_TIDY_OR_SYMBOL,
-                                &ignore_cxx_copy_ctors_parse                },
+                                &ignore_cxx_copy_ctors_parse                  },
   { "ignore-cxx-move-assigns",  TABLE_TIDY_OR_SYMBOL,
-                                &ignore_cxx_move_assigns_parse              },
+                                &ignore_cxx_move_assigns_parse                },
   { "ignore-cxx-move-ctors",    TABLE_TIDY_OR_SYMBOL,
-                                &ignore_cxx_move_ctors_parse                },
-  { "ignore-undefined",         TABLE_ANY,
-                                &ignore_undefined_parse                     },
-  { "ignore-unneeded-extern",   TABLE_ANY,
-                                &ignore_unneeded_extern_parse               },
-  { "ignore-unneeded-forward",  TABLE_ANY,
-                                &ignore_unneeded_forward_parse              },
-  { "ignore-paths",             TABLE_SYMBOL_TIDY,    &ignore_paths_parse   },
-  { "ignore-symbols",           TABLE_TIDY_OR_SOURCE, &ignore_symbols_parse },
-  { "ignore-unused",            TABLE_ANY,            &ignore_unused_parse },
-  { "root-symbols",             TABLE_TIDY_OR_SOURCE, &root_symbols_parse   },
+                                &ignore_cxx_move_ctors_parse                  },
+  { "ignore-extern",            TABLE_ANY,            &ignore_extern_parse    },
+  { "ignore-forward",           TABLE_ANY,            &ignore_forward_parse   },
+  { "ignore-undefined",         TABLE_ANY,            &ignore_undefined_parse },
+  { "ignore-paths",             TABLE_SYMBOL_TIDY,    &ignore_paths_parse     },
+  { "ignore-symbols",           TABLE_TIDY_OR_SOURCE, &ignore_symbols_parse   },
+  { "ignore-unused",            TABLE_ANY,            &ignore_unused_parse    },
+  { "root-symbols",             TABLE_TIDY_OR_SOURCE, &root_symbols_parse     },
   { "root-symbols-from",        TABLE_SYMBOL_TIDY,
-                                &root_symbols_from_parse                    },
+                                &root_symbols_from_parse                      },
 };
 
 /**
@@ -508,6 +505,26 @@ static void ignore_cxx_move_ctors_parse( config_parse_fn_args const *config ) {
 }
 
 /**
+ * Parses the value of an `"ignore-extern"` key.
+ *
+ * @param config The config_parse_fn_args to use.
+ */
+static
+void ignore_extern_parse( config_parse_fn_args const *config ) {
+  config_bool_parse( config, &opt_ignore_extern );
+}
+
+/**
+ * Parses the value of an `"ignore-forward"` key.
+ *
+ * @param config The config_parse_fn_args to use.
+ */
+static
+void ignore_forward_parse( config_parse_fn_args const *config ) {
+  config_bool_parse( config, &opt_ignore_forward );
+}
+
+/**
  * Parses the value of an `"ignore-undefined"` key.
  *
  * @param config The config_parse_fn_args to use.
@@ -515,26 +532,6 @@ static void ignore_cxx_move_ctors_parse( config_parse_fn_args const *config ) {
 static
 void ignore_undefined_parse( config_parse_fn_args const *config ) {
   config_bool_parse( config, &opt_ignore_undefined );
-}
-
-/**
- * Parses the value of an `"ignore-unneeded-extern"` key.
- *
- * @param config The config_parse_fn_args to use.
- */
-static
-void ignore_unneeded_extern_parse( config_parse_fn_args const *config ) {
-  config_bool_parse( config, &opt_ignore_extern );
-}
-
-/**
- * Parses the value of an `"ignore-unneeded-forward"` key.
- *
- * @param config The config_parse_fn_args to use.
- */
-static
-void ignore_unneeded_forward_parse( config_parse_fn_args const *config ) {
-  config_bool_parse( config, &opt_ignore_forward );
 }
 
 /**

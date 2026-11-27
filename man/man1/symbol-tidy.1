@@ -35,7 +35,7 @@
 .if !'\\$1'0' .sp
 ..
 .\" ---------------------------------------------------------------------------
-.TH \f3symbol-tidy\fP 1 "November 26, 2026" "PJL TOOLS"
+.TH \f3symbol-tidy\fP 1 "November 27, 2026" "PJL TOOLS"
 .SH NAME
 symbol-tidy \(em Symbol tidier
 .SH SYNOPSIS
@@ -693,6 +693,18 @@ Like
 .BR ignore-cxx-move-assigns ,
 but for move constructors.
 .TP
+.BI ignore-extern " \f1=\fP b"
+If true,
+same as the
+.B \-\-no-extern
+command-line option.
+.TP
+.BI ignore-forward " \f1=\fP b"
+If true,
+same as the
+.B \-\-no-forward
+command-line option.
+.TP
 .BI ignore-symbols " \f1=\fP s" "\f1 | \fP[" s " \f1[,\fP " s "\f1]*\fP ]"
 The symbol name
 (that is specified as a single string)
@@ -717,18 +729,6 @@ in any scope.
 If true,
 same as the
 .B \-\-no-undefined
-command-line option.
-.TP
-.BI ignore-unneeded-extern " \f1=\fP b"
-If true,
-same as the
-.B \-\-no-extern
-command-line option.
-.TP
-.BI ignore-unneeded-forward " \f1=\fP b"
-If true,
-same as the
-.B \-\-no-forward
 command-line option.
 .TP
 .BI ignore-unused " \f1=\fP b"
@@ -793,22 +793,22 @@ ignore-as-argument = true
 .cE 0
 .RE
 .TP
+.BI ignore-extern " \f1=\fP b"
+Same as in the
+.BR "symbol-tidy Table" ,
+but only for the source file given for the table name.
+.TP
+.BI ignore-forward " \f1=\fP b"
+Same as in the
+.BR "symbol-tidy Table" ,
+but only for the source file given for the table name.
+.TP
 .BI ignore-symbols " \f1=\fP s" "\f1 | \fP[" s " \f1[,\fP " s "\f1]*\fP ]"
 Same as in the
 .BR "symbol-tidy Table" ,
 but only for the source file given for the table name.
 .TP
 .BI ignore-undefined " \f1=\fP b"
-Same as in the
-.BR "symbol-tidy Table" ,
-but only for the source file given for the table name.
-.TP
-.BI ignore-unneeded-extern " \f1=\fP b"
-Same as in the
-.BR "symbol-tidy Table" ,
-but only for the source file given for the table name.
-.TP
-.BI ignore-unneeded-forward " \f1=\fP b"
 Same as in the
 .BR "symbol-tidy Table" ,
 but only for the source file given for the table name.
@@ -849,19 +849,19 @@ Same as in the
 but only for the class
 given by the table name.
 .TP
+.BI ignore-extern " \f1=\fP b"
+Same as in the
+.BR "symbol-tidy Table" ,
+but only for the symbol
+given by the table name.
+.TP
+.BI ignore-forward " \f1=\fP b"
+Same as in the
+.BR "symbol-tidy Table" ,
+but only for the symbol
+given by the table name.
+.TP
 .BI ignore-undefined " \f1=\fP b"
-Same as in the
-.BR "symbol-tidy Table" ,
-but only for the symbol
-given by the table name.
-.TP
-.BI ignore-unneeded-extern " \f1=\fP b"
-Same as in the
-.BR "symbol-tidy Table" ,
-but only for the symbol
-given by the table name.
-.TP
-.BI ignore-unneeded-forward " \f1=\fP b"
 Same as in the
 .BR "symbol-tidy Table" ,
 but only for the symbol

@@ -133,8 +133,8 @@ hash_table_t tidy_symbol_set;
 ////////// local variables ////////////////////////////////////////////////////
 
 static hash_table_t header_set;         ///< The set of all header files.
+static bool         print_externs;      ///< Print unneeded externals?
 static bool         print_undefined;    ///< Print undefined for any source?
-static bool         print_unneeded_external;  ///< Print unneeded externals?
 static symbol_stats stats;              ///< Additional statistics.
 
 ////////// inline functions ///////////////////////////////////////////////////
@@ -2403,7 +2403,7 @@ void svd_init( symbols_visit_data *svd, tidy_source *source ) {
   };
 
   if ( !svd->ignore_extern )
-    print_unneeded_external = true;
+    print_externs = true;
   if ( !svd->ignore_undefined )
     print_undefined = true;
 }
@@ -2696,7 +2696,7 @@ void symbols_print_unused( unsigned unused_count ) {
 }
 
 unsigned symbols_print_unneeded_external( void ) {
-  if ( !print_unneeded_external )
+  if ( !print_externs )
     return 0;
 
   ht_iterator_t it;
