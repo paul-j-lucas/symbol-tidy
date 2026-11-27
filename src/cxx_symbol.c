@@ -1268,9 +1268,9 @@ void cxx_symbols_mark_adl_roots( void ) {
   if ( cxx_adl_name_set.size == 0 || cxx_adl_type_set.size == 0 )
     return;
 
-  ht_iterator_t sym_iter;
-  ht_iterator_init( &sym_iter, &tidy_symbol_set );
-  for ( tidy_symbol *sym; (sym = ht_iterator_next( &sym_iter )) != NULL; ) {
+  ht_iterator_t sym_it;
+  ht_iterator_init( &sym_it, &tidy_symbol_set );
+  for ( tidy_symbol *sym; (sym = ht_iterator_next( &sym_it )) != NULL; ) {
     if ( sym->is_root || sym->cxx_adl_usr_set.size == 0 )
       continue;
 
@@ -1278,9 +1278,9 @@ void cxx_symbols_mark_adl_roots( void ) {
     if ( ht_table_find( &cxx_adl_name_set, unqual_name ) == NULL )
       continue;
 
-    ht_iterator_t usr_iter;
-    ht_iterator_init( &usr_iter, &sym->cxx_adl_usr_set );
-    for ( char const *usr; (usr = ht_iterator_next( &usr_iter )) != NULL; ) {
+    ht_iterator_t usr_it;
+    ht_iterator_init( &usr_it, &sym->cxx_adl_usr_set );
+    for ( char const *usr; (usr = ht_iterator_next( &usr_it )) != NULL; ) {
       if ( ht_table_find( &cxx_adl_type_set, usr ) != NULL ) {
         sym->is_root = true;
         break;

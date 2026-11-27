@@ -338,9 +338,9 @@ static void fwd_statistics_cleanup( fwd_statistics *stats ) {
  */
 static void const* ht_table_get_any( hash_table_t const *table ) {
   assert( table != NULL );
-  ht_iterator_t iter;
-  ht_iterator_init( &iter, table );
-  return ht_iterator_next( &iter );
+  ht_iterator_t it;
+  ht_iterator_init( &it, table );
+  return ht_iterator_next( &it );
 }
 // LCOV_EXCL_STOP
 
@@ -444,9 +444,9 @@ unsigned fwd_decs_print_unneeded( tidy_source const *source ) {
 
   unsigned unneeded_count = STATIC_CAST( unsigned, fwd_dec_redundant.len );
 
-  ht_iterator_t iter;
-  ht_iterator_init( &iter, &fwd_dec_set );
-  for ( fwd_dec const *fwd; (fwd = ht_iterator_next( &iter )) != NULL; ) {
+  ht_iterator_t it;
+  ht_iterator_init( &it, &fwd_dec_set );
+  for ( fwd_dec const *fwd; (fwd = ht_iterator_next( &it )) != NULL; ) {
     if ( !fwd_dec_is_necessary( fwd ) )
       ++unneeded_count;
   } // for
@@ -462,8 +462,8 @@ unsigned fwd_decs_print_unneeded( tidy_source const *source ) {
     *(fwd_dec*)array_push_back( &fwd_array ) = *fwd;
   } // for
 
-  ht_iterator_init( &iter, &fwd_dec_set );
-  for ( fwd_dec const *fwd; (fwd = ht_iterator_next( &iter )) != NULL; ) {
+  ht_iterator_init( &it, &fwd_dec_set );
+  for ( fwd_dec const *fwd; (fwd = ht_iterator_next( &it )) != NULL; ) {
     if ( !fwd_dec_is_necessary( fwd ) )
       *(fwd_dec*)array_push_back( &fwd_array ) = *fwd;
   } // for

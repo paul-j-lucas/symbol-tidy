@@ -1071,9 +1071,9 @@ static void print_max_lf_stats( verbose_stat_ctx *vsc, size_t mbr_off,
   tidy_symbol const *max_sym = NULL;
   double max_lf = -1.0;
 
-  ht_iterator_t iter;
-  ht_iterator_init( &iter, &tidy_symbol_set );
-  for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
+  ht_iterator_t it;
+  ht_iterator_init( &it, &tidy_symbol_set );
+  for ( tidy_symbol const *sym; (sym = ht_iterator_next( &it )) != NULL; ) {
     if ( sym->is_dead )
       continue;
     hash_table_t const *const set = MEMBER_AT( sym, mbr_off );
@@ -1447,12 +1447,10 @@ static void symbol_mark_used( tidy_symbol *sym ) {
     sym->is_used = true;
     if ( sym->parent_sym != NULL )
       symbol_mark_used( sym->parent_sym );
-    ht_iterator_t iter;
-    ht_iterator_init( &iter, &sym->ref_sym_set );
-    for ( tidy_symbol *ref_sym;
-          (ref_sym = ht_iterator_next( &iter )) != NULL; ) {
+    ht_iterator_t it;
+    ht_iterator_init( &it, &sym->ref_sym_set );
+    for ( tidy_symbol *ref_sym; (ref_sym = ht_iterator_next( &it )) != NULL; )
       symbol_mark_used( ref_sym );
-    } // for
   }
 }
 
@@ -2593,10 +2591,10 @@ unsigned symbols_mark_used( void ) {
   ASSERT_RUN_ONCE();
   cxx_symbols_mark_adl_roots();
 
-  ht_iterator_t iter;
+  ht_iterator_t it;
 
-  ht_iterator_init( &iter, &tidy_symbol_set );
-  for ( tidy_symbol *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
+  ht_iterator_init( &it, &tidy_symbol_set );
+  for ( tidy_symbol *sym; (sym = ht_iterator_next( &it )) != NULL; ) {
     if ( sym->is_root && !sym->is_defined && !symbol_is_referenced( sym ) )
       sym->is_root = false;
     else if ( sym->is_root )
@@ -2604,8 +2602,8 @@ unsigned symbols_mark_used( void ) {
   } // for
 
   unsigned unused_count = 0;
-  ht_iterator_init( &iter, &tidy_symbol_set );
-  for ( tidy_symbol *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
+  ht_iterator_init( &it, &tidy_symbol_set );
+  for ( tidy_symbol *sym; (sym = ht_iterator_next( &it )) != NULL; ) {
     if ( sym->is_dead )
       continue;
     if ( sym->def_loc.path == NULL || symbol_in_unused_scope( sym ) )
@@ -2621,11 +2619,11 @@ unsigned symbols_print_undefined( void ) {
   if ( !print_undefined )
     return 0;
 
-  ht_iterator_t iter;
+  ht_iterator_t it;
   unsigned undefined_count = 0;
 
-  ht_iterator_init( &iter, &tidy_symbol_set );
-  for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
+  ht_iterator_init( &it, &tidy_symbol_set );
+  for ( tidy_symbol const *sym; (sym = ht_iterator_next( &it )) != NULL; ) {
     if ( symbol_is_undefined( sym ) )
       ++undefined_count;
   } // for
@@ -2635,8 +2633,8 @@ unsigned symbols_print_undefined( void ) {
   array_t symbol_array = ARRAY_INIT( sizeof(tidy_symbol) );
   array_reserve( &symbol_array, undefined_count );
 
-  ht_iterator_init( &iter, &tidy_symbol_set );
-  for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
+  ht_iterator_init( &it, &tidy_symbol_set );
+  for ( tidy_symbol const *sym; (sym = ht_iterator_next( &it )) != NULL; ) {
     if ( symbol_is_undefined( sym ) )
       *(tidy_symbol*)array_push_back( &symbol_array ) = *sym;
   } // for
@@ -2669,9 +2667,9 @@ void symbols_print_unused( unsigned unused_count ) {
   array_t symbol_array = ARRAY_INIT( sizeof(tidy_symbol) );
   array_reserve( &symbol_array, unused_count );
 
-  ht_iterator_t iter;
-  ht_iterator_init( &iter, &tidy_symbol_set );
-  for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
+  ht_iterator_t it;
+  ht_iterator_init( &it, &tidy_symbol_set );
+  for ( tidy_symbol const *sym; (sym = ht_iterator_next( &it )) != NULL; ) {
     if ( symbol_is_unused( sym ) )
       *(tidy_symbol*)array_push_back( &symbol_array ) = *sym;
   } // for
@@ -2701,11 +2699,11 @@ unsigned symbols_print_unneeded_external( void ) {
   if ( !print_unneeded_external )
     return 0;
 
-  ht_iterator_t iter;
+  ht_iterator_t it;
   unsigned unneeded_count = 0;
 
-  ht_iterator_init( &iter, &tidy_symbol_set );
-  for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
+  ht_iterator_init( &it, &tidy_symbol_set );
+  for ( tidy_symbol const *sym; (sym = ht_iterator_next( &it )) != NULL; ) {
     if ( symbol_is_unneeded_ext_link( sym ) )
       ++unneeded_count;
   } // for
@@ -2715,8 +2713,8 @@ unsigned symbols_print_unneeded_external( void ) {
   array_t symbol_array = ARRAY_INIT( sizeof(tidy_symbol) );
   array_reserve( &symbol_array, unneeded_count );
 
-  ht_iterator_init( &iter, &tidy_symbol_set );
-  for ( tidy_symbol const *sym; (sym = ht_iterator_next( &iter )) != NULL; ) {
+  ht_iterator_init( &it, &tidy_symbol_set );
+  for ( tidy_symbol const *sym; (sym = ht_iterator_next( &it )) != NULL; ) {
     if ( symbol_is_unneeded_ext_link( sym ) )
       *(tidy_symbol*)array_push_back( &symbol_array ) = *sym;
   } // for

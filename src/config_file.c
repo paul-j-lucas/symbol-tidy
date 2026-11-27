@@ -1019,10 +1019,10 @@ static void config_parse( char const *config_path, FILE *config_file ) {
       }
     }
 
-    toml_iterator iter;
-    toml_iterator_init( &iter, &table );
+    toml_iterator it;
+    toml_iterator_init( &it, &table );
     for ( toml_key_value const *kv;
-          (kv = toml_iterator_next( &iter )) != NULL; ) {
+          (kv = toml_iterator_next( &it )) != NULL; ) {
       config_key const *const found_key = config_key_find( kv->key.name );
       if ( found_key == NULL ) {
         print_file_error(
@@ -1174,10 +1174,10 @@ static void ignore_symbols_dump( void ) {
   array_t ignore_symbol_array = ARRAY_INIT( sizeof(ignore_symbol) );
   array_reserve( &ignore_symbol_array, ignore_symbol_set.size );
 
-  ht_iterator_t iter;
-  ht_iterator_init( &iter, &ignore_symbol_set );
+  ht_iterator_t it;
+  ht_iterator_init( &it, &ignore_symbol_set );
   for ( ignore_symbol const *igsym;
-        (igsym = ht_iterator_next( &iter )) != NULL; ) {
+        (igsym = ht_iterator_next( &it )) != NULL; ) {
     *(ignore_symbol*)array_push_back( &ignore_symbol_array ) = *igsym;
   } // for
 
@@ -1330,9 +1330,9 @@ static void root_symbols_dump( void ) {
   array_t root_symbol_array = ARRAY_INIT( sizeof(root_symbol) );
   array_reserve( &root_symbol_array, root_symbol_set.size );
 
-  ht_iterator_t iter;
-  ht_iterator_init( &iter, &root_symbol_set );
-  for ( root_symbol const *rsym; (rsym = ht_iterator_next( &iter )) != NULL; )
+  ht_iterator_t it;
+  ht_iterator_init( &it, &root_symbol_set );
+  for ( root_symbol const *rsym; (rsym = ht_iterator_next( &it )) != NULL; )
     *(root_symbol*)array_push_back( &root_symbol_array ) = *rsym;
 
   array_qsort(
