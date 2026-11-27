@@ -358,32 +358,6 @@ void verbose_print_cursor_impl( char const *label, CXCursor cursor ) {
 }
 // LCOV_EXCL_STOP
 
-#ifndef NDEBUG
-// LCOV_EXCL_START since this is used for debugging.
-void verbose_print_tokens( CXCursor cursor ) {
-  CXSourceRange const     range = tidy_getCursorExtent( cursor );
-  CXTranslationUnit const tu = clang_Cursor_getTranslationUnit( cursor );
-
-  CXToken *tokens;
-  unsigned tokens_len;
-  clang_tokenize( tu, range, &tokens, &tokens_len );
-
-  verbose_printf( "tokens: [\n" );
-  verbose_printf( "  " );
-  for ( unsigned i = 0; i < tokens_len; ++i ) {
-    CXString const    token_cxs = clang_getTokenSpelling( tu, tokens[i] );
-    char const *const token_cs = clang_getCString( token_cxs );
-    printf( "%s\"%s\"", i > 0 ? ", " : "", token_cs );
-    clang_disposeString( token_cxs );
-  }
-  putchar( '\n' );
-  verbose_printf( "]\n" );
-
-  clang_disposeTokens( tu, tokens, tokens_len );
-}
-// LCOV_EXCL_STOP
-#endif /* NDEBUG */
-
 int verbose_printf( char const *format, ... ) {
   PUTS( VERBOSE_PREFIX );
   va_list args;
@@ -412,6 +386,48 @@ void verbose_print_statistics( void (*print_fn)( verbose_stat_ctx* ) ) {
   freelocale( loc );
   // LCOV_EXCL_STOP
 }
+
+#ifndef NDEBUG
+// LCOV_EXCL_START since this is used for debugging.
+void verbose_print_tokens( CXCursor cursor ) {
+  CXSourceRange const     range = tidy_getCursorExtent( cursor );
+  CXTranslationUnit const tu = clang_Cursor_getTranslationUnit( cursor );
+
+  CXToken *tokens;
+  unsigned tokens_len;
+  clang_tokenize( tu, range, &tokens, &tokens_len );
+
+  verbose_printf( "tokens: [\n" );
+  verbose_printf( "  " );
+  for ( unsigned i = 0; i < tokens_len; ++i ) {
+    CXString const    token_cxs = clang_getTokenSpelling( tu, tokens[i] );
+    char const *const token_cs = clang_getCString( token_cxs );
+    printf( "%s\"%s\"", i > 0 ? ", " : "", token_cs );
+    clang_disposeString( token_cxs );
+  }
+  putchar( '\n' );
+  verbose_printf( "]\n" );
+
+  clang_disposeTokens( tu, tokens, tokens_len );
+}
+// LCOV_EXCL_STOP
+#endif /* NDEBUG */
+
+#ifndef NDEBUG
+// LCOV_EXCL_START since this is used for debugging.
+void verbose_print_type( CXType type ) {
+  CXString const    type_cxs = clang_getTypeSpelling( type );
+  char const *const type_cs = clang_getCString( type_cxs );
+  CXString const    kind_cxs = clang_getTypeKindSpelling( type.kind );
+  char const *const kind_cs = clang_getCString( kind_cxs );
+
+  verbose_printf( "%s (%s)\n", type_cs, kind_cs );
+
+  clang_disposeString( type_cxs );
+  clang_disposeString( kind_cxs );
+}
+// LCOV_EXCL_STOP
+#endif /* NDEBUG */
 
 // LCOV_EXCL_START
 void verbose_statf( verbose_stat_ctx *vsc, char const *format, ... ) {

@@ -108,7 +108,8 @@ ignore-symbols = [
 [verbose.h]
 ignore-symbols = [
   "VERBOSE_DEBUG_CURSOR",
-  "verbose_print_tokens"
+  "verbose_print_tokens",
+  "verbose_print_type"
 ]
 
 # vim:se et sw=2 ts=2:

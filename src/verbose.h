@@ -145,6 +145,15 @@ void verbose_print_cursor_impl( char const *label, CXCursor cursor );
 void verbose_print_tokens( CXCursor cursor );
 #endif /* NDEBUG */
 
+#ifndef NDEBUG
+/**
+ * Prints a type's "spelling" and its kind's "spelling."
+ *
+ * @param type The type to print.
+ */
+void verbose_print_type( CXType type );
+#endif /* NDEBUG */
+
 /**
  * Prints output preceeded by `"// tidy | "`.
  *
