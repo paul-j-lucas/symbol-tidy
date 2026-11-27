@@ -3,3 +3,8 @@ $ symbol-tidy -std=c++20 -Xtidy --directory=data -Xtidy --no-config-layers -Xtid
    19,24 | "unconstructed::unconstructed()"
 symbol-tidy: 1 unused symbol
 
+$ symbol-tidy -std=c++20 -Xtidy --directory=data -Xtidy --no-config-layers -Xtidy --no-config type_ctors_param-deep.cpp
+"type_ctors_param-deep.cpp": warning: unused symbols:
+   16,17 | "w_deep::w_deep()"
+symbol-tidy: 1 unused symbol
+
