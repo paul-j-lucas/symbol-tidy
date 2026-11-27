@@ -705,6 +705,31 @@ same as the
 .B \-\-no-forward
 command-line option.
 .TP
+.BI ignore-paths " \f1=\fP f" "\f1 | \fP[" f " \f1[,\fP " f "\f1]*\fP ]"
+The path
+(that is specified as a single path)
+or one or more paths
+(that are specified as a bracket-enclosed,
+comma-separated
+array of paths)
+are ignored.
+.IP
+This allows there to be files
+you don't control
+(third-party or generated)
+present and not check them for violations.
+For example,
+the
+.BR autoheader (1)
+generated \f(CWconfig.h\fP file
+should be ignored:
+.RS 5
+.cS
+[symbol-tidy]
+ignore-paths = "config.h"
+.cE 0
+.RE
+.TP
 .BI ignore-symbols " \f1=\fP s" "\f1 | \fP[" s " \f1[,\fP " s "\f1]*\fP ]"
 The symbol name
 (that is specified as a single string)
@@ -754,45 +779,18 @@ names may be fully qualified,
 e.g., \f(CWMyClass::size\fP.
 .TP
 .BI root-symbols-from " \f1=\fP f" "\f1 | \fP[" f " \f1[,\fP " f "\f1]*\fP ]"
-The file name
-(that is specified as a single path)
-or one or more file names
+For the path
+(that is specified as a single string)
+or one or more paths
 (that are specified as a bracket-enclosed,
 comma-separated
-array of paths)
+array of strings),
 all symbols declared in them are root symbols.
 .SS Source Tables
 This type of table specifies a source file,
 either a \f(CW.c\fP or \f(CW.cpp\fP
 file.
 .TP 6
-.BI ignore-as-argument " \f1=\fP b"
-If true,
-the file given for the table name
-is not checked for violations
-when given as
-.IR source-file .
-.IP
-This allows there to be files
-you don't control
-(third-party or generated)
-present and not check them for violations
-yet still use \f(CW*.c\fP with shell.
-(See
-.B Use with Make
-above.)
-For example,
-the
-.BR bison (1)
-generated \f(CWparser.c\fP
-should be ignored:
-.RS 5
-.cS
-[parser.c]
-ignore-as-argument = true
-.cE 0
-.RE
-.TP
 .BI ignore-extern " \f1=\fP b"
 Same as in the
 .BR "symbol-tidy Table" ,
