@@ -1,3 +1,12 @@
+2026-11-27  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
+
+   * symbol-tidy.toml, verbose.c, verbose.h: Added verbose_print_type().
+   * type_ctors_param-deep.cpp, type_ctors_param.out, type_ctors_param.test:
+     Another cxx_type_ctors_param test.
+   * clang_util.c, clang_util.h, cxx_symbol.c, test/Makefile.am,
+     type_ctors_param.cpp, type_ctors_param.out, type_ctors_param.test: Fixed
+     cxx_type_ctors_param.
+
 2026-11-26  Paul J. Lucas <7366785+paul-j-lucas@users.noreply.github.com>
 
    * test/Makefile.am, member_by_name.cpp, member_by_name.out,
