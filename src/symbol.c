@@ -1893,7 +1893,7 @@ static void visit_CXXForRangeStmt( CXCursor range_stmt_csr,
   if ( clang_Cursor_isNull( svd->cxx_for_range.begin_csr ) ||
        clang_Cursor_isNull( svd->cxx_for_range.end_csr ) ) {
     svd->cxx_for_range.begin_csr = clang_getNullCursor();
-    svd->cxx_for_range.end_csr = clang_getNullCursor();
+    svd->cxx_for_range.end_csr = svd->cxx_for_range.begin_csr;
 
     CXCursor scope_csr = clang_getCursorSemanticParent( cls_csr );
     while ( !tidy_Cursor_isInvalid( scope_csr ) ) {
