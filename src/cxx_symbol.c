@@ -709,8 +709,12 @@ static bool cxx_type_ctors_param( CXType type, char const *find_param_name,
   decl_csr = clang_getTypeDeclaration( type );
   enum CXCursorKind kind = clang_getCursorKind( decl_csr );
 
-  if ( kind == CXCursor_TemplateTypeParameter )
-    return tidy_Cursor_isSpellingEqualTo( decl_csr, find_param_name );
+  //
+  // libclang has no declaration for a template type parameter, so compare the
+  // type's spelling to the parameter's name instead.
+  //
+  if ( type.kind == CXType_Unexposed && clang_isInvalid( kind ) )
+    return tidy_Type_isSpellingEqualTo( type, find_param_name );
 
   int const num_args = clang_Type_getNumTemplateArguments( type );
   for ( int i = 0; i < num_args; ++i ) {

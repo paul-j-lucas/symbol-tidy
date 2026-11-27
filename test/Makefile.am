@@ -83,6 +83,7 @@ TESTS+=	tests/auto_delete_pool.test \
 	tests/template-adl.test \
 	tests/template-ctor.test \
 	tests/template-omanip.test \
+	tests/type_ctors_param.test \
 	tests/unique_ptr.test
 
 # Miscellaneous tests.

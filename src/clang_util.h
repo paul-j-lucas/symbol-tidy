@@ -854,6 +854,16 @@ NODISCARD
 CXType tidy_Type_getUnderlyingType( CXType type );
 
 /**
+ * Gets whether the spelling of \a type equals \a value.
+ *
+ * @param type The type to compare.
+ * @param value The value to compare against.
+ * @return Returns `true` only if the spelling of \a type equals \a value.
+ */
+NODISCARD
+bool tidy_Type_isSpellingEqualTo( CXType type, char const *value );
+
+/**
  * Similar to `clang_visitChildren()`, but visits the children of the class
  * definition cursor of \a cursor.
  *

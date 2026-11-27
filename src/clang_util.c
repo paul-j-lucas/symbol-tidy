@@ -1564,6 +1564,17 @@ CXType tidy_Type_getUnderlyingType( CXType type ) {
   return type;
 }
 
+bool tidy_Type_isSpellingEqualTo( CXType type, char const *value ) {
+  assert( value != NULL );
+
+  CXString const    cxs = clang_getTypeSpelling( type );
+  char const *const cs = empty_if_null( clang_getCString( cxs ) );
+  int const         cmp = strcmp( cs, value );
+
+  clang_disposeString( cxs );
+  return cmp == 0;
+}
+
 unsigned tidy_visitClassChildren( CXCursor cls_csr, CXCursorVisitor visitor,
                                   CXClientData data ) {
   assert( tidy_Cursor_isClassDecl( cls_csr ) );
