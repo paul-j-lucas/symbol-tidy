@@ -1313,10 +1313,10 @@ toml_value const* toml_table_find( toml_table const *table, char const *key ) {
   assert( key != NULL );
 
   toml_key_value const kv = { .key = { .name = key } };
-  ht_entry_t const *const found_ht = ht_table_find( &table->keys_values, &kv );
-  if ( found_ht == NULL )
+  ht_entry_t const *const entry = ht_table_find( &table->keys_values, &kv );
+  if ( entry == NULL )
     return NULL;
-  toml_key_value const *const found_kv = HT_DINT( found_ht );
+  toml_key_value const *const found_kv = HT_DINT( entry );
   return &found_kv->value;
 }
 

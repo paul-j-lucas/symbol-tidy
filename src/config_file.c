@@ -1511,7 +1511,8 @@ void config_init( void ) {
 bool config_path_is_ignored( char const *path ) {
   assert( path != NULL );
   path = path_no_dot_slash( path );
-  return ht_table_find( &ignore_path_set, path ) != NULL;
+  ht_entry_t const *const entry = ht_table_find( &ignore_path_set, path );
+  return entry != NULL;
 }
 
 bool config_symbol_is_ignored( char const *sym_name, char const *sym_path ) {
@@ -1520,20 +1521,19 @@ bool config_symbol_is_ignored( char const *sym_name, char const *sym_path ) {
     .name = sym_name,
     .path = path_no_dot_slash( sym_path )
   };
-  ht_entry_t const *found_igsym =
-    ht_table_find( &ignore_symbol_set, &find_igsym );
+  ht_entry_t const *entry = ht_table_find( &ignore_symbol_set, &find_igsym );
 
-  if ( found_igsym == NULL ) {
+  if ( entry == NULL ) {
     // Second, if the name is qualified, try looking for its unqualified name.
     char const *const unqual_name = cxx_unqual_name( sym_name );
     if ( unqual_name == sym_name )
       return false;
     find_igsym.name = unqual_name;
     find_igsym.in_any_cxx_scope = true;
-    found_igsym = ht_table_find( &ignore_symbol_set, &find_igsym );
+    entry = ht_table_find( &ignore_symbol_set, &find_igsym );
   }
 
-  return found_igsym != NULL;
+  return entry != NULL;
 }
 
 bool config_symbol_is_root( char const *sym_name, char const *sym_path ) {
@@ -1542,15 +1542,15 @@ bool config_symbol_is_root( char const *sym_name, char const *sym_path ) {
     .name = sym_name,
     .path = path_no_dot_slash( sym_path )
   };
-  ht_entry_t const *found_rsym = ht_table_find( &root_symbol_set, &find_rsym );
+  ht_entry_t const *entry = ht_table_find( &root_symbol_set, &find_rsym );
 
-  if ( found_rsym == NULL ) {
+  if ( entry == NULL ) {
     // Second, see if the symbol's path is a root-symbols-from path.
     find_rsym.name = NULL;
-    found_rsym = ht_table_find( &root_symbol_set, &find_rsym );
+    entry = ht_table_find( &root_symbol_set, &find_rsym );
   }
 
-  return found_rsym != NULL;
+  return entry != NULL;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

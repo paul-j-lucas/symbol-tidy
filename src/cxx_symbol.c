@@ -1275,13 +1275,15 @@ void cxx_symbols_mark_adl_roots( void ) {
       continue;
 
     char const *const unqual_name = cxx_unqual_name( sym->name );
-    if ( ht_table_find( &cxx_adl_name_set, unqual_name ) == NULL )
+    ht_entry_t const *entry = ht_table_find( &cxx_adl_name_set, unqual_name );
+    if ( entry == NULL )
       continue;
 
     ht_iterator_t usr_it;
     ht_iterator_init( &usr_it, &sym->cxx_adl_usr_set );
     for ( char const *usr; (usr = ht_iterator_next( &usr_it )) != NULL; ) {
-      if ( ht_table_find( &cxx_adl_type_set, usr ) != NULL ) {
+      entry = ht_table_find( &cxx_adl_type_set, usr );
+      if ( entry != NULL ) {
         sym->is_root = true;
         break;
       }

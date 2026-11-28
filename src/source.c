@@ -356,8 +356,8 @@ bool is_source_path( char const *path ) {
   if ( null_or_empty( path ) )
     return false;                       // LCOV_EXCL_LINE
   path = path_no_dot_slash( path );
-  ht_entry_t const *const found_ht = ht_table_find( &source_path_set, path );
-  return found_ht != NULL;
+  ht_entry_t const *const entry = ht_table_find( &source_path_set, path );
+  return entry != NULL;
 }
 
 void source_cleanup( tidy_source *source ) {
