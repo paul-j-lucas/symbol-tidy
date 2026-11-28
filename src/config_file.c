@@ -1516,6 +1516,9 @@ bool config_path_is_ignored( char const *path ) {
 }
 
 bool config_symbol_is_ignored( char const *sym_name, char const *sym_path ) {
+  assert( sym_name != NULL );
+  assert( sym_path != NULL );
+
   // First, try looking for the name as-is.
   ignore_symbol find_igsym = {
     .name = sym_name,
