@@ -326,9 +326,9 @@ static config_key const CONFIG_KEYS[] = {
  * Strings for table kinds.
  */
 static char const *const TABLE_KINDS[] = {
-  [ TABLE_SYMBOL_TIDY ]     = TABLE_SYMBOL_TIDY_NAME,
-  [ TABLE_SOURCE ]          = "source",
-  [ TABLE_SYMBOL ]          = "symbol",
+  [ TABLE_SYMBOL_TIDY ]                 = TABLE_SYMBOL_TIDY_NAME,
+  [ TABLE_SOURCE ]                      = "source",
+  [ TABLE_SYMBOL ]                      = "symbol",
   [ TABLE_SYMBOL_TIDY | TABLE_SOURCE ]  = TABLE_SYMBOL_TIDY_NAME " or source",
   [ TABLE_SYMBOL_TIDY | TABLE_SYMBOL ]  = TABLE_SYMBOL_TIDY_NAME " or symbol",
 };
