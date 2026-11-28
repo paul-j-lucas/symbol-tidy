@@ -81,15 +81,13 @@ char const* cxx_unqual_name( char const *name ) {
   char const *unqual_name = name;
 
   while ( *name != '\0' ) {
-    if ( name[0] != ':' ) {
-      ++name;
-    }
-    else if ( name[1] == ':' ) {
+    if ( name[0] == ':' && name[1] == ':' ) {
       name += 2;
       unqual_name = name;
     }
-    else
+    else {
       ++name;
+    }
   } // while
 
   return unqual_name;
