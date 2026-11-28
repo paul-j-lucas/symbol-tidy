@@ -93,8 +93,6 @@ enum config_table_kind {
 
 /// @cond DOXYGEN_IGNORE
 #define TABLE_ANY                 STATIC_CAST( config_table_kind, ~0 )
-#define TABLE_TIDY_OR_SOURCE      (TABLE_SYMBOL_TIDY | TABLE_SOURCE)
-#define TABLE_TIDY_OR_SYMBOL      (TABLE_SYMBOL_TIDY | TABLE_SYMBOL)
 /// @endcond
 
 ////////// typedefs ///////////////////////////////////////////////////////////
@@ -253,25 +251,75 @@ static void   toml_value_print( toml_value const*, FILE* );
  * Configuration keys.
  */
 static config_key const CONFIG_KEYS[] = {
-  { "color",                    TABLE_SYMBOL_TIDY,    &color_parse            },
-  { "error",                    TABLE_SYMBOL_TIDY,    &error_parse            },
-  { "ignore-cxx-copy-assigns",  TABLE_TIDY_OR_SYMBOL,
-                                &ignore_cxx_copy_assigns_parse                },
-  { "ignore-cxx-copy-ctors",    TABLE_TIDY_OR_SYMBOL,
-                                &ignore_cxx_copy_ctors_parse                  },
-  { "ignore-cxx-move-assigns",  TABLE_TIDY_OR_SYMBOL,
-                                &ignore_cxx_move_assigns_parse                },
-  { "ignore-cxx-move-ctors",    TABLE_TIDY_OR_SYMBOL,
-                                &ignore_cxx_move_ctors_parse                  },
-  { "ignore-extern",            TABLE_ANY,            &ignore_extern_parse    },
-  { "ignore-forward",           TABLE_ANY,            &ignore_forward_parse   },
-  { "ignore-undefined",         TABLE_ANY,            &ignore_undefined_parse },
-  { "ignore-paths",             TABLE_SYMBOL_TIDY,    &ignore_paths_parse     },
-  { "ignore-symbols",           TABLE_TIDY_OR_SOURCE, &ignore_symbols_parse   },
-  { "ignore-unused",            TABLE_ANY,            &ignore_unused_parse    },
-  { "root-symbols",             TABLE_TIDY_OR_SOURCE, &root_symbols_parse     },
-  { "root-symbols-from",        TABLE_SYMBOL_TIDY,
-                                &root_symbols_from_parse                      },
+  { "color",
+    TABLE_SYMBOL_TIDY,
+    &color_parse
+  },
+
+  { "error",
+    TABLE_SYMBOL_TIDY,
+    &error_parse
+  },
+
+  { "ignore-cxx-copy-assigns",
+    TABLE_SYMBOL_TIDY | TABLE_SYMBOL,
+    &ignore_cxx_copy_assigns_parse
+  },
+
+  { "ignore-cxx-copy-ctors",
+    TABLE_SYMBOL_TIDY | TABLE_SYMBOL,
+    &ignore_cxx_copy_ctors_parse
+  },
+
+  { "ignore-cxx-move-assigns",
+    TABLE_SYMBOL_TIDY | TABLE_SYMBOL,
+    &ignore_cxx_move_assigns_parse
+  },
+
+  { "ignore-cxx-move-ctors",
+    TABLE_SYMBOL_TIDY | TABLE_SYMBOL,
+    &ignore_cxx_move_ctors_parse
+  },
+
+  { "ignore-extern",
+    TABLE_ANY,
+    &ignore_extern_parse
+  },
+
+  { "ignore-forward",
+    TABLE_ANY,
+    &ignore_forward_parse
+  },
+
+  { "ignore-undefined",
+    TABLE_ANY,
+    &ignore_undefined_parse
+  },
+
+  { "ignore-paths",
+    TABLE_SYMBOL_TIDY,
+    &ignore_paths_parse
+  },
+
+  { "ignore-symbols",
+    TABLE_SYMBOL_TIDY | TABLE_SOURCE,
+    &ignore_symbols_parse
+  },
+
+  { "ignore-unused",
+    TABLE_ANY,
+    &ignore_unused_parse
+  },
+
+  { "root-symbols",
+    TABLE_SYMBOL_TIDY | TABLE_SOURCE,
+    &root_symbols_parse
+  },
+
+  { "root-symbols-from",
+    TABLE_SYMBOL_TIDY,
+    &root_symbols_from_parse
+  },
 };
 
 /**
@@ -281,8 +329,8 @@ static char const *const TABLE_KINDS[] = {
   [ TABLE_SYMBOL_TIDY ]     = TABLE_SYMBOL_TIDY_NAME,
   [ TABLE_SOURCE ]          = "source",
   [ TABLE_SYMBOL ]          = "symbol",
-  [ TABLE_TIDY_OR_SOURCE ]  = TABLE_SYMBOL_TIDY_NAME " or source",
-  [ TABLE_TIDY_OR_SYMBOL ]  = TABLE_SYMBOL_TIDY_NAME " or symbol",
+  [ TABLE_SYMBOL_TIDY | TABLE_SOURCE ]  = TABLE_SYMBOL_TIDY_NAME " or source",
+  [ TABLE_SYMBOL_TIDY | TABLE_SYMBOL ]  = TABLE_SYMBOL_TIDY_NAME " or symbol",
 };
 
 ////////// local variables ////////////////////////////////////////////////////
